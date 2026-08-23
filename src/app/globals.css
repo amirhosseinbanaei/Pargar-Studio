@@ -1,0 +1,265 @@
+/* ==========================================================================
+   KAVAN STUDIO — the token layer.
+
+   Ported verbatim in value from `legacy/css/tokens.css`. Every token below has
+   the same name and the same value it had on the static site, because the
+   legacy shell CSS (`legacy/css/shell.css`, `legacy/css/panel.css`) references
+   them BY NAME and is carried over intact in prompt 4 rather than rewritten as
+   utilities.
+
+   DECLARED TWICE, ON PURPOSE (see AGENTS.md):
+     - `@theme` — so Tailwind v4 generates utilities (`bg-s-0`, `text-a-1`,
+       `tracking-wide-kavan`) for the prompt-6 dashboard, which is built with
+       utilities.
+     - `:root` — the raw custom properties the ported shell CSS reads. Tailwind's
+       `@theme` also emits `:root` variables, but only under namespaces it knows;
+       the fluid `--fs-*` clamps, the shell geometry, the durations and the layer
+       scale are in no Tailwind namespace and would otherwise simply vanish.
+
+   A colour literal in a component is a value no rebrand can reach. If a token is
+   genuinely missing, add it HERE — never inline the hex.
+   ========================================================================== */
+
+@import 'tailwindcss';
+
+/* This app is dark-only by design — the canvas is #0c0b0a and there is no light
+   theme to switch to. The variant is still declared so that `dark:` means "the
+   class on <html>" rather than the OS media query, which a toggle cannot
+   override; without it, adding a light dashboard theme later would fight the OS
+   setting instead of the markup. */
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Tailwind utility namespaces. `--color-a-1` -> `bg-a-1` / `text-a-1`,
+   `--text-fs-xl` -> `text-fs-xl`, and so on. Only the tokens the dashboard
+   composes as utilities need to be here; the `:root` block below is the
+   complete set.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* surface ramp (near-black -> raised) */
+  --color-s-0: #0c0b0a;
+  --color-s-1: #121010;
+  --color-s-2: #171513;
+  --color-s-3: #1e1a17;
+  --color-s-4: #262119;
+
+  /* text ramp */
+  --color-t-hi: #f4efe7;
+  --color-t-md: #a9a29a;
+  --color-t-lo: #6f6862;
+  --color-t-xlo: #45403c;
+
+  /* accent */
+  --color-a-1: #e3cfa3;
+  --color-a-2: #a8743f;
+  --color-a-glow: rgba(227, 207, 163, 0.14);
+
+  /* hairlines — usable as `border-rule`, `bg-rule-hi` */
+  --color-rule: rgba(244, 239, 231, 0.09);
+  --color-rule-md: rgba(244, 239, 231, 0.16);
+  --color-rule-hi: rgba(244, 239, 231, 0.34);
+
+  /* Type families. These DO deliberately shadow Tailwind's defaults — replacing
+     `--font-sans` is how a v4 app sets its own font, and `font-sans` should mean
+     this stack everywhere. Zero webfont bytes: no next/font, no CDN font CSS,
+     so there is no FOIT and no CLS. */
+  --font-sans:
+    'Futura', 'Avenir Next', 'Avenir', 'Century Gothic', 'URW Gothic', 'Questrial', ui-sans-serif,
+    system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, ui-serif, serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+
+  /* Fluid type scale — 360px -> 1600px viewport. Named `fs-*` rather than
+     overriding `--text-xs` / `--text-lg`: Tailwind's defaults pair a size WITH a
+     line-height, and redefining one with a bare clamp silently drops the
+     line-height half, so every heading loses its leading with no error anywhere.
+     `text-fs-xl` is unambiguous and maps 1:1 onto the `--fs-xl` the shell CSS
+     reads. */
+  --text-fs-xs: clamp(0.594rem, 0.55rem + 0.19vw, 0.688rem);
+  --text-fs-sm: clamp(0.688rem, 0.64rem + 0.21vw, 0.781rem);
+  --text-fs-md: clamp(0.781rem, 0.73rem + 0.23vw, 0.875rem);
+  --text-fs-lg: clamp(0.938rem, 0.86rem + 0.34vw, 1.125rem);
+  --text-fs-xl: clamp(1.125rem, 0.98rem + 0.64vw, 1.5rem);
+  --text-fs-2xl: clamp(1.5rem, 1.19rem + 1.36vw, 2.25rem);
+  --text-fs-3xl: clamp(2rem, 1.44rem + 2.5vw, 3.5rem);
+
+  /* Tracking — the wide uppercase is the signature of this design. Suffixed
+     because Tailwind's own `tracking-wide` is 0.025em, an order of magnitude
+     tighter; shadowing it would make an already-familiar utility mean something
+     wildly different, and nothing would report the change. */
+  --tracking-wide-kavan: 0.42em;
+  --tracking-mid-kavan: 0.24em;
+  --tracking-tight-kavan: 0.12em;
+  --tracking-flat-kavan: 0.02em;
+
+  /* Motion easings. `expo` / `quint` are new names; `out` / `in` / `inout` are
+     suffixed rather than shadowing Tailwind's `ease-out` / `ease-in`, so an
+     author who types the familiar name still gets the familiar curve and has to
+     ask for this one deliberately. */
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout-kavan: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --ease-out-kavan: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-kavan: cubic-bezier(0.55, 0, 1, 0.45);
+
+  /* The ten-step `--sp-*` ramp is deliberately NOT mirrored into a Tailwind
+     namespace. Its values (0.25 0.5 0.75 1 1.5 2 3 4 6 8rem) are every one
+     already reachable on Tailwind's default 0.25rem multiplier — p-1 p-2 p-3
+     p-4 p-6 p-8 p-12 p-16 p-24 p-32 — so mirroring it would buy nothing and
+     would redefine what `p-5` means for every author who already knows it. The
+     raw `--sp-*` names live in `:root` below, which is where the ported shell
+     CSS reads them.
+
+     Durations (`--d-*`) stay `:root`-only for a stronger reason: Tailwind has no
+     duration theme namespace, and the reduced-motion override at the bottom of
+     this file has to reach them as plain custom properties. Compose them as
+     `duration-[var(--d-sm)]`, which keeps that collapse working. */
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   The raw custom properties, exactly as `legacy/css/tokens.css` declares them.
+   The ported shell CSS reads these names, so do not rename one here without
+   changing it in `legacy/css/` first — and prompt 7 deletes `legacy/` only once
+   nothing reads from it any more.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* ---- surface ramp (near-black -> raised) ---------------------------- */
+  --s-0: #0c0b0a; /* page canvas                                        */
+  --s-1: #121010; /* column rest state                                  */
+  --s-2: #171513; /* raised / hovered                                   */
+  --s-3: #1e1a17; /* cards, wells                                       */
+  --s-4: #262119; /* input, active well                                 */
+
+  /* ---- text ramp ------------------------------------------------------ */
+  --t-hi: #f4efe7; /* titles at full attention        ~15.9:1 on --s-0   */
+  --t-md: #a9a29a; /* resting titles, body            ~6.8:1             */
+  --t-lo: #6f6862; /* metadata, captions              ~3.2:1 (large only)*/
+  --t-xlo: #45403c; /* disabled, decorative                              */
+
+  /* ---- accent --------------------------------------------------------- */
+  --a-1: #e3cfa3; /* champagne — marks, active, focus  ~11.4:1          */
+  --a-2: #a8743f; /* burnt amber — secondary, hover                     */
+  --a-glow: rgba(227, 207, 163, 0.14);
+
+  /* ---- hairlines ------------------------------------------------------ */
+  --rule: rgba(244, 239, 231, 0.09);
+  --rule-md: rgba(244, 239, 231, 0.16);
+  --rule-hi: rgba(244, 239, 231, 0.34);
+
+  /* ---- type ----------------------------------------------------------- */
+  /* Geometric sans first — Futura/Avenir ship with macOS, Century Gothic
+     with Windows. No webfont request means no FOIT, no CLS, instant paint. */
+  --f-sans:
+    'Futura', 'Avenir Next', 'Avenir', 'Century Gothic', 'URW Gothic', 'Questrial', ui-sans-serif,
+    system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, ui-serif, serif;
+  --f-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+
+  /* fluid scale — 360px -> 1600px viewport */
+  --fs-xs: clamp(0.594rem, 0.55rem + 0.19vw, 0.688rem);
+  --fs-sm: clamp(0.688rem, 0.64rem + 0.21vw, 0.781rem);
+  --fs-md: clamp(0.781rem, 0.73rem + 0.23vw, 0.875rem);
+  --fs-lg: clamp(0.938rem, 0.86rem + 0.34vw, 1.125rem);
+  --fs-xl: clamp(1.125rem, 0.98rem + 0.64vw, 1.5rem);
+  --fs-2xl: clamp(1.5rem, 1.19rem + 1.36vw, 2.25rem);
+  --fs-3xl: clamp(2rem, 1.44rem + 2.5vw, 3.5rem);
+
+  /* tracking — the wide uppercase is the signature of this design */
+  --tr-wide: 0.42em;
+  --tr-mid: 0.24em;
+  --tr-tight: 0.12em;
+  --tr-flat: 0.02em;
+
+  /* ---- spacing (4px base) --------------------------------------------- */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+  --sp-9: 6rem;
+  --sp-10: 8rem;
+
+  /* ---- shell geometry -------------------------------------------------- */
+  --head-h: 4.5rem;
+  --foot-h: 3rem;
+  --gutter: clamp(1rem, 3.2vw, 3.5rem);
+  --nav-w: 21vw; /* left pane of an opened panel */
+  --nav-w-min: 15rem;
+
+  /* ---- motion ---------------------------------------------------------- */
+  /* expo-out: the reference used anime's easeOutExpo. This bezier is a
+     faithful stand-in and is compositor-friendly. */
+  --e-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --e-inout: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --e-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --e-in: cubic-bezier(0.55, 0, 1, 0.45);
+
+  --d-xs: 180ms;
+  --d-sm: 320ms;
+  --d-md: 560ms;
+  --d-lg: 820ms;
+  --d-xl: 1150ms;
+
+  /* ---- layers ---------------------------------------------------------- */
+  --z-art: 0;
+  --z-rule: 5;
+  --z-title: 10;
+  --z-panel: 20;
+  --z-head: 40;
+  --z-wipe: 60;
+  --z-preload: 80;
+  --z-cursor: 100;
+}
+
+/* Coarse pointers get no custom cursor and slightly tighter tracking. */
+@media (pointer: coarse) {
+  :root {
+    --tr-wide: 0.3em;
+    --head-h: 3.75rem;
+  }
+}
+
+/* Load-bearing for accessibility, not decoration. Every duration collapses to
+   1ms so the shell's sweeps and reveals still RUN — and still fire their
+   completion callbacks — without animating. Removing the animations outright
+   would strand elements in their pre-animation state, which is how a
+   reduced-motion visitor ends up on a blank page. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --d-xs: 1ms;
+    --d-sm: 1ms;
+    --d-md: 1ms;
+    --d-lg: 1ms;
+    --d-xl: 1ms;
+  }
+}
+
+/* `@source inline(...)` belongs here and is deliberately absent for now: v4's
+   scanner reads source TEXT, so any class composed at runtime (by a `prefix()`
+   helper, by a `data-[state=…]` selector a headless primitive sets, by string
+   concatenation) is never generated and its style is simply missing — in the
+   production build only. No component exists yet to compose one. Prompt 3
+   enumerates every dynamic state class its primitives emit here, and verifies by
+   grepping the built CSS in `.next/static/css/`. */
+
+/* The canvas. Declared here rather than on a component so the background is
+   painted before any React code runs — the original site does the same with an
+   inline <style> in the document head. */
+html {
+  background: var(--s-0);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--s-0);
+  color: var(--t-md);
+  font-family: var(--f-sans);
+  -webkit-font-smoothing: antialiased;
+}
