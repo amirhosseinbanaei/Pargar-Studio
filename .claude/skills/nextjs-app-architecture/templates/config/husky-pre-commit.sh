@@ -1,0 +1,11 @@
+# Target path in a real project: <repo-root>/.husky/pre-commit
+#
+# Husky v9+ hook files are PLAIN SHELL: no shebang, no `. "$(dirname "$0")/_/husky.sh"`
+# preamble. The old preamble now prints a deprecation warning on every commit.
+#
+# Formats and autofixes STAGED FILES ONLY (see the `lint-staged` block in
+# package.scripts.json). Fast by design — a pre-commit hook that takes 30 seconds is a
+# pre-commit hook people bypass with `--no-verify`, and a bypassed hook is no gate at all.
+#
+# This is NOT a substitute for `npm run lint`: it sees only what you staged.
+npx lint-staged

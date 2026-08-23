@@ -1,0 +1,34 @@
+# Target path in a real project: <repo-root>/.dockerignore
+#
+# Without this file the build context includes your laptop's node_modules and .next —
+# slow to upload, and it can poison the image with host-built native modules that then
+# crash only in the container.
+
+node_modules
+.next
+out
+coverage
+storybook-static
+
+.git
+.gitignore
+
+# Not needed inside the image, and changing them would bust the build cache for nothing.
+Dockerfile
+.dockerignore
+compose.yaml
+.github
+
+*.log
+
+# Real env files are EXCLUDED and the example is kept. Secrets belong in the
+# orchestrator's environment, never baked into an image layer — `docker history` reads a
+# layer's build args and copied files straight back out.
+.env
+.env.*
+!.env.example
+
+.vscode
+.idea
+.DS_Store
+*.md
