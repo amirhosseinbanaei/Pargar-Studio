@@ -1,0 +1,17 @@
+# The original static site, kept byte-for-byte until prompt 7 deletes it. Formatting it
+# would rewrite files that are the reference record of how the site worked.
+legacy/
+
+# Generated
+.next/
+node_modules/
+package-lock.json
+next-env.d.ts
+
+# Prompt artifacts — documents, not source.
+prompts/
+
+
+# The architecture skill's own reference guides and templates. `npm run format` would
+# rewrite documentation this repo does not own, and the reformat is pure diff noise.
+.claude/
