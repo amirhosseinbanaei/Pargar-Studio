@@ -1,0 +1,55 @@
+# Target path in a real project: <repo-root>/compose.yaml
+#
+# Local full-stack composition. The one idea to take from this file:
+# THE BROWSER-FACING URL AND THE CONTAINER-INTERNAL URL ARE TWO DIFFERENT VALUES, AND
+# BOTH ARE NEEDED. The browser resolves `localhost`; the web container resolves the
+# service name over the compose network. Collapsing them into one variable breaks
+# whichever side you did not test — almost always server-side fetching, which then fails
+# only in the container and never in `npm run dev`.
+
+services:
+  # Example backend. Replace with your API's image or build, or delete this service and
+  # its `depends_on` entry when the API lives elsewhere.
+  api:
+    image: ${API_IMAGE}
+    expose: ['8000']
+    networks: [app]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # BUILD TIME — inlined into the client bundle, so these must be reachable FROM THE
+        # BROWSER, not from inside the compose network. See the box in the Dockerfile.
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+    depends_on: [api]
+    restart: unless-stopped
+
+    # Published port. Behind a shared reverse proxy, replace `ports:` with
+    # `expose: ['3000']` and attach that proxy's external network instead — publishing a
+    # port that only the proxy should reach exposes the app directly to the host.
+    ports: ['3000:3000']
+
+    # RUNTIME, server-only values (secrets, internal URLs). Never committed; see env.example.
+    env_file: [.env.local]
+
+    environment:
+      NODE_ENV: production
+      # Server-side fetches go container-to-container over the compose network, NOT
+      # through the browser-facing URL above.
+      INTERNAL_API_URL: http://api:8000/api/v1
+
+    # PID 1 reaper: without it, signals never reach Node, so `docker stop` waits out its
+    # full 10-second timeout on every single deploy and in-flight requests are killed.
+    init: true
+
+    # Cheap and belongs on every service: blocks setuid escalation inside the container.
+    security_opt: ['no-new-privileges:true']
+
+    networks: [app]
+
+networks:
+  app:

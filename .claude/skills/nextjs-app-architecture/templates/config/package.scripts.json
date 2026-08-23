@@ -1,0 +1,83 @@
+// Target path in a real project: <repo-root>/package.json — merge the two blocks below
+// into the existing file (do NOT copy this file in as-is).
+//
+// package.json is STRICT JSON — strip every comment in this file when you paste.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// WHY THE SCRIPT NAMES ARE FIXED
+// An agent (or a new teammate, or a runbook, or a CI template) that lands in an
+// unfamiliar repo in this architecture must be able to type `npm run typecheck`
+// and have it work WITHOUT reading package.json first. That property is the entire
+// value, and it is destroyed by one repo that calls it `check`. Rename nothing.
+// If you want extra verbs, ADD aliases; never repurpose a canonical name.
+//
+// THE GATE, in this order — cheapest signal first:
+//   npm run typecheck   types
+//   npm run lint        rules and boundaries
+//   npm run build       the compiler's own view: server/client boundary, prerender
+//   npm run test        behavior
+// All four pass, or the change is not done. `build` stays in the gate even after a
+// green typecheck because `tsc` knows nothing about the server/client boundary: a
+// server-only module pulled into a client bundle, a missing 'use client', or a
+// prerender that throws are build-only failures — and they are the ones that reach
+// production.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  "scripts": {
+    // Dev server. Keep it flag-free so nobody has to remember anything. If you must pin
+    // a port, pin it HERE (`next dev -p 4000`) so `npm run dev` stays the only command.
+    // Next.js 16: Turbopack is the default for dev AND build — REMOVE any `--turbopack`
+    // flag; it is noise, and a stray webpack config now fails the build unless you opt
+    // out explicitly with `--webpack`. On 15.x, opt IN with `next dev --turbopack`.
+    "dev": "next dev",
+
+    "build": "next build",
+
+    // `-H 0.0.0.0` so a container or a LAN device can reach it. The default binding is
+    // loopback: the server starts, looks healthy, and refuses every external connection.
+    "start": "next start -H 0.0.0.0",
+
+    // Never the framework's own lint wrapper: `next lint` was REMOVED in Next.js 16, and
+    // `next build` does not run ESLint on any version. If the build is your only lint
+    // step, you are shipping unlinted code while believing otherwise.
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+
+    // The single source of type truth. The dev server transpiles per file and never
+    // checks the graph, so "it runs" proves nothing about types.
+    "typecheck": "tsc --noEmit",
+
+    // Generated route types. Must run before `typecheck` on a clean checkout — the types
+    // do not exist yet, and `tsc` reports confident nonsense about your page props.
+    "typegen": "next typegen",
+
+    // `--passWithNoTests` keeps ONE gate command valid in every package and branch,
+    // including ones that legitimately have no tests yet, so CI never special-cases them.
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+
+    "format": "prettier --write .",
+    // Read-only variant, safe to run in CI without producing a dirty tree.
+    "format:check": "prettier --check .",
+
+    // Component workshop. Drop both if the project has no design system. `build-storybook`
+    // is a real gate step: it compiles every story, catching components that no current
+    // route happens to render.
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+
+    // Installs the git hooks on `npm install`. This is what makes hooks self-installing:
+    // without it, hooks exist only on the machine of whoever set them up.
+    "prepare": "husky"
+  },
+
+  // Pre-commit formatting, run on STAGED FILES ONLY — a fast pre-flight, never a
+  // substitute for `npm run lint`.
+  // Order inside each array matters: `eslint --fix` first (its autofixes are not
+  // formatting-aware), then `prettier --write` to normalize the result. Reverse them and
+  // every commit lands slightly mis-formatted, so the next person's diff is whitespace.
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{js,mjs,cjs,json,css,md}": ["prettier --write"]
+  }
+}

@@ -1,0 +1,13 @@
+# Target path in a real project: <repo-root>/.husky/pre-push
+#
+# The local half of the merge gate. `&&` chaining is intentional: stop at the first
+# failure so the output shows one cause, not four cascading ones.
+#
+# `build` is deliberately OMITTED here — it is by far the slowest step, and CI runs it on
+# every push anyway. The trade: catch the cheap failures in seconds locally, let the
+# expensive one run in parallel remotely. Everything else stays, because a lint or type
+# failure that reaches CI costs ten minutes to learn what ten seconds would have told you.
+#
+# `--no-verify` on push is banned in this architecture. The gate you skip is the one that
+# would have caught it. If the hook itself is wrong, fix the hook.
+npm run typecheck && npm run lint && npm run test

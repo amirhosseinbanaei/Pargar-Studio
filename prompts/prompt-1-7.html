@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kavan Studio Next.js migration — prompts 1–7</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --s-0:#0c0b0a; --s-1:#121010; --s-2:#171513; --s-3:#1e1a17; --s-4:#262119;
+  --t-hi:#f4efe7; --t-md:#a9a29a; --t-lo:#6f6862; --t-xlo:#45403c;
+  --a-1:#e3cfa3; --a-2:#a8743f; --a-glow:rgba(227,207,163,.14);
+  --rule:rgba(244,239,231,.09); --rule-md:rgba(244,239,231,.16); --rule-hi:rgba(244,239,231,.34);
+  --f-sans:"Futura","Avenir Next","Avenir","Century Gothic","URW Gothic",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,monospace;
+}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--s-0);color:var(--t-md);font-family:var(--f-sans);
+  font-size:15px;line-height:1.65;padding:clamp(1rem,4vw,3.5rem) clamp(1rem,4vw,2rem) 6rem}
+.wrap{max-width:62rem;margin:0 auto}
+header.top{border-bottom:1px solid var(--rule);padding-bottom:1.75rem;margin-bottom:2rem}
+.eyebrow{font-size:.6875rem;letter-spacing:.24em;text-transform:uppercase;color:var(--a-1);margin:0 0 .75rem}
+h1{font-size:clamp(1.5rem,1.2rem+1.4vw,2.25rem);line-height:1.15;color:var(--t-hi);
+  margin:0 0 .85rem;font-weight:500;letter-spacing:.01em}
+.lede{margin:0;max-width:52rem;color:var(--t-md)}
+.lede + .lede{margin-top:.7rem}
+.strip{display:flex;flex-wrap:wrap;gap:.4rem;margin:1.75rem 0 .6rem}
+.seg{flex:1 1 4rem;min-width:2.5rem;height:.4rem;background:var(--s-3);
+  border:1px solid var(--rule);border-radius:2px;transition:background .25s,border-color .25s}
+.seg.is-done{background:var(--a-1);border-color:var(--a-1)}
+.strip-note{font-size:.75rem;letter-spacing:.06em;color:var(--t-lo);margin:0 0 2.5rem}
+.strip-note b{color:var(--a-1);font-weight:500}
+.card{border:1px solid var(--rule);border-radius:4px;background:var(--s-1);margin:0 0 1.25rem;overflow:hidden}
+.card.is-sent{opacity:.62}
+.card.is-sent .card-head{background:var(--s-0)}
+.card-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem .85rem;
+  padding:1.1rem 1.25rem;border-bottom:1px solid var(--rule);background:var(--s-2)}
+.chip{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.1em;color:var(--s-0);
+  background:var(--a-1);border-radius:2px;padding:.2rem .5rem;flex:none}
+.card-title{font-size:1rem;color:var(--t-hi);margin:0;font-weight:500;flex:1 1 16rem;line-height:1.35}
+.badge{font-size:.6875rem;letter-spacing:.1em;text-transform:uppercase;color:var(--a-1);
+  border:1px solid var(--rule-md);border-radius:2px;padding:.2rem .5rem;flex:none;white-space:nowrap}
+.card-meta{padding:.85rem 1.25rem;border-bottom:1px solid var(--rule);display:flex;
+  flex-wrap:wrap;gap:.5rem 1.5rem;align-items:center}
+.branch{font-family:var(--f-mono);font-size:.75rem;color:var(--t-lo)}
+.branch b{color:var(--t-md);font-weight:400}
+.summary{padding:1rem 1.25rem;margin:0;color:var(--t-md);font-size:.9375rem;border-bottom:1px solid var(--rule)}
+.actions{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;padding:.9rem 1.25rem}
+button.copy{font:inherit;font-size:.8125rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--s-0);background:var(--a-1);border:1px solid var(--a-1);border-radius:2px;
+  padding:.5rem 1.1rem;cursor:pointer;transition:background .18s,color .18s}
+button.copy:hover{background:var(--a-2);border-color:var(--a-2);color:var(--t-hi)}
+button.copy:focus-visible{outline:2px solid var(--a-1);outline-offset:2px}
+button.copy.is-ok{background:transparent;color:var(--a-1)}
+label.sent{display:inline-flex;align-items:center;gap:.5rem;font-size:.8125rem;
+  letter-spacing:.06em;color:var(--t-lo);cursor:pointer;user-select:none}
+label.sent input{accent-color:var(--a-1);width:1rem;height:1rem;cursor:pointer}
+button.toggle{font:inherit;font-size:.8125rem;letter-spacing:.06em;color:var(--t-lo);
+  background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;
+  text-underline-offset:3px;margin-inline-start:auto}
+button.toggle:hover{color:var(--a-1)}
+pre{margin:0;padding:1.25rem;background:var(--s-0);border-top:1px solid var(--rule);
+  font-family:var(--f-mono);font-size:.8125rem;line-height:1.6;color:var(--t-md);
+  white-space:pre-wrap;word-wrap:break-word;overflow-x:auto;max-height:30rem;overflow-y:auto}
+pre[hidden]{display:none}
+footer.bot{border-top:1px solid var(--rule);margin-top:2.5rem;padding-top:1.5rem;
+  font-size:.8125rem;color:var(--t-lo)}
+footer.bot p{margin:0 0 .6rem;max-width:52rem}
+footer.bot b{color:var(--t-md);font-weight:500}
+@media (max-width:32rem){
+  .card-head{padding:.9rem 1rem}.card-meta,.summary,.actions{padding-inline:1rem}
+  pre{padding:1rem;font-size:.75rem}
+  button.toggle{margin-inline-start:0;flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Prompts 1&ndash;7</p>
+  <h1>Migrating Kavan Studio to Next.js 16.3</h1>
+  <p class="lede">Seven prompts that take this repository from a zero-dependency static site of HTML, CSS and vanilla ES modules to a Next.js 16.3 App Router application on the three-layer architecture &mdash; with a real route per project, design work and media entry instead of a hash and a modal, all content in a libSQL database, and an authenticated dashboard that edits every part of it through Server Actions.</p>
+  <p class="lede">Run them in order. Each one names the prompts it depends on and tells you how to check that the dependency is actually merged. Each ends with the four-command gate, an AGENTS.md update and a commit pass.</p>
+</header>
+
+<div class="strip">
+    <i class="seg" data-seg="1"></i>
+    <i class="seg" data-seg="2"></i>
+    <i class="seg" data-seg="3"></i>
+    <i class="seg" data-seg="4"></i>
+    <i class="seg" data-seg="5"></i>
+    <i class="seg" data-seg="6"></i>
+    <i class="seg" data-seg="7"></i>
+</div>
+<p class="strip-note" id="strip-note">0 of 7 sent</p>
+
+  <article class="card" data-card="1">
+    <div class="card-head">
+      <span class="chip">Prompt 1</span>
+      <h2 class="card-title">Foundation: Next.js 16.3 skeleton, gates and boundary lint</h2>
+      <span class="badge">Opus 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-1-foundation</b></span>
+    </div>
+    <p class="summary">git init, move the static site to legacy/, scaffold Next.js 16.3 pinned, install the gate, declare the ESLint boundary zones empty, port the token layer, land the error system and the ActionResult contract, write AGENTS.md.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="1">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="1"> Sent</label>
+      <button type="button" class="toggle" data-toggle="1">Show prompt text</button>
+    </div>
+    <pre data-prompt="1" hidden>Work on a new branch: prompt-1-foundation. Create and switch to it before making any changes.
+
+This repository is not under version control yet — `git rev-parse --git-dir` fails at the repo root. Before branching: run `git init`, add a `.gitignore` covering `node_modules/`, `.next/`, `.env*.local` and `*.db`, and make one initial commit of the existing static site exactly as it stands with no edits. Then create the branch.
+
+1. READ FIRST
+
+Read the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/, starting from README.md, then SKILL.md at .claude/skills/nextjs-app-architecture/SKILL.md, then 12-adoption-playbook.md Part A (steps A1 through A19) and its Anti-patterns table. Read the anti-patterns table BEFORE step A1 — most of its rows are ordering mistakes that are cheap to avoid now and a project to unwind later.
+
+Also read, in the repo as it stands today:
+- README.md — describes the existing static site in full
+- index.html — the five-column shell, static, renders with no JS
+- css/tokens.css — 107 lines, the complete design token set this project runs on
+- js/main.js — boot, hash routing, language switch, the Tehran clock
+
+There is no AGENTS.md yet. This prompt creates it.
+
+2. CONTEXT
+
+This repo is "Kavan Studio", an architecture-studio website currently built as pure HTML, CSS and vanilla JavaScript ES modules with zero dependencies and no build step. It serves from `python3 -m http.server 8000`.
+
+What exists today:
+- index.html — five full-height columns (Projects, Design, Media, Studio, Contact) between six hairline rules. Section markup at index.html:112 onward; each column carries `data-id`, a `.col__art` drawing host, and a `.panel` div that is filled in at runtime.
+- css/ — tokens.css, base.css, shell.css, panel.css, chrome.css, i18n.css (6 files, ~49KB)
+- js/ — 13 ES modules across core/, art/, ui/ (~115KB). js/main.js:20 reads `location.hash` and js/ui/shell.js:35 opens a section as an in-page panel. There are no real routes; every section is a hash plus a modal-style panel.
+- data/ — content as JS module exports: data/projects.js:23 exports 76 PROJECTS, data/works.js:10 exports 9 DESIGN_WORKS and data/works.js:273 exports 14 MEDIA, data/studio.js exports BRAND, NAV, STUDIO, CONTACT. Persian translations live in data/projects.fa.part1-4.js, data/works.fa.js and data/studio.fa.js, keyed by the exact English slug.
+
+Why this is changing: the site needs real per-record routes instead of hash-plus-modal, and an admin dashboard that edits every piece of content out of a SQLite database. That work is split across prompts 1 to 7; this prompt is the foundation all six others stand on.
+
+3. GOAL
+
+When this is done, the repo root is a Next.js 16.3 App Router project on TypeScript strict, with the three-layer architecture (app then modules then common) machine-enforced by ESLint boundary zones, the four-command gate passing, the error system and the ActionResult contract in place, and the entire legacy static site preserved untouched under `legacy/` as a read-only reference that `src/` is lint-forbidden from importing.
+
+No route, no module, no database and no visible page of the new site exists yet. This is infrastructure. It is finished when `npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test` all pass on an app with a single placeholder route.
+
+4. SCOPE
+
+In scope:
+- git init and the initial commit of the site as it stands
+- moving the legacy site into `legacy/`
+- create-next-app scaffold, pinned to Next.js 16.3.x
+- playbook steps A1, A1b, A2, A2b, A3, A4, A5, A6, A7, A11, A19
+- porting css/tokens.css into the Tailwind v4 token layer
+- AGENTS.md, created from the skill's template
+
+Out of scope, do not start any of it in this pass:
+- Any database, ORM, migration or seed script — that is prompt 2
+- Any ds/ or form/ component, and any port of js/core/anim.js, js/art/* or js/ui/* — that is prompt 3
+- Any route under app/ beyond the single placeholder needed to make `npm run build` meaningful — that is prompts 4 and 5
+- Any auth, session, proxy.ts or dashboard — that is prompt 6
+- Any Docker, CI or deploy config — that is prompt 7
+- Editing, reformatting or "cleaning up" a single byte of the legacy site. It moves; it does not change.
+
+5. SPECIFICS
+
+5.1 Preserve the legacy site.
+Create `legacy/` and `git mv index.html css js data README.md legacy/`. All five move; nothing is edited. `legacy/README.md` is the existing project README and stays as the record of how the original site worked — later prompts read it. The repo root then holds only `.claude/`, `legacy/` and git metadata, which is what lets the scaffolder run cleanly.
+
+5.2 Scaffold Next.js.
+create-next-app refuses to write into a directory holding a conflicting `README.md`, which is why 5.1 comes first. Scaffold into a temporary subdirectory and lift it:
+
+  npx create-next-app@latest .scaffold --ts --app --src-dir --eslint --tailwind --import-alias "@/*" --no-turbopack --yes
+  mv .scaffold/.* .scaffold/* .   (ignore the errors on . and ..)
+  rmdir .scaffold
+
+Every flag including --yes is passed explicitly; without them the scaffolder prompts and a headless session hangs on a question nobody answers.
+
+Then pin the framework: `npm i next@~16.3.0` and confirm with `npx next --version` that it reports 16.3.x. If npm resolves something else, stop and report it rather than proceeding — every later prompt is written against 16.3 APIs (`updateTag`, Cache Components) that do not exist on 15.x. On 16 Turbopack is the default for dev and build, so remove any `--turbopack` flag the scaffolder left in the dev/build scripts; it is noise there.
+
+5.3 Install dependencies.
+Runtime: zod@^4, @tanstack/react-query, zustand, clsx, tailwind-merge, class-variance-authority, server-only, react-hook-form, @hookform/resolvers, radix-ui.
+Tooling: prettier, prettier-plugin-tailwindcss, @tanstack/react-query-devtools, vitest, jsdom, @vitejs/plugin-react, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, jest-axe, @types/jest-axe, husky, lint-staged, @commitlint/cli, @commitlint/config-conventional.
+
+Deliberately NOT installed, and this is recorded in AGENTS.md as a deviation from playbook A1: msw (A14's mock front-db is unnecessary — this app's SQLite database is its own local data source, so a seeded dev database replaces MSW entirely) and storybook with its addons and eslint-plugin-storybook (the component workshop and the build-storybook CI step are deferred under a two-day delivery deadline). Because eslint-plugin-storybook is absent, delete the storybook block from the ESLint template rather than leaving a config that cannot load, and delete the storybook scripts from the script set.
+
+5.4 Scripts.
+Merge the `scripts` and `lint-staged` blocks from .claude/skills/nextjs-app-architecture/templates/config/package.scripts.json into package.json, stripping its comments — package.json is strict JSON. Do not rename any canonical script; `typecheck`, `lint`, `build`, `test` are fixed names across every project on this architecture. Drop only the storybook entries, per 5.3.
+
+5.5 TypeScript.
+Copy .claude/skills/nextjs-app-architecture/templates/config/tsconfig.json to the repo root whole. Do not hand-assemble a shorter version. Both `.next/types/**/*.ts` and `.next/dev/types/**/*.ts` must appear in `include` — on Next 16, `next build` and `next dev` write generated route types to different roots, and shipping only one silently degrades every typed params/searchParams signature in whichever mode is not covered. Add `legacy` to `exclude` so the legacy ES modules are never type-checked.
+
+5.6 Framework config and the token layer.
+Copy templates/config/next.config.ts to the repo root. Enable Cache Components (`cacheComponents: true`) — prompt 2 caches every read with `'use cache'` and `cacheTag`, and prompt 6's actions purge with `updateTag`, both of which are 16-only Cache Components APIs. If the installed Next 16.3 spells that config key differently, the installed package wins; follow it and record the spelling in AGENTS.md.
+
+Then build the Tailwind v4 token layer in src/app/globals.css from references/02-design-system.md section 0, porting css/tokens.css (now at legacy/css/tokens.css) verbatim in value. Every one of its tokens carries over: the five-step surface ramp `--s-0` #0c0b0a through `--s-4` #262119; the four-step text ramp `--t-hi` #f4efe7, `--t-md`, `--t-lo`, `--t-xlo`; the champagne accent `--a-1` #e3cfa3, `--a-2` #a8743f and `--a-glow`; the three hairline rules; the `--f-sans` geometric system stack (Futura, Avenir Next, Avenir, Century Gothic, URW Gothic, Questrial, then system fallbacks — this project ships zero webfont bytes, so no next/font and no CDN font CSS), `--f-serif` and `--f-mono`; the seven-step fluid `--fs-*` scale; the four `--tr-*` tracking steps; the ten-step `--sp-*` spacing scale; the shell geometry (`--head-h`, `--foot-h`, `--gutter`, `--nav-w`, `--nav-w-min`); the five motion easings and five durations; and the `--z-*` layer scale. Carry over both media-query overrides at legacy/css/tokens.css:95 and :102 — the coarse-pointer tracking reduction and the reduced-motion collapse of every duration to 1ms. These are semantic tokens, not decoration: the reduced-motion block is load-bearing for accessibility and the tracking token is the design's signature.
+
+5.7 Prettier and the ESLint boundary enforcer.
+Copy templates/config/.prettierrc and templates/config/eslint.config.mjs. Declare `const MODULES = []` — empty, on purpose. A boundary declared against zero files is free; the same boundary retrofitted onto 200 files costs roughly ten times as much because the violations are already load-bearing by then. Add one project-specific restricted zone: nothing under `src/**` may import from `legacy/**`. The legacy tree is reference material that later prompts read with their eyes, never a module graph the app links against.
+
+5.8 Husky, commitlint, lint-staged.
+Copy templates/config/husky-pre-commit.sh, husky-commit-msg.sh, husky-pre-push.sh and commitlint.config.ts to their stated target paths, and run `npx husky init` if the hooks directory does not exist.
+
+5.9 The src/ skeleton.
+Create the canonical tree from SKILL.md: src/app/, src/modules/, src/common/{components/{ui,ds,form,variants,layout,feedback,loader},services,schemas,errors,api,stores,config,constants,hooks,lib,utils,types,observability}. Empty directories that git will not track can hold a one-line `.gitkeep`. Delete every example page and asset the scaffolder generated that this project will not keep — dead scaffolding is read by a later session as intent.
+
+5.10 The error system (A6).
+Copy templates/src/common/errors/{types.ts,map-error.ts,messages.ts,parse-body.ts,index.ts}. mapError must stay the only place a thrown value is interpreted, it must extract by duck-typing rather than `instanceof` (an error that crossed the RPC boundary is no longer an instance of anything), and exactly one shape `{ status, code, message, fieldErrors }` reaches the UI.
+
+5.11 Environment config (A7).
+Copy templates/src/common/config/env.ts and templates/config/env.example. Env is zod-parsed at import time so a missing variable fails at boot rather than at the first user click. This project's variables, to be declared now even though prompt 2 is what first reads them: `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` (prompt 2), `ADMIN_PASSWORD` and `SESSION_SECRET` (prompt 6). Write them into env.example with placeholder values and a comment naming the prompt that consumes each. Do not commit a real `.env.local`.
+
+5.12 The action contract (A11).
+Copy templates/src/common/services/action-result.ts. This is the single most important file for prompts 6 and 7: every write action in the dashboard returns a discriminated ActionResult and never throws for an expected failure, because a throw is sanitized crossing the RPC boundary and destroys the status and body that rollback and field-error binding need.
+
+5.13 Copy the remaining tier-appropriate runtime templates.
+Read templates/src/README.md for the copy order by dependency tier and follow it — it is ordered so nothing ever fails to resolve. At minimum this pass lands templates/src/common/lib/utils.ts (`cn()`), common/observability/dev-log.ts, common/constants/api.ts, common/schemas/{envelopes.ts,helpers.ts} and common/api/query-keys.ts. Where a template carries a fenced block for the mock front-db or a fixture fallback, delete that block — per 5.3 there is no MSW in this project.
+
+5.14 A placeholder route.
+`npm run build` is not meaningful without one route. Create src/app/layout.tsx and src/app/page.tsx as the smallest possible pair that renders the wordmark on the token background. This is deliberately throwaway: prompt 4 replaces both. Do not build any part of the real shell here.
+
+5.15 AGENTS.md.
+Copy templates/config/AGENTS.md.template to AGENTS.md and fill it in. It must record, at minimum: the three-layer architecture and the gate; that this is Next.js 16.3 with Cache Components enabled; the four deviations from the playbook taken here (no MSW, no Storybook, `db -&gt; repository -&gt; service` replacing the HTTP transport ring in prompt 2, and a single-admin cookie session replacing the three-legged JWT rotation of A9 in prompt 6), each with its reason and its re-enable condition; that `legacy/` is a read-only reference deleted in prompt 7; and the three project decisions listed in section 6 below. Resolve every `// TODO(project):` marker in every copied template before the gate — an unresolved marker is an unmade decision, and leaving it is how a template becomes cargo cult.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- The target is Next.js 16.3 specifically, as requested. Prompts 2 through 7 use `'use cache'`, `cacheLife`, `cacheTag` and `updateTag`, which are Cache Components APIs that exist on 16 and not on 15.x. If the project ends up on 15.x, every caching instruction in prompts 2, 4, 5, 6 and 7 needs rewriting to `revalidateTag(tag)` plus `router.refresh()`.
+- The database is Turso / libSQL, chosen so the app can deploy to a serverless host. Prompt 1 only declares `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in env config; prompt 2 wires the driver.
+- Bilingual content is stored as per-locale columns on one row (`title_en`, `title_fa`), not a translations table. Prompt 2 builds the schema; this prompt only records the decision in AGENTS.md.
+- The dashboard has one admin, authenticated by a single signed HttpOnly cookie against `ADMIN_PASSWORD`. Prompt 6 builds it; this prompt only declares the env vars.
+- The geometric system font stack is kept exactly as-is and no webfont is introduced. The original site ships zero font bytes on purpose — no FOIT, no CLS.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether Tailwind v4 utilities or plain CSS carry the five-column shell layout in prompt 4. Recommended: keep legacy/css/shell.css and legacy/css/panel.css as real CSS imported by the shell module, and use Tailwind only for the dashboard. The shell CSS is 32KB of precisely tuned geometry that a utility rewrite would not reproduce faithfully in the time available, and prompt 3 depends on this call.
+- Whether `src/app/globals.css` holds the tokens as Tailwind v4 `@theme` variables, as plain `:root` custom properties, or both. Recommended: both — `@theme` for what Tailwind utilities must reach in the dashboard, and the raw `:root` custom properties for the ported shell CSS, which references them by name.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Dependencies flow app then modules then common, one way, never sideways. No cross-module imports, not even type-only.
+- app/ is routing and composition only — no domain JSX, no business logic, no mappers.
+- Product code imports ds/ and form/, never ui/. Style lives in variants/*.ts and every class list terminates in cn().
+- No colour literal in a component. Every colour, radius, duration and z-index comes from the token layer in globals.css. If a token is genuinely missing, add it there; never inline the hex.
+- Every file that reads a token or talks to the data layer imports 'server-only'.
+- No `any`. No `typescript.ignoreBuildErrors`, no `eslint.ignoreDuringBuilds`, no `git commit --no-verify`, no file-level or blanket `eslint-disable`, no `.skip` on a test you just broke. A narrow single-rule one-line disable with a comment naming the false positive is the only sanctioned escape hatch.
+- Nothing under src/ imports anything under legacy/.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done — not "mostly passes", not "fails on unrelated files". `test` passing with zero test files is acceptable at this step only; prompt 2 adds the first real tests.
+
+Then run `npm run dev` and open http://localhost:3000. The placeholder page must render on the #0c0b0a canvas in the champagne accent, proving the token layer is live. Confirm `npx next --version` reports 16.3.x. Confirm `grep -rn "legacy" src/` returns nothing. Confirm `grep -rn "TODO(project)" src/ *.ts *.mjs *.json` returns nothing.
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: what changed, every decision recorded above, the four playbook deviations with their reasons, and the note that legacy/ is deleted in prompt 7.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-1-foundation. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="2">
+    <div class="card-head">
+      <span class="chip">Prompt 2</span>
+      <h2 class="card-title">The SQLite data layer: schema, seed and cached reads</h2>
+      <span class="badge">Opus 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-2-data-layer</b></span>
+    </div>
+    <p class="summary">drizzle + libSQL/Turso, six tables with per-locale columns, a seed script that reproduces all 76 projects with their Persian translations, the db → repository → service rings, and one cache tag per entity and per record.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="2">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="2"> Sent</label>
+      <button type="button" class="toggle" data-toggle="2">Show prompt text</button>
+    </div>
+    <pre data-prompt="2" hidden>Work on a new branch: prompt-2-data-layer. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then in this order: 03-server-data-layer.md, 05-contracts-and-schemas.md, and section 8 of 04-actions-and-mutations.md (server-side cache invalidation).
+
+Then read the legacy content files this prompt migrates, in full:
+- legacy/data/projects.js — 76 records from line 23, the `p()` shorthand constructor at line 19, TYPES/STATUSES/SCALES at lines 9-16, FILTERS at line 422
+- legacy/data/works.js — DESIGN_WORKS at line 10 (9 records), MEDIA at line 273 (14 records)
+- legacy/data/studio.js — BRAND at line 6, NAV at line 17, STUDIO at line 25, CONTACT at line 165
+- legacy/data/projects.fa.js and its four parts, legacy/data/works.fa.js, legacy/data/studio.fa.js — the Persian layer
+- legacy/js/core/i18n.js:154 — the `overlay()` function, which shows exactly how an English record and its Persian overlay are merged today
+
+2. CONTEXT
+
+Prompt 1 (branch prompt-1-foundation) stood up the Next.js 16.3 skeleton: three-layer architecture with ESLint boundary zones, the error system in src/common/errors/, zod-parsed env config in src/common/config/env.ts declaring TURSO_DATABASE_URL and TURSO_AUTH_TOKEN, the ActionResult contract in src/common/services/action-result.ts, and the token layer in src/app/globals.css. Confirm src/common/services/action-result.ts and src/common/config/env.ts exist before starting; if they do not, prompt 1 has not been merged and this prompt is not ready to run.
+
+All site content currently lives as JavaScript module exports under legacy/data/. English and Persian are separate: legacy/data/projects.js holds the 76 English records and legacy/data/projects.fa.part1-4.js hold their Persian overlays, keyed by the exact English slug. legacy/js/core/i18n.js:154 merges them at render time with a spread, so a missing Persian key degrades to English rather than throwing.
+
+The architecture skill's data layer assumes a remote HTTP backend and three transport rings (`services` then `api-client` then `http`). This project has no backend — the database is in-process. AGENTS.md records the substitution this prompt implements: the ring shape is kept and its contents replaced, giving `services` then `repositories` then `db`.
+
+3. GOAL
+
+When this is done, every piece of site content lives in a libSQL/Turso database behind a three-ring server-only data layer; a seed script reproduces all 76 projects, 9 design works, 14 media entries and both singleton records with their Persian translations intact; every read is a cached service function tagged for precise invalidation; and a test proves the seeded row counts and one round-tripped Persian string.
+
+No route and no UI renders any of this yet. Prompts 4 and 5 consume these services.
+
+4. SCOPE
+
+In scope:
+- drizzle-orm + @libsql/client, drizzle-kit
+- the schema, the migration, the seed script
+- src/common/services/db.ts, the per-resource repositories, the per-resource services
+- src/common/schemas/{project,design-work,media,studio,contact}.ts
+- `'use cache'` + cacheLife + cacheTag on every read service
+- vitest tests for the seed and for one repository
+
+Out of scope, do not start any of it in this pass:
+- Any component, page or route — prompts 3, 4 and 5
+- Any Server Action or write path — prompts 6 and 7 own every mutation. This prompt writes read services and the repository functions a later write will call, and nothing else.
+- Any auth or session work — prompt 6
+- Deleting legacy/data/ — prompt 7 deletes the whole legacy tree, after prompts 3 through 5 have finished reading it
+
+5. SPECIFICS
+
+5.1 Install and wire the driver.
+`npm i drizzle-orm @libsql/client` and `npm i -D drizzle-kit`. Create src/common/services/db.ts as ring 1: it imports 'server-only', reads TURSO_DATABASE_URL and TURSO_AUTH_TOKEN through src/common/config/env.ts (never `process.env` directly), creates exactly one libSQL client, and exports the drizzle instance. This is the only file in the codebase that opens a database connection. A local file URL (`file:./dev.db`) must work for development and a `libsql://` URL for production, so the client is constructed from the env value without branching on it.
+
+Add `drizzle.config.ts` at the repo root and a `db:generate`, `db:migrate` and `db:seed` script to package.json. Do not repurpose a canonical script name.
+
+5.2 The schema, at src/common/services/schema.ts.
+Bilingual fields are per-locale columns on one row, per the decision recorded in AGENTS.md. Six tables:
+
+`projects` — id (pk), slug (unique, not null), types (JSON string array — a project carries more than one; legacy/data/projects.js:31 shows `['Residential', 'Interior Design']`), status, scale, year (integer), area, sort_order (integer), created_at, updated_at, and per-locale pairs for title, blurb, description, location and client. Persian translates exactly title, blurb, description, location and client — confirm against legacy/data/projects.fa.part1.js:8 and carry no more and no fewer.
+
+`design_works` — id, slug (unique), category, year, status, sort_order, timestamps, and per-locale pairs for title, blurb, client, scope, materials, description, team (JSON string array) and facts (JSON array of `{ k, v }`). Persian translates all of these including facts — legacy/data/works.fa.js:28 has a translated facts array.
+
+`media` — id, slug (unique), type, year, project_slug (nullable, the related project's slug from legacy/data/works.js:283), sort_order, timestamps, and per-locale pairs for title, outlet, blurb, author, excerpt, context and facts (JSON `{ k, v }` array). Note that `outlet` is translated in some records and left in Latin in others (legacy/data/works.fa.js:283 keeps "ArchDaily"), so it needs both columns even though many will be identical.
+
+`studio` — a single-row table with id fixed to 1, holding the editorial block at legacy/data/studio.js:25: per-locale manifesto, and per-locale JSON columns for founders, stats, team, alumni, awards and chapters.
+
+`contact` — a single-row table with id fixed to 1, holding legacy/data/studio.js:165: address, district, city, country, postcode, phone, phone_href, email, press, hours, lat, lng, socials (JSON), and per-locale pairs for the free-text fields that have Persian equivalents in legacy/data/studio.fa.js:109 — check that file and mirror it exactly rather than guessing which fields are translated.
+
+`contact_messages` — id, name, email, subject, body, created_at, read_at (nullable). This is the inbound side: messages submitted through the public contact form in prompt 5 and read in the dashboard in prompt 7. It has no Persian columns; a visitor writes in whichever language they choose.
+
+Every JSON column stores a JSON string and is parsed by the zod schema in 5.4, never cast.
+
+5.3 The migration.
+Generate with `npx drizzle-kit generate` and commit the generated SQL. Do not use `drizzle-kit push` as the production path — a generated, committed migration is what makes the deploy in prompt 7 reproducible.
+
+5.4 The zod schemas, one file per resource under src/common/schemas/.
+Read schemas are tolerant at the leaves and strict at the shape; write schemas are exact. Types are derived with `z.infer` — never hand-written alongside a schema. The JSON columns are parsed here with `z.preprocess` or `.transform` so that a row leaves the repository as a real array, never a string. One unanticipated null in one leaf must not blank an entire route, which is what tolerant leaves buy.
+
+Each resource also gets a locale-resolved output type: the repository returns the full bilingual row, and a single mapper per resource collapses it to one locale. Put those mappers in src/common/schemas/, not in a component and not in a page.
+
+5.5 The repositories, ring 2, at src/common/services/&lt;resource&gt;-repository.ts.
+Each imports 'server-only' and imports only db.ts and its schema file. This is the one and only place a database row is zod-parsed — nothing downstream casts, because a cast is an unverifiable claim and `.parse()` is one the runtime enforces. Each resource needs `list`, `bySlug` (or `get` for the two singletons), `create`, `update` and `remove`, even though nothing calls the writes until prompt 6. `contact_messages` needs `list`, `create`, `markRead` and `remove`.
+
+5.6 The services, ring 3, at src/common/services/&lt;resource&gt;-service.ts.
+Each imports 'server-only' and imports only its repository. Reads are cached:
+
+  export async function listProjects(locale: Locale) {
+    'use cache';
+    cacheLife('max');
+    cacheTag('projects');
+    return projectRepo.list().then((rows) =&gt; rows.map((r) =&gt; toLocale(r, locale)));
+  }
+
+Tag convention, and prompts 6 and 7 depend on it exactly: one collection tag per entity (`projects`, `design-works`, `media`, `studio`, `contact`, `contact-messages`) plus one instance tag per record (`project:&lt;slug&gt;`, `design-work:&lt;slug&gt;`, `media:&lt;slug&gt;`). A mutation then invalidates precisely instead of nuking a path. Write the tag list into AGENTS.md so prompts 6 and 7 purge the same strings that are declared here — a tag that is set and never purged, or purged under a name that was never set, is silent staleness.
+
+Do not cache `contact_messages` reads. The dashboard inbox must be dynamic.
+
+5.7 The seed script, at scripts/seed.ts, run by `npm run db:seed`.
+It imports the legacy ES modules directly — they are plain ESM with no DOM dependency, so `import { PROJECTS } from '../legacy/data/projects.js'` works under tsx or the vitest runner. This is a one-time script outside src/, so the "nothing under src/ imports legacy/" lint zone from prompt 1 is not violated; confirm the zone still passes after adding it.
+
+For each project it merges the English record with its Persian overlay from PROJECTS_FA keyed by slug, exactly as legacy/js/core/i18n.js:154 does, and writes both locales into their columns. Where a Persian key is missing, write the English value into the `_fa` column rather than null — the legacy site's degradation rule was "fall back to English", and losing it would leave blank Persian pages.
+
+The script is idempotent: re-running it must not duplicate rows. Delete-then-insert inside one transaction is fine and is the simplest thing that is correct.
+
+Every string is copied verbatim. Do not translate, paraphrase, re-wrap or "fix" the spacing of a single Persian string — the Persian content uses zero-width non-joiners that are meaningful, and legacy/data/projects.fa.part1.js:3 records that numbers deliberately stay in Latin digits because the interface converts them at render time.
+
+5.8 Tests, at src/common/services/__tests__/.
+Two tests, both real:
+- Seed fidelity: after seeding a temporary file database, `projects` has exactly 76 rows, `design_works` 9, `media` 14, `studio` 1 and `contact` 1; and the project with slug `qeytarieh-08-residence` round-trips its Persian title as the exact string at legacy/data/projects.fa.part1.js:9.
+- Repository contract: `bySlug` on a missing slug returns null rather than throwing, and a row with a JSON column comes back with `types` as an array of strings, not a string.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- Turso / libSQL is the database, per AGENTS.md. `@libsql/client` speaks both `file:` and `libsql:` URLs, so development runs against a local `dev.db` file and production against the hosted URL with no code change.
+- "Contacts" in the original request means two distinct things and both are built: the `contact` singleton, which is the editable content of the public contact page, and `contact_messages`, which is the inbound inbox from the public form. If only one of these was intended, stop and ask before building the other.
+- The 76 projects keep their existing numeric `id` values from legacy/data/projects.js as their primary keys, so a slug rename never orphans a record.
+- `sort_order` is seeded from the existing array order, which is reverse-chronological. The dashboard in prompt 6 edits it; nothing depends on insertion order.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether `cacheLife('max')` or a shorter profile is right for the content services. Recommended: `'max'` — this is studio content that changes only through the dashboard, and every dashboard write purges its tags explicitly, so there is no reason to expire on a timer.
+- Whether the filter taxonomy at legacy/data/projects.js:422 (type, status, scale, year) becomes database-derived or stays a hardcoded constant. Recommended: derive it in the service from the distinct values actually present, matching the existing behaviour at legacy/data/projects.js:424 where the option list is filtered to types that at least one project uses. A hardcoded list goes stale the first time the dashboard adds a project of a new type.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Each ring imports only the ring below: services then repositories then db. Skipping a ring is how an unparsed row reaches a page.
+- Every file in the data layer imports 'server-only', so a client import fails the build instead of leaking a connection string into a browser bundle.
+- The row is zod-parsed in exactly one place, the repository. Nothing downstream casts.
+- Components never call the database and never build a query — they call a service.
+- Types are derived with `z.infer`. Read schemas tolerant at the leaves, strict at the shape; write schemas exact.
+- No colour literal, no `any`, no ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable.
+- Nothing under src/ imports anything under legacy/. The seed script lives at scripts/seed.ts, outside src/, which is why it may.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against a local `file:./dev.db`: run `npm run db:migrate &amp;&amp; npm run db:seed`, and query the database directly to confirm 76 / 9 / 14 / 1 / 1 rows. Print one full project row and read it — the Persian title, blurb, description, location and client must all be populated and must be Persian, not English fallbacks, for `qeytarieh-08-residence`. Confirm `grep -rn "process.env" src/` returns nothing outside src/common/config/env.ts. Confirm every `cacheTag` string in src/common/services/ appears in the tag list you wrote into AGENTS.md.
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the six tables and their per-locale column convention, the complete cache tag list, the two open decisions as resolved, and the seed script's fallback rule for missing Persian keys.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-2-data-layer. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="3">
+    <div class="card-head">
+      <span class="chip">Prompt 3</span>
+      <h2 class="card-title">Design system, and the motion and drawing layers ported</h2>
+      <span class="badge">Opus 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-3-design-system</b></span>
+    </div>
+    <p class="summary">Port the eight procedural drawing generators to server-safe TypeScript, port the motion core and the per-glyph FLIP shell, port the five stylesheets, and build only the ds/ and form/ controls the dashboard needs.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="3">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="3"> Sent</label>
+      <button type="button" class="toggle" data-toggle="3">Show prompt text</button>
+    </div>
+    <pre data-prompt="3" hidden>Work on a new branch: prompt-3-design-system. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then 02-design-system.md in full, then 08-state-and-data-flow.md section 1 (the state decision table).
+
+Then read every legacy module this prompt ports, in full — all of it is being reproduced faithfully, so skimming is not enough:
+- legacy/js/core/anim.js — the motion core: EASE at line 23, `reduced()` at 34, `instant()` at 46, `damp()` at 60, the single shared ticker `onTick()` at 82, `animate()` at 104, `stagger()` at 165, `wait()` at 175, `flip()` at 194, `spring()` at 236
+- legacy/js/art/rng.js — `hash()` at 10, `rng()` at 24 (FNV-1a plus mulberry32)
+- legacy/js/art/palette.js — MATERIALS at 18, SKIES at 34, `palette()` at 49, `mix()` at 87, `shade()` at 93
+- legacy/js/art/draw.js — the eight generators: `elevation` 77, `massing` 220, `court` 300, `section` 397, `plan` 556, `screen` 663, `contour` 709, `portrait` 789; plus KIND_NAMES 834, `kindFor` 843, `draw` 859, `drawingSet` 864
+- legacy/js/ui/cursor.js:18, legacy/js/ui/smooth.js:17, legacy/js/ui/preload.js (endIntro 21, runPreload 28, revealShell 120)
+- legacy/js/ui/shell.js:35 — `createShell`, the signature open/close transition
+- legacy/css/base.css, shell.css, panel.css, chrome.css, i18n.css
+- legacy/README.md — its "Rules the code follows" section states four invariants that must survive this port
+
+2. CONTEXT
+
+Prompt 1 (branch prompt-1-foundation) created the Next.js 16.3 skeleton and ported legacy/css/tokens.css into the token layer at src/app/globals.css. Prompt 2 (branch prompt-2-data-layer) built the database and the read services. Confirm src/app/globals.css contains the `--s-0` through `--a-glow` tokens and that src/common/services/ holds the resource services; if either is missing, the prerequisite prompt has not been merged and this prompt is not ready to run.
+
+The original site's entire visual identity is generated code, not assets: legacy/js/art/draw.js emits SVG from a string seed, and a project's slug is its seed, so a drawing is unique per project and identical on every machine and every reload. There are zero image files and zero webfont bytes in the whole project. legacy/js/core/anim.js and the four legacy/js/ui/ modules carry the signature transition — a per-glyph FLIP with a single shared requestAnimationFrame ticker.
+
+This code is the product. It is ported, not rewritten. Do not replace it with Framer Motion, GSAP, or any animation library; do not replace the drawing generators with images; do not "modernise" the FLIP into a CSS transition. A rewrite of this layer is the single most likely way this migration misses its deadline, and the reproduction would not be faithful.
+
+3. GOAL
+
+When this is done, the drawing generators run as pure server-safe TypeScript that a React Server Component calls to emit inline SVG with no client JavaScript at all; the motion core and the four interaction modules live behind one 'use client' boundary in common/; the five legacy stylesheets are real CSS the app imports; and the ds/ and form/ component tiers exist with the handful of controls the dashboard in prompts 6 and 7 needs.
+
+Nothing routes yet. Prompt 4 assembles the shell out of what this prompt builds.
+
+4. SCOPE
+
+In scope:
+- src/common/lib/art/ — rng, palette, draw, ported to TypeScript, server-safe
+- src/common/lib/motion/ — anim core plus cursor, smooth, preload, shell, all client-side
+- the five legacy stylesheets, ported and imported
+- src/common/components/ui/, ds/, form/, variants/ — only the controls listed in 5.5
+- src/common/components/feedback/ and loader/ — the error and loading states
+- providers.tsx, the query client, dev logging (playbook A13)
+
+Out of scope, do not start any of it in this pass:
+- Any route, page, layout or the assembled five-column shell — prompt 4
+- Any editorial page content — prompt 5
+- Any dashboard chrome or auth — prompt 6
+- Reading from the database. This prompt builds components; it does not fetch.
+- Any change to the token values landed by prompt 1
+
+5. SPECIFICS
+
+5.1 Port the art layer to src/common/lib/art/, as TypeScript with no DOM dependency.
+legacy/js/art/rng.js, palette.js and draw.js are already pure — they build and return SVG markup from a seed string, touching no `document` and no `window`. Verify that claim as you port; if any generator reaches for the DOM, say so rather than working around it silently.
+
+Because they are pure, they run on the server. A React Server Component calls `drawingSet(slug, types)` and renders the returned SVG inline. That is the single biggest win available in this migration: roughly 52KB of generator JavaScript leaves the client bundle, the drawings become part of the cached HTML, and there is no hydration cost and no layout shift. Do not add 'use client' to anything under src/common/lib/art/.
+
+Type the ports properly — the seeded PRNG, the palette record, the eight generator signatures `(seed: string, ratio?: number) =&gt; string`, KIND_NAMES as a readonly tuple, and `kindFor(seed, types)`. No `any`. Preserve every numeric constant exactly; the drawings are deterministic and a changed constant silently changes every image on the site.
+
+The legacy `n()` helper at legacy/js/art/rng.js:80 rounds coordinates to two decimals so the emitted SVG is stable and compact — keep it and keep its precision.
+
+5.2 Port the motion core to src/common/lib/motion/anim.ts.
+This one file carries four invariants that legacy/README.md states explicitly, and each exists because of a real failure. Preserve all four and copy their comments across, because the comment is the reason:
+- CSS owns every resting state. Animations default to `fill: 'backwards'`, never `'forwards'` — a forwards-filled animation keeps overriding the cascade after it ends, which is how a closed panel's leftovers reappear on the next open.
+- Await `anim.done`, never `anim.finished`. A hidden document stops advancing its animation timeline, so an animation started just before a tab switch never resolves; `done` races the real promise against the animation's own worst case, so a transition state machine can never be stranded mid-flight.
+- One requestAnimationFrame. The cursor, both inertia scrollers and any parallax subscribe to the single ticker at legacy/js/core/anim.js:82. N competing rAF loops is the most common source of jitter in sites like this.
+- Damping is frame-rate independent (legacy/js/core/anim.js:60), so the feel is identical at 60Hz and 120Hz.
+
+5.3 Port the four interaction modules to src/common/lib/motion/.
+cursor.ts, smooth.ts, preload.ts and shell.ts, from legacy/js/ui/. These genuinely need the DOM. Do not put 'use client' on each of them — put it on the single React component in src/common/components/layout/ that mounts them, and let these stay plain modules it imports. 'use client' belongs on the leaf that needs it, and a directive on a shared library pulls everything that touches it into the client graph.
+
+The shell module is the most delicate thing in this repo. legacy/js/ui/shell.js:35 measures every character of a column title before and after a class flip and flies each from where it was to where it now is, staggered. Only `transform`, `opacity` and `clip-path` are ever animated; the layout change itself is instantaneous, a class flip that CSS resolves in one frame. Nothing animates `top`, `left`, `width`, `height` or `letter-spacing`. Keep it that way.
+
+Persian breaks the naive version of this and the legacy code already handles it: legacy/js/core/i18n.js:190 exports `canSplitGlyphs`, which the shell asks before splitting a title, because Arabic-script letters join and wrapping each in its own inline-block renders the word as disconnected presentation forms. The FLIP target is always `.ch` — one box per letter in English, one box holding the whole word in Persian. Same code path, same animation. Port that check and its comment intact.
+
+5.4 Port the stylesheets.
+legacy/css/base.css, shell.css, panel.css, chrome.css and i18n.css move to src/app/ (or src/common/styles/, your call — record it) as real CSS files imported by the layout, per the decision AGENTS.md records from prompt 1. They reference the token custom properties by name, so the raw `:root` properties in globals.css must remain, not only the Tailwind `@theme` mapping.
+
+legacy/css/i18n.css is not optional polish. It collapses every tracking token to zero under `html.is-fa` and steps the type scale up, because the wide letter-spacing that gives the English wordmark its character severs the joins in Persian, and Persian reads small at the same nominal size. Port it whole.
+
+Do not convert these to Tailwind utilities. Do not add `!important`. Do not introduce an inline `&lt;style&gt;` block.
+
+5.5 The component tiers (playbook A12 and A12b).
+Only what prompts 6 and 7 actually need — this is a two-day delivery and a speculative component is waste. Build, in ui/ then wrapped in ds/: Button (with the Slot.Root asChild mechanism from radix-ui), Input, Textarea, Select, Checkbox, Table, Dialog, and a Field/Label pair. Then the form/ tier: the react-hook-form-bound wrappers over ds/, per 07-forms.md, ready for prompts 6 and 7 to build every dashboard form on.
+
+Style lives in variants/*.ts using class-variance-authority, and every class list terminates in `cn()`. Product code imports ds/ and form/, never ui/ — ui/ is regenerable, so anything written into it dies at the next regeneration.
+
+Also build the feedback/ and loader/ pieces: an ErrorState that renders the one normalized error shape `{ status, code, message, fieldErrors }` from src/common/errors/, and a LoadingState skeleton that matches the geometry of what it replaces rather than a generic spinner.
+
+Per AGENTS.md, Storybook is deferred, so the "every ds/ component ships with a story" rule from 02-design-system.md does not apply in this pass. The axe requirement does: each ds/ component gets a jest-axe test. Record the deferred stories in AGENTS.md as an outstanding item rather than pretending the rule was met.
+
+5.6 Providers and the query client (playbook A13).
+Copy templates/src/app/providers.tsx and templates/src/common/lib/query-client.ts. Note that @tanstack/react-query-devtools is resolved at build time, not only in development, so it must be installed even though it renders nothing in production. Server data never enters a client store — two copies of one record drift the moment either refetches. The dashboard's server data comes from Server Components and Server Actions; React Query is there for the client-side mutation flows prompts 6 and 7 add, not as a second source of truth.
+
+5.7 Accessibility carried over.
+The legacy site has a complete accessibility model and it must survive: full keyboard navigation (arrows between columns, Enter to open, Escape to close), `inert` on inactive columns while a panel is open, focus driving the same artwork and caption reveals as hover, focused elements scrolled into view inside the inertia panes, `aria-live` announcements on section change, a skip link, and `prefers-reduced-motion` collapsing every duration to a single frame and removing the custom cursor entirely. Prompt 4 wires these to routes; this prompt must not drop them from the ported modules.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- The drawing generators are pure and therefore server-renderable. This is the assumption with the most leverage in the whole migration: if it turns out a generator touches the DOM, the art layer stays a client component and roughly 52KB returns to the bundle. Verify before committing to it.
+- The five legacy stylesheets are ported as CSS rather than rewritten as Tailwind utilities, per the recommendation prompt 1 recorded. 32KB of precisely tuned column geometry would not survive a utility rewrite faithfully in the time available.
+- The inertia scrolling in legacy/js/ui/smooth.js is kept. It is part of the site's feel, it is already frame-rate independent, and it already yields to prefers-reduced-motion.
+- The custom magnetic cursor is kept, and it remains absent on coarse pointers and under reduced motion, as legacy/css/tokens.css:95 and the cursor module already arrange.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Where the ported stylesheets live: src/app/ next to globals.css, or src/common/styles/. Recommended: src/common/styles/, imported once by the site layout, because these are shared assets and app/ is composition only.
+- Whether the preloader at legacy/js/ui/preload.js survives into the Next version. Recommended: keep it but shorten it. Its 2.6-second hard deadline and visibilitychange handler exist because the original had no server rendering; a server-rendered page has content on screen immediately, so the preloader becomes an intro flourish rather than a necessity, and a long one now costs perceived performance it used to buy.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Server Components are the default. 'use client' sits on the leaf that needs it, never on a shared library and never on a page.
+- Product code imports ds/ and form/, never ui/. Style lives in variants/*.ts and every class list ends in cn().
+- No colour literal outside the token layer. If a token is genuinely missing, add it to globals.css; never inline the hex.
+- Only `transform`, `opacity` and `clip-path` are animated. Never `top`, `left`, `width`, `height` or `letter-spacing`.
+- Directional CSS uses `margin-inline`, `padding-inline`, `start` and `end` — never `left`/`right` where direction matters. This site is RTL in Persian, and RTL is a first-class mode, not a variant.
+- No webfont. The geometric system stack in the token layer ships zero font bytes on purpose; do not add next/font and do not add CDN font CSS.
+- No `any`. No ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable, no `.skip` on a test you just broke.
+- Nothing under src/ imports anything under legacy/. The legacy modules are read and ported, never linked.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then write a scratch route that renders `drawingSet('qeytarieh-08-residence', ['Residential'])` and open it. Compare the result against the same seed in the legacy site (`python3 -m http.server 8000` inside legacy/, then open the Projects column): the drawing must be identical, because the seed is the slug and the generator is deterministic. A different image means a constant was changed in the port. Delete the scratch route before committing.
+
+Confirm with the browser devtools network panel that the drawing route ships no JavaScript for the SVG. Check the ds/ controls at 360px, 768px, 1024px and 1440px, and check them with `dir="rtl"` set on the html element. Confirm the jest-axe tests actually run and pass rather than being present and empty.
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: where the ported stylesheets live, the two open decisions as resolved, the confirmed or refuted purity of the art layer, and the deferred Storybook stories as an outstanding item.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-3-design-system. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="4">
+    <div class="card-head">
+      <span class="chip">Prompt 4</span>
+      <h2 class="card-title">Locale routing, the five-column shell and the projects routes</h2>
+      <span class="badge">Opus 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-4-site-shell-projects</b></span>
+    </div>
+    <p class="summary">Replace hash-plus-modal with real routes: /[locale]/(site), the server-rendered shell with its signature transition intact, and the projects list with searchParams filters plus a statically generated detail page per slug.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="4">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="4"> Sent</label>
+      <button type="button" class="toggle" data-toggle="4">Show prompt text</button>
+    </div>
+    <pre data-prompt="4" hidden>Work on a new branch: prompt-4-site-shell-projects. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then 10-routing-and-app-shell.md in full, then 01-layering-and-boundaries.md section 9 (adding a feature module), then 08-state-and-data-flow.md section 1 (the state decision table).
+
+Then read:
+- legacy/index.html — the complete five-column shell markup; the Projects column is at line 112, each column carries data-id, a .col__art drawing host, a .col__title with per-character .ch spans, a .col__caption and an empty .panel div
+- legacy/js/main.js — boot at line 80, hash routing at line 20, `pageTitle` at 25, the popstate handler at 106, the Tehran clock at 152
+- legacy/js/ui/panel.js — `mountPanel` at line 534, and the per-section content, filtering and project detail rendering above it
+- legacy/data/projects.js:422 — the FILTERS definition: type, status, scale, year, each with its options and its match predicate
+- legacy/data/studio.js:17 — NAV, the five sections with their labels, paths and captions
+- legacy/data/i18n.js:11 — the STRINGS dictionary, English at line 12 and Persian at line 142
+- legacy/js/core/i18n.js — language state at 61, RTL at 62, `t()` at 126, `num()` at 132, `term()` at 138, `list()` at 144, the overlay merge at 154, `nav()` at 172, `canSplitGlyphs` at 190
+
+2. CONTEXT
+
+Prompt 1 built the Next.js 16.3 skeleton and the token layer. Prompt 2 built the libSQL database, the `services` then `repositories` then `db` rings, and the cached read services with their tag list. Prompt 3 ported the art generators to server-safe TypeScript at src/common/lib/art/, the motion core and interaction modules to src/common/lib/motion/, the five legacy stylesheets, and the ds/ and form/ tiers. Confirm src/common/lib/art/, src/common/lib/motion/ and the read services all exist; if any is missing, its prompt has not been merged and this prompt is not ready to run.
+
+Today the legacy site has no routes. legacy/js/main.js:20 reads a hash fragment, and legacy/js/ui/shell.js opens the matching section as an in-page panel over the same document. Every project, design work and media entry is a state of one page. That is the thing this prompt replaces: real routes, real URLs, real server-rendered pages, one per record.
+
+3. GOAL
+
+When this is done, the public site has real locale-prefixed routes; the five-column home renders server-side with its signature transition intact; `/en/projects` and `/fa/projects` list all 76 projects with the four filters driven by searchParams; and `/en/projects/&lt;slug&gt;` renders a server-rendered detail page with its generated drawings, statically generated for every slug. The hash-plus-modal model is gone from the new app.
+
+4. SCOPE
+
+In scope:
+- src/app/[locale]/(site)/ — layout, the home shell, and the projects list and detail routes
+- the i18n foundation: locale segment, dictionary, RTL, Persian digits
+- src/modules/projects/ — the first feature module, and the acceptance test for prompts 1 through 3
+- generateStaticParams and generateMetadata on the project detail route
+- loading.tsx and error.tsx for the site route group
+
+Out of scope, do not start any of it in this pass:
+- The design, media, studio and contact routes — prompt 5. Their columns on the home shell link to routes that do not exist yet; that is expected and prompt 5 lands them.
+- Any dashboard, auth or write path — prompts 6 and 7
+- sitemap.ts and robots.ts — prompt 5, once every public route exists
+- Changing anything in src/common/lib/motion/ or src/common/lib/art/ beyond what integration genuinely requires. If integration forces a change there, make it and say so explicitly.
+
+5. SPECIFICS
+
+5.1 The locale segment.
+Routes are `src/app/[locale]/(site)/...` with locale being `en` or `fa`. Add `generateStaticParams` returning both. The root layout sets `lang` and `dir` from the segment before first paint — legacy/README.md records that this is deliberate, so a Persian visitor never watches the layout flip after the fact. Persian also needs the `is-fa` class on the html element, which is what legacy/css/i18n.css keys its tracking collapse on.
+
+Redirect `/` to the default locale. Recommended default is `en`, matching the current site's behaviour at legacy/js/core/i18n.js:97, but check that function before deciding — if it honours `navigator.language`, preserve that intent with an Accept-Language read in the redirect.
+
+5.2 The dictionary.
+Port legacy/data/i18n.js:11 STRINGS into src/common/i18n/ as typed dictionaries — English at legacy/data/i18n.js:12, Persian at :142. Keep the key structure exactly; the keys are referenced throughout the ported CSS and modules. Port `faDigits` from legacy/data/i18n.js:280 and the `num()` wrapper from legacy/js/core/i18n.js:132: Persian renders Persian numerals, and the database stores Latin digits deliberately (legacy/data/projects.fa.part1.js:3 records this), so conversion happens at render time and nowhere else.
+
+Port `term()` from legacy/js/core/i18n.js:138 for the fixed vocabularies — project type, status, scale, design category, media kind — and `list()` from :144, which joins with the Arabic comma in Persian and the Latin one in English.
+
+The language switch is now navigation, not client state: switching language means going to the same route under the other locale prefix, so the Persian content module no longer loads on demand and legacy/js/core/i18n.js's `prefetchFa`, `loadFa` and `onLang` machinery has no successor. Say so in AGENTS.md rather than porting dead code.
+
+5.3 The site layout.
+src/app/[locale]/(site)/layout.tsx composes the masthead (wordmark, the mark stepper, the language switch, the closer), the footer bar with the Tehran clock, and the client boundary that mounts the ported cursor, smooth-scroll and preload modules from src/common/lib/motion/. That client boundary is one component in src/common/components/layout/ carrying 'use client'; the layout itself stays a Server Component.
+
+The Tehran clock at legacy/js/main.js:152 is UTC+03:30 and its formatter is locale-dependent, using `fa-IR` with the `arabext` numbering system in Persian. It ticks every 30 seconds, so it is client-side; give it its own leaf 'use client' component and render a server-computed initial value so there is no hydration flash.
+
+The mark stepper in the masthead compresses into a section indicator and mirrors under RTL so the dot that grows matches what the reader sees — legacy/README.md records this. Preserve it.
+
+5.4 The home shell.
+src/app/[locale]/(site)/page.tsx renders the five columns from legacy/index.html:112 onward as server-rendered markup, with each column's `.col__art` filled by calling the ported generator directly on the server — the Projects column uses `elevation` seeded `kavan-projects`, Design uses `screen` seeded `kavan-design`, Media uses `massing` seeded `kavan-media`; read legacy/index.html for the remaining two rather than guessing.
+
+The five column titles are `&lt;a&gt;` elements that now navigate to real routes (`/en/projects` and so on) instead of setting a hash. The signature transition still plays: the ported shell module runs the per-glyph FLIP on the click, and the navigation completes underneath it. Wire the FLIP to the router transition rather than to a hash change. Per-character `.ch` spans are emitted server-side for English titles and as one span holding the whole word for Persian, gated by the ported `canSplitGlyphs` — a Persian title split per character renders as disconnected presentation forms.
+
+The whole shell must still be legible with JavaScript disabled, which server rendering now gives for free. Keep the skip link at legacy/index.html:62 and the `aria-live` region.
+
+5.5 The projects module.
+Declare it first: add `'projects'` to the MODULES array in eslint.config.mjs before creating the folder, so the boundary is enforced from the first file.
+
+src/modules/projects/ holds components/, lib/ and its index.ts barrel — the module's entire public API. app/ imports the barrel and nothing deeper. A page.tsx past roughly 40 lines has absorbed the module's job; if that happens, move the work into the module.
+
+5.6 The projects list route.
+src/app/[locale]/(site)/projects/page.tsx. The four filters — type, status, scale, year, defined at legacy/data/projects.js:422 — are `searchParams`, not client state. The state decision table's first row puts anything shareable and derivable from the request in the URL, and it means a filtered view is linkable and back-button-correct, which the current site cannot do. Each filter's semantics come from its `match` predicate at legacy/data/projects.js:426 onward; note that `type` is `includes` on an array, not equality, because a project carries multiple types.
+
+Cards draw themselves from the server. Because the generators run server-side now, the legacy lazy-draw-on-scroll machinery is unnecessary — but keep `content-visibility: auto` with `contain-intrinsic-size` from the ported CSS, which is what makes 76 cards cost about as much as the dozen on screen.
+
+5.7 The project detail route.
+src/app/[locale]/(site)/projects/[slug]/page.tsx, with `generateStaticParams` over every slug from the service, in both locales, and `generateMetadata` producing the title in the pattern legacy/js/main.js:25 uses. `notFound()` on an unknown slug. The drawing set comes from `drawingSet(slug, types)` on the server; a project's slug is its seed, so the artwork on the detail page matches the card exactly.
+
+5.8 Boundaries.
+Add loading.tsx and error.tsx to the (site) route group — one chrome and one error boundary per area. error.tsx renders the ErrorState from prompt 3 against the one normalized error shape, never raw JSON and never a blank page.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- Locale is a URL segment (`/en/...`, `/fa/...`), not a cookie or a client toggle. This makes each language independently cacheable and crawlable, which the current hash-based site is not, and it is the reason the on-demand Persian loader has no successor.
+- The five-column home is the site root, not a separate landing page. Opening a section navigates away from it rather than expanding it in place, which is the substantive behavioural change this migration was asked for.
+- English is the default locale for the bare `/` redirect, matching the current site.
+- The route slugs are English in both locales (`/fa/projects`, not `/fa/پروژه‌ها`). Persian slugs would need a second slug column and a second static-params set, which is out of scope here.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether the per-glyph FLIP runs on route navigation at all. Recommended: keep it, driven by the router's transition, because it is the site's signature. If wiring it to navigation proves unstable, fall back to playing it on the outgoing view only and say so — a half-working transition is worse than a clean cut.
+- Whether project detail pages are fully statically generated at build time or rendered on demand and cached. Recommended: generateStaticParams over all 76 slugs in both locales — 152 pages is cheap to build, and the dashboard writes in prompts 6 and 7 purge by tag anyway.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- app/ is routing and composition only. No domain JSX, no business logic, no mappers. Domain work lives in src/modules/projects/ and is consumed through its index.ts barrel.
+- Server Components are the default; 'use client' sits on the leaf that needs it — the clock, the cursor host, the filter controls — never on a page or a layout.
+- Components never call the database and never build a query. They call a service from prompt 2.
+- Filter state lives in searchParams. Server data never enters a client store.
+- No colour literal outside the token layer. Only transform, opacity and clip-path are animated.
+- Directional CSS uses margin-inline, padding-inline, start and end. RTL is a first-class mode, not a variant.
+- Persian copy is rendered verbatim from the database. Never translate, paraphrase or re-space it in a component.
+- No `any`. No ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable.
+- Nothing under src/ imports anything under legacy/.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then run `npm run dev` and check all of the following:
+- http://localhost:3000/ redirects to /en
+- /en renders the five columns; /fa renders them right-to-left with Persian labels, Persian numerals in the footer counts, and the tracking collapsed
+- Clicking Projects plays the transition and lands on /en/projects with a real URL; the browser Back button returns to the shell without reloading the document
+- /en/projects shows 76 cards; applying type=Residential and status=Completed narrows the list, and the resulting URL is copy-pasteable into a fresh tab and reproduces the same view
+- /en/projects/qeytarieh-08-residence renders the detail with its drawing, and the drawing is identical to the same project's card drawing
+- /fa/projects/qeytarieh-08-residence renders the Persian title, blurb, description, location and client from the database
+- An unknown slug renders not-found rather than throwing
+- With JavaScript disabled, /en still renders the whole five-column shell
+- Keyboard: arrows move between columns, Enter opens, Escape closes; the skip link works; focus is visible
+- With prefers-reduced-motion set, the custom cursor is absent and transitions collapse to a single frame
+- Widths 360px, 768px, 1024px and 1440px, in both locales
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the locale routing scheme, the two open decisions as resolved, that the on-demand Persian loader has no successor and why, and any change this prompt was forced to make inside src/common/lib/motion/.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-4-site-shell-projects. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="5">
+    <div class="card-head">
+      <span class="chip">Prompt 5</span>
+      <h2 class="card-title">Design, media, studio and contact routes</h2>
+      <span class="badge">Sonnet 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-5-site-editorial</b></span>
+    </div>
+    <p class="summary">The remaining four public sections, following prompt 4’s pattern, plus the one public Server Action (the contact form), metadata, sitemap and robots. The public site is complete when this lands.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="5">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="5"> Sent</label>
+      <button type="button" class="toggle" data-toggle="5">Show prompt text</button>
+    </div>
+    <pre data-prompt="5" hidden>Work on a new branch: prompt-5-site-editorial. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then 10-routing-and-app-shell.md sections 6, 8 and 9 (metadata, sitemap, robots), then 04-actions-and-mutations.md and 07-forms.md for the one write this prompt introduces.
+
+Then read the content this prompt routes:
+- legacy/data/works.js:10 — DESIGN_WORKS, 9 records with client, scope, materials, team, status, description and a facts array
+- legacy/data/works.js:273 — MEDIA, 14 records with outlet, type, author, excerpt, context, a related project slug and a facts array
+- legacy/data/studio.js:25 — STUDIO: founders at 26, manifesto at 50, stats at 60, team at 67 (22 names), alumni at 76 (40 names), awards at 89, chapters at 104
+- legacy/data/studio.js:165 — CONTACT: address, phone, email, press, hours, coordinates, socials, careers
+- legacy/js/ui/panel.js — how each of these sections is laid out today
+- src/app/[locale]/(site)/projects/ as prompt 4 built it — the editorial routes follow its shape exactly
+
+2. CONTEXT
+
+Prompt 4 (branch prompt-4-site-shell-projects) landed the locale-prefixed routing, the five-column home shell, the i18n dictionary and digit handling, and the projects list and detail routes as the first feature module. Confirm src/app/[locale]/(site)/projects/[slug]/page.tsx and src/modules/projects/index.ts exist; if they do not, prompt 4 has not been merged and this prompt is not ready to run.
+
+Four of the five columns on the home shell currently link to routes that do not exist. This prompt lands them. Every pattern it needs — the locale segment, the service call, generateStaticParams, generateMetadata, the server-rendered drawings, the ErrorState boundary — was established by prompt 4 and is followed here rather than reinvented.
+
+The one genuinely new thing is a write: the contact page gains a form that inserts into the `contact_messages` table prompt 2 created. It is the only Server Action in the public site.
+
+3. GOAL
+
+When this is done, all five public sections have real routes in both locales — design and media with per-record detail pages, studio and contact as single editorial pages — the contact form writes to the database through a Server Action returning an ActionResult, and the site has correct metadata, a sitemap and a robots file covering every public route.
+
+The public site is then complete. Prompts 6 and 7 build the dashboard that edits it.
+
+4. SCOPE
+
+In scope:
+- src/app/[locale]/(site)/design/ — list and [slug] detail
+- src/app/[locale]/(site)/media/ — list and [slug] detail
+- src/app/[locale]/(site)/studio/ — single page
+- src/app/[locale]/(site)/contact/ — single page plus the message form
+- src/modules/design/, src/modules/media/, src/modules/studio/, src/modules/contact/
+- src/app/sitemap.ts and src/app/robots.ts
+- generateMetadata on every public route
+
+Out of scope, do not start any of it in this pass:
+- Any dashboard, auth, session or admin route — prompts 6 and 7
+- Any change to the projects module or the home shell beyond adding the four links, unless a real defect blocks this work; if one does, fix it and say so
+- Deleting legacy/ — prompt 7
+- Docker, CI and deploy — prompt 7
+
+5. SPECIFICS
+
+5.1 Declare the four modules first.
+Add `'design'`, `'media'`, `'studio'` and `'contact'` to the MODULES array in eslint.config.mjs before creating any folder. No cross-module imports, not even type-only — if design and media want to share a card component, that component is promoted to src/common/components/, never borrowed sideways. This will come up: their detail pages are structurally similar. Promote deliberately rather than importing across.
+
+5.2 Design routes.
+/[locale]/(site)/design lists the 9 works from the service, each with its category, year and blurb. /[locale]/(site)/design/[slug] renders the detail: client, scope, materials, team, status, the two-paragraph description, and the facts table. legacy/data/works.js:10 is the field-by-field reference. Drawings come from the server-side generator seeded on the slug, as in prompt 4.
+
+The facts array is `{ k, v }` pairs and is translated — legacy/data/works.fa.js:28 has a Persian facts array — so it renders from the locale-resolved record, not from a hardcoded label list.
+
+5.3 Media routes.
+/[locale]/(site)/media lists the 14 entries. /[locale]/(site)/media/[slug] is built around the excerpt, the studio's own note on the piece (`context`), the author, the outlet, and the facts table. Each media record carries a related project slug at legacy/data/works.js:283 — render it as a real link through to /[locale]/projects/&lt;slug&gt;. Verify every such link resolves to a project that exists; a media entry pointing at a missing project must render without the link rather than a dead one.
+
+Note that `outlet` is sometimes translated and sometimes left in Latin script (legacy/data/works.fa.js:283 keeps "ArchDaily"). Prompt 2 gave it both columns. Latin runs inside Persian text — outlet names, emails, coordinates — must be bidi-isolated so they do not scramble at a line boundary; legacy/css/i18n.css already carries the rule, so use the class rather than inventing one.
+
+5.4 Studio route.
+/[locale]/(site)/studio is one page with an index rail beside the content: hero band, manifesto, founders, the stats numbers, the history chapters, awards, and the twenty-two current people. The 40 alumni names at legacy/data/studio.js:76 are also in the record — check legacy/js/ui/panel.js for whether the current site surfaces them, and match it. Founder portraits use the `portrait` generator at legacy/js/art/draw.js:789, seeded on the founder's name.
+
+Stats render with Persian numerals in the Persian locale, through the ported `num()` helper.
+
+5.5 Contact route.
+/[locale]/(site)/contact renders the hero band, the three-column detail grid (address, phone, email, press, hours, socials, careers) and the drawn site plan — the original uses the `contour` generator instead of an embedded map, seeded on the coordinates or the address; read legacy/js/ui/panel.js to find which and reproduce it.
+
+Then the form. It is the only Server Action in the public site:
+- Schema in src/modules/contact/schemas/, exact — a write schema is never tolerant. Name, email, subject, body, with real minimums and a proper email check.
+- Built on the form/ tier from prompt 3, react-hook-form with zodResolver. Never a hand-rolled onSubmit.
+- The action lives in src/modules/contact/actions/, carries 'use server', re-validates its input with the schema (the UI that called it is not a security boundary — an action is a public HTTP endpoint), inserts through the contact-messages repository, and RETURNS a discriminated ActionResult. It never throws for an expected failure: a throw is sanitized crossing the RPC boundary, which destroys the status and body that field-error binding needs. Use `toActionResult` server-side and bind `fieldErrors` back onto the form.
+- Branch on `status` and `code`, never on message text — messages get localized, and this site is bilingual, so string matching would break in exactly one language.
+- Add basic abuse resistance: a honeypot field and a per-IP rate limit. Do not add a third-party captcha.
+- The action does not need to purge any cache tag, because no public page reads contact_messages. Confirm that is still true rather than adding a purge reflexively.
+
+5.6 Metadata, sitemap and robots.
+generateMetadata on every route, with the title pattern established at legacy/js/main.js:25. Per-locale metadata, and `alternates.languages` pointing each page at its counterpart in the other locale.
+
+src/app/sitemap.ts enumerates every public route in both locales by reading the services — the five section pages plus every project, design work and media slug. src/app/robots.ts allows the public site and disallows the dashboard path prompt 6 will create.
+
+5.7 Delete the leftovers.
+Remove the placeholder route prompt 1 created at src/app/page.tsx if the locale redirect has superseded it, and remove anything else the scaffolder left that is now dead. Delete on arrival: when the new path lands, the old one goes in the same phase.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- Studio and contact are single pages driven by the two singleton database rows prompt 2 created, not multi-record collections.
+- The contact form writes to `contact_messages` and sends no email. Adding SMTP is a deploy-time concern with its own credentials and failure modes, and the dashboard inbox in prompt 7 is where messages are read. If email delivery is actually required for launch, stop and say so — it changes prompt 7's scope.
+- Design and media detail pages reuse the projects detail layout's structure but are separate components in separate modules. Anything genuinely shared is promoted to src/common/components/.
+- Alumni names render on the studio page. If legacy/js/ui/panel.js shows the current site hides them, match the current site instead and record it.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether the contact form needs a rate limit backed by the database or an in-memory one is enough. Recommended: in-memory per-IP with a short window, because a serverless deploy may not share memory across instances but a studio contact form is not a target worth a table. If the deploy turns out to be single-instance, in-memory is simply correct.
+- Whether the site plan drawing on the contact page is seeded from the coordinates at legacy/data/studio.js:176 or from a fixed string. Recommended: a fixed string, so that editing the address in the dashboard does not silently redraw the map.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- app/ is routing and composition only. Each of the four new modules is consumed through its index.ts barrel, and no module imports another.
+- Server Components by default; 'use client' only on the contact form's interactive leaf.
+- Components never call the database — they call a service.
+- A write Server Action returns a discriminated ActionResult and never throws for an expected failure. It re-validates its input. It never accepts an identity as an argument.
+- Forms are react-hook-form plus zodResolver through the form/ tier. Never a hand-rolled onSubmit.
+- No colour literal outside the token layer. Only transform, opacity and clip-path are animated.
+- Directional CSS uses margin-inline, padding-inline, start and end. Latin runs inside Persian are bidi-isolated.
+- Persian copy renders verbatim from the database. Never translate, paraphrase or re-space it in a component.
+- Every link resolves to a real route. No dead links, no placeholder hrefs.
+- No `any`. No ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable.
+- Nothing under src/ imports anything under legacy/.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then run `npm run dev` and check:
+- All five columns on /en and /fa link to routes that render; no 404 from the home shell
+- /en/design lists 9, /en/media lists 14; both detail routes render their full field set including the facts table
+- Every media detail's related-project link resolves; click at least three
+- /en/studio renders founders with their generated portraits, the manifesto, 22 team names, the awards and the chapters
+- /fa/studio renders Persian numerals in the stats and does not scramble Latin runs
+- /en/contact renders the drawn site plan; submitting the form with valid input inserts exactly one row into contact_messages; submitting with an invalid email shows the error bound to that field and does not insert; submitting with the honeypot filled does not insert
+- The Persian contact form shows Persian validation messages, and the code branches on status rather than on message text
+- /sitemap.xml lists every public route in both locales; /robots.txt disallows the dashboard path
+- Widths 360px, 768px, 1024px and 1440px, in both locales, with keyboard navigation and prefers-reduced-motion
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the four new modules and anything promoted to common/ rather than shared sideways, the two open decisions as resolved, the contact form's abuse-resistance approach, and the explicit note that no email is sent.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-5-site-editorial. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="6">
+    <div class="card-head">
+      <span class="chip">Prompt 6</span>
+      <h2 class="card-title">Auth, the dashboard shell and projects CRUD</h2>
+      <span class="badge">Opus 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-6-auth-dashboard-projects</b></span>
+    </div>
+    <p class="summary">A single signed cookie session, the request proxy, the dashboard route group, and the first full CRUD surface — 76 projects edited in both languages, every write returning an ActionResult and purging its exact cache tags.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="6">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="6"> Sent</label>
+      <button type="button" class="toggle" data-toggle="6">Show prompt text</button>
+    </div>
+    <pre data-prompt="6" hidden>Work on a new branch: prompt-6-auth-dashboard-projects. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then in this order: 04-actions-and-mutations.md in full, 07-forms.md in full, 03-server-data-layer.md section 6.1 (the session module), 10-routing-and-app-shell.md sections 6 and 7 (auth gating and request interception), and 06-error-system.md.
+
+Then read:
+- src/common/services/action-result.ts — the ActionResult contract prompt 1 landed
+- src/common/services/project-repository.ts and project-service.ts — the write functions prompt 2 wrote but nothing has called yet
+- the cache tag list in AGENTS.md, written by prompt 2
+- src/common/components/form/ — the form tier prompt 3 built
+- .claude/skills/nextjs-app-architecture/templates/src/common/services/session.ts and templates/src/proxy.ts and templates/src/common/config/private-routes.ts
+
+2. CONTEXT
+
+Prompts 1 through 5 built the foundation, the database, the design system and the complete public site. Confirm src/app/[locale]/(site)/contact/page.tsx exists and that the contact form's Server Action returns an ActionResult; if it does not, prompt 5 has not been merged and this prompt is not ready to run.
+
+Everything so far is read-only apart from one contact form. This prompt opens the write side: an authenticated dashboard where the studio edits its own content, and the first full CRUD surface — projects, all 76 of them, in both languages.
+
+AGENTS.md records the auth deviation this prompt implements. The architecture skill's step A9 specifies a three-legged JWT rotation against a remote auth server. There is no remote auth server here and there is one administrator, so the session ring collapses to a single signed HttpOnly cookie checked against ADMIN_PASSWORD. What is kept from A9, because it is cheap and load-bearing, is the rule that session.ts is the only module in the codebase that touches auth cookies, and that cookie writes happen only in Server Actions, Route Handlers and request interception — never during a Server Component render.
+
+3. GOAL
+
+When this is done, /dashboard is behind a login, the dashboard shell exists with navigation to all six content areas, and projects are fully manageable: list, create, edit, delete, reorder, in both English and Persian, through Server Actions that return ActionResult and purge the exact cache tags prompt 2 declared — so a change made in the dashboard is visible on the public site immediately.
+
+Prompt 7 repeats this CRUD pattern for the remaining five areas.
+
+4. SCOPE
+
+In scope:
+- src/common/services/session.ts and the login and logout actions
+- src/proxy.ts and src/common/config/private-routes.ts
+- src/app/(dashboard)/ — the route group, its layout, login page, and the projects screens
+- src/modules/dashboard/ — the shell chrome, the shared CRUD pieces prompt 7 reuses
+- projects CRUD: list, create, edit, delete, reorder
+- tests for the actions
+
+Out of scope, do not start any of it in this pass:
+- CRUD for design, media, studio, contact or messages — prompt 7. Their dashboard navigation entries should link to routes that do not exist yet; leave them as visibly disabled entries rather than dead links.
+- Any change to the public site's rendering — this prompt only causes its cache to be purged
+- Docker, CI and deploy — prompt 7
+- Deleting legacy/ — prompt 7
+- Multi-user accounts, roles or password reset. One admin, one password.
+
+5. SPECIFICS
+
+5.1 The session module.
+src/common/services/session.ts, imports 'server-only'. It is the only module in the codebase that reads or writes the auth cookie. It holds: `createSession()` which signs a payload with SESSION_SECRET using node:crypto HMAC and sets an HttpOnly, SameSite=Lax, Secure-in-production cookie; `readSession()` which verifies the signature and expiry and returns a discriminated result rather than throwing; and `destroySession()`. Use a timing-safe comparison for both the password check and the signature check.
+
+Both SESSION_SECRET and ADMIN_PASSWORD are read through src/common/config/env.ts, which prompt 1 declared them in. Never `process.env` directly, and never a literal fallback — a missing secret must fail at boot, not silently degrade to an empty string that validates every cookie.
+
+Give the session a sensible expiry and record it in AGENTS.md.
+
+5.2 The login and logout actions.
+In src/modules/dashboard/actions/. `loginAction` re-validates its input with a zod schema, compares the password timing-safely, calls `createSession()` and returns an ActionResult — a wrong password is `{ ok: false, status: 401 }`, not a throw. Rate-limit failed attempts. `logoutAction` calls `destroySession()` and redirects.
+
+Cookie writes happen here, in a Server Action. Never during a Server Component render — that throws in the App Router and the failure surfaces far from its cause.
+
+5.3 Request interception.
+src/proxy.ts (Next 16 spelling; the file is `middleware.ts` on 15.x — this project is on 16.3, so use proxy.ts) plus src/common/config/private-routes.ts listing the dashboard paths. Copy the templates rather than hand-writing them.
+
+Two things this must get right. First, it is a coarse UX gate that redirects an unauthenticated visitor to the login page — it is never the authorization decision. Every Server Action still re-authorizes from the session itself, because an action is a public HTTP endpoint that can be called without ever passing through the proxy. Second, it injects REQUEST headers: `NextResponse.next({ headers })` sets RESPONSE headers and breaks every Server Action in the app, which is a failure that presents as unrelated forms silently doing nothing.
+
+Confirm robots.txt from prompt 5 already disallows the dashboard path, and that the path matches what private-routes.ts lists.
+
+5.4 The dashboard route group.
+src/app/(dashboard)/ — deliberately outside the `[locale]` segment, because the dashboard is an admin tool with one interface language, not a bilingual public surface. It gets its own layout, its own error.tsx and its own loading.tsx: one chrome and one error boundary per area.
+
+Dashboard routes are dynamic and must never be cached. No `'use cache'` anywhere under (dashboard).
+
+Decide the dashboard's own interface language and record it in AGENTS.md — see the open decisions below. Whichever it is, it is fixed; the dashboard does not have a language switch.
+
+5.5 The dashboard shell.
+src/modules/dashboard/ with its index.ts barrel. Add `'dashboard'` to the MODULES array in eslint.config.mjs before creating the folder. The shell is navigation to the six content areas (Projects, Design, Media, Studio, Contact, Messages), a header showing who is signed in with a logout control, and the content region. Built from the ds/ tier prompt 3 created, on the same token layer as the public site — this is a dark champagne-on-near-black admin tool, not a default Tailwind admin template.
+
+Because prompt 7 reuses everything here, build the pieces it will need as genuinely reusable components in this module: a list table with sorting, a form scaffold that binds ActionResult fieldErrors, a delete confirmation dialog, and a toast or inline result region that renders the normalized error shape.
+
+5.6 The projects CRUD.
+Screens: a list at /dashboard/projects with search and the four filters, a create form, an edit form, delete with confirmation, and reordering that writes `sort_order`.
+
+The forms edit both locales at once. Each translated field is a pair of inputs side by side — English on the left, Persian on the right with `dir="rtl"` and the Persian type treatment. This is the whole reason the schema uses per-locale columns, and it is what makes translating a project a single save rather than two.
+
+Every write is a Server Action in src/modules/dashboard/actions/ that:
+- carries 'use server'
+- re-authorizes by calling `readSession()` first and returns `{ ok: false, status: 401 }` if there is no session. Do this in every action without exception. The UI that called it is not a security boundary.
+- re-validates its input against an exact write schema and returns `{ ok: false, status: 422, body: fieldErrors }` on failure, using `z.flattenError`
+- calls the repository write from prompt 2 through `toActionResult`
+- purges cache tags: `updateTag('projects')` and, for a single-record write, `updateTag('project:' + slug)`. Use the exact tag strings AGENTS.md lists — a tag purged under a name that was never set is silent staleness that nobody notices until the client does.
+- returns a discriminated ActionResult. It never throws for an expected failure.
+
+Use `updateTag`, not `revalidateTag`. `updateTag` expires immediately and the same request reads fresh, which is what makes the dashboard show the change the moment it is saved. `revalidateTag` serves stale while it refreshes in the background, which for an editor looks exactly like a save that did not work. If a `revalidateTag` call is genuinely needed somewhere, it must pass the cache-life profile as its second argument — the single-argument form is deprecated on 16 and still compiles, which is exactly why it survives review.
+
+A slug change must move the record's instance tag: purge both the old and the new `project:&lt;slug&gt;` tags, or the old detail page stays cached forever under a URL that no longer exists.
+
+5.7 Tests.
+Real tests for the action layer, in src/modules/dashboard/__tests__/:
+- An unauthenticated call to each write action returns 401 and does not touch the database
+- An invalid payload returns 422 with fieldErrors keyed by field name, and does not touch the database
+- A valid update writes the row and calls updateTag with both the collection and the instance tag. Mock next/cache to assert the tag strings.
+- Login with the wrong password returns 401 and sets no cookie
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- One administrator, one password from ADMIN_PASSWORD, one signed cookie. No users table, no roles, no registration, no password reset. Losing the password means changing the environment variable.
+- The dashboard lives at /dashboard, outside the locale segment, and has one fixed interface language.
+- The dashboard edits English and Persian side by side in one form, which is the direct consequence of the per-locale column decision recorded in AGENTS.md.
+- Deleting a project deletes the row outright. If soft-delete or an undo window is wanted, it needs a `deleted_at` column and a schema change, so say so now rather than after the dashboard is built.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- The dashboard's interface language. Recommended: English, because every field label maps directly to a database column name and to the vocabulary in AGENTS.md, which keeps the admin tool debuggable. Persian is defensible if the people using it prefer it — but then the dashboard chrome needs the full RTL treatment from legacy/css/i18n.css, which is roughly two extra hours.
+- Whether Persian fields are required or may be left empty on save. Recommended: optional, with the public site falling back to the English value exactly as the seed script does for missing translations. Requiring both would block the studio from publishing a new project until someone has translated it.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- A write Server Action RETURNS a discriminated ActionResult and never throws for an expected failure. A throw is sanitized crossing the RPC boundary and destroys the status and body that rollback and field-error binding need.
+- Every action re-validates its input and re-authorizes from the session, and never accepts a user, tenant or owner identity as an argument.
+- Branch on status, code, or a named field key — never on message text.
+- session.ts is the only module that touches auth cookies. Cookie writes happen only in Server Actions, Route Handlers and request interception, never during a Server Component render.
+- The proxy is a coarse UX gate, never an authorization decision, and it injects REQUEST headers.
+- mapError is the only place a thrown value is interpreted; exactly one shape `{ status, code, message, fieldErrors }` reaches the UI, extracted by duck-typing and never by instanceof.
+- Forms are react-hook-form plus zodResolver through the form/ tier. Never a hand-rolled onSubmit.
+- app/ is routing and composition only; the dashboard module is consumed through its index.ts barrel.
+- Dashboard routes are never cached. No 'use cache' under (dashboard).
+- No colour literal outside the token layer. No `any`. No ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable.
+- Nothing under src/ imports anything under legacy/.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then run `npm run dev` against the seeded database and check:
+- Visiting /dashboard while signed out redirects to the login page
+- The wrong password shows an error and sets no cookie; the right one signs in and lands on the dashboard
+- /dashboard/projects lists all 76; search and the filters narrow it
+- Creating a project with both locales filled appears immediately at /en/projects and /fa/projects with no rebuild and no manual refresh of anything but the page. This is the cache-purge test and it is the single most important check in this prompt.
+- Editing a project's Persian title shows the new title at /fa/projects/&lt;slug&gt; immediately, and the English page is unchanged
+- Changing a project's slug leaves no stale page at the old URL
+- Deleting a project removes it from both public lists immediately
+- Reordering changes the public list order
+- Submitting the create form with a missing required field shows the error bound to that field and writes nothing
+- Logging out returns you to the login page, and /dashboard is inaccessible again
+- Calling a write action without a session — reproduce it by clearing the cookie and re-submitting a form — returns 401 and writes nothing
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the auth model and session expiry, the dashboard's interface language and the Persian-optional decision, the exact tag strings the actions purge, and the reusable dashboard pieces prompt 7 is expected to reuse.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-6-auth-dashboard-projects. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="7">
+    <div class="card-head">
+      <span class="chip">Prompt 7</span>
+      <h2 class="card-title">The remaining dashboard areas, deploy and the conformance audit</h2>
+      <span class="badge">Sonnet 5 · high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-7-dashboard-rest-and-deploy</b></span>
+    </div>
+    <p class="summary">CRUD for design, media, studio, contact and the message inbox; delete the legacy tree; container, CI and Turso deploy; then run the playbook’s Part C audit and record the result.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="7">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="7"> Sent</label>
+      <button type="button" class="toggle" data-toggle="7">Show prompt text</button>
+    </div>
+    <pre data-prompt="7" hidden>Work on a new branch: prompt-7-dashboard-rest-and-deploy. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md and the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ (start from README.md), then 11-tooling-and-gates.md in full, then 04-actions-and-mutations.md sections 8 and 9, then 12-adoption-playbook.md Part C (the conformance audit) — this prompt runs it.
+
+Then read:
+- src/modules/dashboard/ as prompt 6 built it, especially the reusable list table, form scaffold, delete dialog and result region
+- src/modules/dashboard/actions/ — the projects actions are the pattern every action in this prompt follows
+- the cache tag list in AGENTS.md
+- .claude/skills/nextjs-app-architecture/templates/config/Dockerfile, .dockerignore, compose.yaml, ci.yml and env.example
+
+2. CONTEXT
+
+Prompts 1 through 6 built the foundation, the database, the design system, the complete public site, the authenticated dashboard shell and full CRUD for projects. Confirm src/common/services/session.ts and src/app/(dashboard)/projects/ exist; if they do not, prompt 6 has not been merged and this prompt is not ready to run.
+
+Five dashboard areas are still navigation entries pointing nowhere: design, media, studio, contact and messages. This prompt lands all five by repeating the pattern prompt 6 established, then makes the project deployable and removes the legacy tree.
+
+This is the last prompt in the sequence. When it is done the migration is finished.
+
+3. GOAL
+
+When this is done, every piece of site content is editable from the dashboard; the legacy static site is deleted; the app builds and runs in a container against a Turso database; CI runs the four-command gate; and the Part C conformance audit has been run with its result recorded in AGENTS.md.
+
+4. SCOPE
+
+In scope:
+- Dashboard CRUD for design works and media (full create, edit, delete, reorder)
+- Dashboard editors for the studio and contact singletons
+- The messages inbox: list, read, mark-read, delete
+- Deleting legacy/
+- Dockerfile, .dockerignore, compose.yaml, CI workflow
+- Production environment configuration for Turso
+- The Part C conformance audit
+
+Out of scope, do not start any of it in this pass:
+- Any redesign or restyling of the public site or the dashboard
+- Any new public route
+- Email delivery for contact messages. Prompt 5 recorded that no email is sent; if that must change, it is separate work.
+- Analytics, monitoring or error reporting beyond what templates/src/common/observability/dev-log.ts already provides
+- Multi-user accounts or roles
+
+5. SPECIFICS
+
+5.1 Design works CRUD.
+/dashboard/design — list, create, edit, delete, reorder, following prompt 6's projects pattern exactly. The form covers the fields prompt 2's `design_works` table holds: slug, category, year, status, sort_order, and per-locale pairs for title, blurb, client, scope, materials, description, team and facts.
+
+Two fields need real editors rather than a plain text input: `team` is a string array, and `facts` is an array of `{ k, v }` pairs — and both are translated, so each needs an English and a Persian editor side by side. Build these two as reusable field components in src/modules/dashboard/, because media needs the facts editor too. Do not ship a raw JSON textarea; a JSON blob in a text field is how a studio breaks its own site at 11pm.
+
+Actions purge `design-works` and `design-work:&lt;slug&gt;` with `updateTag`, using the exact strings AGENTS.md lists.
+
+5.2 Media CRUD.
+/dashboard/media — same shape. Fields: slug, type, year, sort_order, the related project slug, and per-locale pairs for title, outlet, blurb, author, excerpt, context and facts.
+
+The related project field is a select populated from the projects service, not a free-text slug — a typo there produces a dead link on the public media detail page, which prompt 5 was specifically built to avoid. It must also allow "none", because not every media entry is about a project.
+
+Actions purge `media` and `media:&lt;slug&gt;`.
+
+5.3 The studio and contact editors.
+These two are singletons, so there is no list, no create and no delete — only an edit form on one row, and the form must never be able to create a second row. /dashboard/studio edits the per-locale manifesto and the founders, stats, team, alumni, awards and chapters collections; /dashboard/contact edits the address block, the coordinates, the socials list and the per-locale free-text fields.
+
+These are the most structured records in the database — founders, awards and chapters are arrays of objects. Reuse the repeatable-group field component from 5.1 rather than building a third variant, and reuse it again for socials.
+
+Actions purge `studio` and `contact` respectively.
+
+5.4 The messages inbox.
+/dashboard/messages lists rows from `contact_messages` newest first, showing name, email, subject and received time, with unread visually distinct. Opening one shows the full body and sets `read_at`. Delete removes the row, behind the same confirmation dialog as everywhere else.
+
+This surface is dynamic and uncached — prompt 2 deliberately left `contact_messages` reads out of the cache layer. There is no tag to purge, so do not add one. Verify that no public page reads this table before concluding it.
+
+5.5 Every action in this prompt.
+Without exception, each one: carries 'use server'; calls `readSession()` first and returns `{ ok: false, status: 401 }` when there is none; re-validates against an exact write schema and returns 422 with `fieldErrors` on failure; goes through `toActionResult`; purges its declared tags with `updateTag`; and returns a discriminated ActionResult rather than throwing. A slug change purges both the old and the new instance tag. There are no exceptions to this list — an action that skips the session check because "it is behind the proxy" is the exact hole this architecture exists to close, since an action is a public HTTP endpoint reachable without the proxy.
+
+5.6 Delete the legacy tree.
+`git rm -r legacy/`. Every prompt that needed it has read it: prompt 2 seeded from legacy/data/, prompt 3 ported legacy/js/ and legacy/css/, prompts 4 and 5 reproduced its layouts. Its content now lives in the database and its code lives in src/.
+
+Before deleting, do two things. First, confirm the database seed reproduces every record — 76 projects, 9 design works, 14 media, both singletons — because after this commit the legacy data files exist only in git history. Second, move anything from legacy/README.md that is still true about the new app into the project README, then write a fresh README describing the Next.js app: how to run it, how to seed the database, how to deploy. The legacy README documents a site that no longer exists.
+
+Then remove the `legacy/**` restricted-import zone from eslint.config.mjs, since there is nothing left to restrict, and drop `legacy` from the tsconfig exclude list.
+
+5.7 Container and deploy.
+Copy templates/config/Dockerfile, .dockerignore and compose.yaml. They are a coupled set — read templates/config/README.md for which files break if adopted without their pair. Resolve every `// TODO(project):` marker.
+
+Because the database is Turso rather than a local file, the container needs no volume; it needs TURSO_DATABASE_URL and TURSO_AUTH_TOKEN at runtime. Neither is baked into the image. Confirm the production build actually connects — a libSQL URL that works locally over `file:` and fails over `libsql:` is a failure you want to find now, not at launch.
+
+Document the deploy sequence in the README: build, run migrations against the production database, seed once, start.
+
+5.8 CI.
+Copy templates/config/ci.yml. It runs the four-command gate on every push. Remove the build-storybook step, since AGENTS.md records Storybook as deferred and there is nothing for it to build. CI needs a database to run `npm run build` against — point it at a throwaway `file:` database created and seeded in the workflow, not at the production Turso instance.
+
+5.9 The conformance audit.
+Run 12-adoption-playbook.md Part C against the finished repo and record the result in AGENTS.md as a scored gap list. Every deliberate deviation this migration took — no MSW, no Storybook, `db` replacing the HTTP transport ring, a single-admin cookie replacing the three-legged JWT rotation, `legacy/` having been a temporary reference — is recorded as a deviation with its reason, not silently accepted and not counted as a pass. Anything the audit finds that is not one of those recorded deviations is a real gap: fix it if it is small, and list it in AGENTS.md as outstanding work if it is not.
+
+Pay particular attention to ACT-15 and ACT-16: every declared cache tag must be purged somewhere, and `grep -rn "revalidateTag([^,)]*)" src` must return nothing, because the single-argument form is deprecated on Next 16 and still compiles.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- The five remaining areas follow prompt 6's projects pattern rather than introducing a new one. If the pattern turns out not to fit the singletons, adapt it and record why rather than building a parallel approach.
+- Deleting legacy/ is correct and final. Its content is in the database, its code is in src/, and git history holds the rest.
+- Deployment is Turso plus a container. No volume, no local database file in production.
+- No email is sent when a contact message arrives; the inbox is the delivery mechanism.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether the studio and contact editors save each collection separately or the whole record in one submit. Recommended: one submit for the whole record, because these are read as a single page and a partial save would leave the public page in a state the editor never previewed.
+- Whether a database backup step belongs in the deploy sequence. Recommended: yes, at least a documented `turso db shell ... .dump` before running migrations. This is the only copy of the studio's content once legacy/ is gone, and the cost is one line in the README.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Every write Server Action returns a discriminated ActionResult, re-validates its input, re-authorizes from the session, and never accepts an identity as an argument.
+- Branch on status, code, or a named field key — never on message text.
+- Cache tags are purged with `updateTag` inside the action, using the exact strings AGENTS.md declares. No single-argument `revalidateTag` anywhere.
+- Dashboard routes are never cached.
+- app/ is routing and composition only; the dashboard module is consumed through its index.ts barrel. No cross-module imports; anything shared is promoted to common/.
+- Forms are react-hook-form plus zodResolver through the form/ tier. No raw JSON textarea standing in for a structured editor.
+- No colour literal outside the token layer. No `any`. No ignoreBuildErrors / ignoreDuringBuilds / --no-verify, no blanket eslint-disable, no `.skip` on a test you just broke.
+- The gate is the four commands. All four pass, or the change is not done.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against the seeded database with `npm run dev`:
+- Each of /dashboard/design, /dashboard/media, /dashboard/studio, /dashboard/contact and /dashboard/messages loads and no dashboard navigation entry points at a missing route
+- Editing a design work's Persian title shows it at /fa/design/&lt;slug&gt; immediately; the same for a media entry
+- The media related-project field is a select, and choosing a project produces a working link on the public media detail page
+- Editing the manifesto in /dashboard/studio changes /en/studio and /fa/studio immediately
+- Adding an award through the repeatable-group editor renders on the public studio page in the right order
+- Submitting the public contact form puts a new unread row in /dashboard/messages; opening it marks it read; deleting it removes it
+- Every action rejects an unauthenticated call with 401 and writes nothing
+- `git status` shows legacy/ deleted; `npm run build` succeeds with it gone; `grep -rn "legacy" src/ *.json *.mjs *.ts` returns nothing
+- `docker compose up` builds and serves the app against the Turso database, and a dashboard write from inside the container is visible on the public site
+- `grep -rn "revalidateTag([^,)]*)" src` returns nothing
+- Every cacheTag string in src/common/services/ has a matching updateTag caller in src/modules/dashboard/actions/
+
+Report anything you could not verify, and why. If the container step cannot be verified in this environment, say so explicitly rather than reporting it as done.
+
+9. THEN
+
+1. Update AGENTS.md: the five new dashboard areas, the two open decisions as resolved, the full Part C audit result as a scored gap list with every deliberate deviation recorded as a deviation, any outstanding gap left unfixed, and the deploy sequence.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-7-dashboard-rest-and-deploy. Create and switch to it before making any changes.</pre>
+  </article>
+
+<footer class="bot">
+  <p><b>Before sending prompt 1:</b> this repository is not under version control &mdash; <code>git init</code> is the first thing prompt 1 does. It also moves the entire existing site into <code>legacy/</code>, which stays as a read-only reference until prompt 7 deletes it.</p>
+  <p><b>Four decisions are already baked into these prompts</b> and recorded in each one&rsquo;s assumptions: the database is Turso / libSQL; bilingual content is stored as per-locale columns on one row rather than a translations table; the dashboard has one administrator behind a single signed cookie; and Storybook and MSW are deliberately skipped. If any of those is wrong, change it before prompt 1 rather than after prompt 4.</p>
+  <p><b>Each prompt names its own open decisions</b> in section 6 with a recommendation. Those are the calls the receiving session must not make silently &mdash; it records whichever it chooses in AGENTS.md.</p>
+  <p>Sent state is stored in this browser only.</p>
+</footer>
+
+</div>
+<script>
+(function () {
+  var NUMBERS = [1, 2, 3, 4, 5, 6, 7];
+  var KEY = 'asansabt-prompt-';
+
+  function read(n) {
+    try { return localStorage.getItem(KEY + n) === '1'; } catch (e) { return false; }
+  }
+  function write(n, v) {
+    try { localStorage.setItem(KEY + n, v ? '1' : '0'); } catch (e) {}
+  }
+
+  function paintStrip() {
+    var done = 0;
+    NUMBERS.forEach(function (n) {
+      var on = read(n);
+      if (on) done++;
+      var seg = document.querySelector('[data-seg="' + n + '"]');
+      if (seg) seg.classList.toggle('is-done', on);
+    });
+    var note = document.getElementById('strip-note');
+    if (note) note.innerHTML = '<b>' + done + '</b> of ' + NUMBERS.length + ' sent';
+  }
+
+  NUMBERS.forEach(function (n) {
+    var card = document.querySelector('[data-card="' + n + '"]');
+    var pre = document.querySelector('[data-prompt="' + n + '"]');
+    var copy = document.querySelector('[data-copy="' + n + '"]');
+    var sent = document.querySelector('[data-sent="' + n + '"]');
+    var toggle = document.querySelector('[data-toggle="' + n + '"]');
+
+    if (sent && card) {
+      sent.checked = read(n);
+      card.classList.toggle('is-sent', sent.checked);
+      sent.addEventListener('change', function () {
+        write(n, sent.checked);
+        card.classList.toggle('is-sent', sent.checked);
+        paintStrip();
+      });
+    }
+
+    if (copy && pre) {
+      copy.addEventListener('click', function () {
+        var text = pre.textContent;
+        var done = function () {
+          var was = copy.textContent;
+          copy.textContent = 'Copied';
+          copy.classList.add('is-ok');
+          setTimeout(function () {
+            copy.textContent = was;
+            copy.classList.remove('is-ok');
+          }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else { fallback(); }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+      });
+    }
+
+    if (toggle && pre) {
+      toggle.addEventListener('click', function () {
+        var hidden = pre.hasAttribute('hidden');
+        if (hidden) { pre.removeAttribute('hidden'); toggle.textContent = 'Hide prompt text'; }
+        else { pre.setAttribute('hidden', ''); toggle.textContent = 'Show prompt text'; }
+      });
+    }
+  });
+
+  paintStrip();
+})();
+</script>
+</body>
+</html>

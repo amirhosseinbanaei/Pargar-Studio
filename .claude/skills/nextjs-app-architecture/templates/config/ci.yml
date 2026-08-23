@@ -1,0 +1,72 @@
+# Target path in a real project: <repo-root>/.github/workflows/ci.yml
+#
+# CI RUNS THE LOCAL GATE. Not a superset, not a subset — the SAME commands in the SAME
+# order, with the same env. The moment CI can pass where local fails (or the reverse),
+# developers learn to treat CI failures as noise, and the gate stops being a gate.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # One job on purpose. A matrix of parallel jobs is a performance optimization that costs
+  # you a shared node_modules and a coherent failure story ("which of the five is the real
+  # cause?"). Split only when the wall clock actually justifies it.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # Caches ~/.npm keyed on the lockfile. Do NOT cache `.next/` across runs unless
+          # you have measured the win — a stale build cache produces failures that
+          # reproduce on no developer machine.
+          cache: npm
+
+      # `npm ci`, never `npm install`: `ci` installs exactly the lockfile, while `install`
+      # may resolve new versions — which means CI would be testing a dependency tree that
+      # nobody has locally, and a green CI would prove nothing about your machine.
+      - run: npm ci
+
+      # Generated route types do not exist on a clean checkout. Without this step `tsc`
+      # reports confident nonsense about page/layout props that nobody can reproduce
+      # locally (where the dev server has already generated them).
+      - name: Generate route types
+        run: npm run typegen
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `--max-warnings 0`: a warning nobody is required to fix accumulates until the
+      # output is unreadable, at which point real errors hide inside it. Every rule is
+      # either an error or off.
+      - name: Lint
+        run: npm run lint -- --max-warnings 0
+
+      - name: Test
+        run: npm run test
+
+      # Public env vars are set on the BUILD STEP, not on the job, and they must match
+      # what a deploy will use — they are inlined into the client bundle here and can
+      # never be changed afterwards. A build with different public config than the deploy
+      # produces a different bundle from identical source.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          # DELETE THIS LINE unless the project has a request-mock front-db. With one,
+          # CI builds against it and needs no live backend; without one, setting it
+          # `enabled` produces a build whose client bundle waits for a worker that will
+          # never register.
+          NEXT_PUBLIC_API_MOCKING: enabled
+
+      # A real gate step, not a nicety: it compiles EVERY story, catching components that
+      # no current route happens to render and that the app build therefore never touches.
+      # Delete if the project has no component workshop.
+      - name: Build workshop
+        run: npm run build-storybook

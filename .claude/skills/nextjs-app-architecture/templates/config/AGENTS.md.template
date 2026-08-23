@@ -1,0 +1,60 @@
+<!--
+Target path in a real project: <repo-root>/AGENTS.md  (or CLAUDE.md — same content; if
+your tooling reads one and your teammates' reads the other, make the second a one-line
+pointer to the first, never a second copy).
+
+HOW TO USE THIS TEMPLATE
+  1. Replace every {{PLACEHOLDER}}.
+  2. Delete sections that do not apply. Do NOT add the architecture back in.
+  3. KEEP IT UNDER ~40 LINES. This file is a ROUTER, not a manual. Every rule copied out
+     of the architecture skill into this file is a rule that will disagree with the skill
+     within a month, and the agent will believe the wrong one. Four things belong here:
+     the stack line, the gate, pointers, and bans that are specific to THIS repo.
+  4. Delete this comment block.
+-->
+
+# {{PROJECT_NAME}} — agent instructions
+
+{{FRAMEWORK_AND_VERSION}} (App Router, React {{REACT_VERSION}}, TypeScript strict).
+Dev server: `npm run dev`{{DEV_PORT_NOTE}}.
+
+## Architecture
+
+This project follows the `nextjs-app-architecture` skill. Before writing or changing any
+framework-specific code (routing, caching, data fetching, Server Actions, forms, error
+handling, session), read the matching guide in
+`.claude/skills/nextjs-app-architecture/references/` — start from its index.
+
+Layering is machine-enforced in `eslint.config.mjs`: `app → modules → common`, one way,
+no cross-module imports, modules consumed through their `index.ts` barrel only. Adding a
+module means adding its name to the `MODULES` array **first**.
+
+{{OPTIONAL: If version-matched framework docs are vendored in this repo, add:
+`docs/` contains the version-matched framework guide set; consult it before framework
+work. When a vendored guide and the installed package disagree, trust the package and
+report the discrepancy — the package's bundled docs are ground truth; a checked-in guide
+is a snapshot that ages.}}
+
+## Verification
+
+After any non-trivial change run, in this order:
+
+```bash
+npm run typecheck && npm run lint && npm run build && npm run test
+```
+
+All four pass, or the change is not done. A type or lint error fails the work:
+`ignoreBuildErrors`, `ignoreDuringBuilds`, and `--no-verify` are banned in this repo.
+
+## Bans
+
+<!-- Only rules specific to THIS repo, each with its reason. Delete the examples that do
+     not apply; a ban with no reason gets discarded the first time it is inconvenient. -->
+
+- {{BAN_1}} — {{WHY_1}}
+- No `any`. Use `unknown` plus a type guard, or parse with a schema — `any` disables
+  checking transitively for everything downstream.
+- No new dependency for something the design system or `common/` already does; check
+  first, and say what you checked.
+- {{PROJECT_SPECIFIC_API_BANS: e.g. removed-in-this-major APIs, a library that is being
+  migrated away from, a pattern that caused a production incident here}}
