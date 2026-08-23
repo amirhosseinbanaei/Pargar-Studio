@@ -1,0 +1,74 @@
+// Target path in a real project: <repo-root>/tsconfig.json
+// (tsconfig.json is JSONC — these comments are legal and `tsc` reads the file fine.)
+//
+// `tsc --noEmit` is the single source of type truth in this architecture. The dev server
+// is not: it transpiles per file and never checks the whole graph, so it will happily run
+// code that `tsc` rejects.
+{
+  "compilerOptions": {
+    // Modern output target: top-level await, `.at()`, class fields, error `cause`. Every
+    // runtime this architecture targets (Node 20+, evergreen browsers) supports it, and a
+    // lower target only adds downlevel helper code nobody reads.
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+
+    // Allows a stray `.js` config/script to sit in the repo without breaking the program.
+    "allowJs": true,
+
+    // Skip type-checking dependency .d.ts files. Without it, one dependency shipping
+    // broken types makes YOUR typecheck red for a reason you cannot fix.
+    "skipLibCheck": true,
+
+    // NON-NEGOTIABLE. Without `strict`, `null` and `undefined` are assignable everywhere,
+    // which makes the entire contracts/schema layer buy you nothing: a parsed-and-narrowed
+    // type is worthless if `undefined` can flow into it unchecked.
+    "strict": true,
+
+    // The bundler emits; tsc only checks. Emitting from tsc would fight the bundler.
+    "noEmit": true,
+
+    "esModuleInterop": true,
+    "module": "esnext",
+
+    // Matches how the bundler actually resolves specifiers. `node`/`node16` reject valid
+    // `exports`-map imports that build and run fine, producing type errors with no defect.
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+
+    // Every file must be transpilable in isolation — which is exactly what the bundler
+    // does. It forces `export type { … }` for type-only re-exports, and THAT is what keeps
+    // a barrel from dragging server-only runtime code into a client bundle.
+    "isolatedModules": true,
+
+    // The automatic JSX runtime: no `import React` ceremony in every component file.
+    "jsx": "react-jsx",
+
+    // Makes repeated `typecheck` runs fast enough that people actually run them before
+    // pushing. Add `*.tsbuildinfo` to .gitignore.
+    "incremental": true,
+
+    // EDITOR ONLY: framework-aware diagnostics in the IDE. It does NOT affect `tsc`, so
+    // never treat an in-editor green as a passing gate.
+    "plugins": [{ "name": "next" }],
+
+    // The alias the entire boundary contract is written against. `no-restricted-imports`
+    // matches the specifier TEXT, so a relative `../../../common/...` import is invisible
+    // to it and bypasses every boundary rule. One alias, used for every cross-layer import.
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    // Where GENERATED ROUTE TYPES land (typed params/searchParams, PageProps, LayoutProps,
+    // RouteContext). Omit them and every typed route signature silently degrades to `any`.
+    // Ship BOTH paths: build and dev emit to different roots. Including a directory that
+    // does not exist is harmless.
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  // `legacy/` is the original static site, kept verbatim as reference material (deleted in
+  // prompt 7). It is untyped vanilla ES modules and is never part of this program — with
+  // `allowJs` on, including it would fail the type gate on code nobody is allowed to edit.
+  "exclude": ["node_modules", "legacy"]
+}
