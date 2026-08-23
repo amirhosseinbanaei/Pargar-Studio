@@ -1,0 +1,1 @@
+# Pure helpers with no React and no I/O. (cn() lives in lib/, not here.)

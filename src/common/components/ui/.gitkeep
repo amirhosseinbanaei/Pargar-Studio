@@ -1,0 +1,1 @@
+# Regenerable primitives (lowercase files, Base* exports). Only ds/ and form/ may import from here. Prompt 3.
