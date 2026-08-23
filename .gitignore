@@ -36,3 +36,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+# Rewritten by Next on every dev<->build flip (it points at .next/dev/types in one mode
+# and .next/types in the other), so tracking it means a permanently dirty tree. Regenerate
+# it on a clean checkout with `npm run typegen`, which must run before `npm run typecheck`
+# there — the generated route types do not exist yet and tsc reports confident nonsense
+# about page props without them.
+next-env.d.ts
