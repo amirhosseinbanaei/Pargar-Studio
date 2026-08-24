@@ -12,6 +12,7 @@
     "typegen": "next typegen",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "format": "prettier --write .",
