@@ -58,6 +58,33 @@ All four pass, or the change is not done.
   re-run the query on a schedule to discover that nothing had changed, while still needing
   the purge for the case that matters — a five-minute-stale project page after a save is a
   bug at any profile.
+- **The ported stylesheets live in `src/common/styles/`**, not beside `globals.css`.
+  _(Open decision, resolved in prompt 3.)_ They are shared assets and `app/` is composition
+  only. `src/app/layout.tsx` imports them ONCE, in this order — `globals.css`, `base`,
+  `shell`, `panel`, `chrome`, `i18n` — and the order is load-bearing: `globals.css` must be
+  first because every rule in the other five reads its custom properties by name, and
+  `i18n.css` must be last so it can override the Latin defaults with no `!important`. Their
+  rules are byte-identical to `legacy/css/`; each file carries only a prepended provenance
+  header.
+- **The preloader survives, shortened.** _(Open decision, resolved in prompt 3.)_ Its timings
+  live in one named `T` block at the top of `common/lib/motion/preload.ts`, with every legacy
+  value recorded beside its replacement. The 1600ms ready-race became 600ms and the lift went
+  from ~1240ms to ~880ms: worst case ~2.7s becomes ~1.4s. The original numbers bought
+  perceived performance over a genuinely empty page, because the static site had no server
+  render. A Server Component puts the shell and its artwork in the HTML, so the preloader is
+  now a flourish over a finished page, and a long one costs the very thing it used to buy.
+  Restoring the original feel is one edit to that block.
+- **The art layer is PURE — confirmed, not assumed.** _(The assumption with the most leverage
+  in the migration.)_ `rng`, `palette` and `draw` touch no `document`, `window`, `Date` or
+  `Math.random`; the only matches for "window" in the legacy source are the word in prose
+  comments. The TypeScript port was verified byte-for-byte identical to
+  `legacy/js/art/draw.js` across six seeds, all eight generators and both ratios, and again
+  end-to-end: the three SVGs a Server Component served for `qeytarieh-08-residence` hash
+  identically to the three the legacy module produces, kind selection included. So the
+  generators run on the server, no generator JavaScript reaches the browser, and the drawings
+  are part of the cached HTML with no hydration cost and no layout shift. **Never add
+  `'use client'` under `src/common/lib/art/`** — that one directive puts ~47KB of generator
+  back in the bundle, silently.
 - **The project filter taxonomy is DERIVED from the rows that exist**, in
   `getProjectFilters()`, not stored as a constant. _(Open decision, resolved in prompt 2.)_
   It extends what `legacy/data/projects.js:424` already did for `type` to all four axes.
@@ -194,6 +221,103 @@ Components bundle.
 `src/common/services/__tests__/` that spawn it. Seed the production database before that
 commit, not after.
 
+## The art, motion and component layers (prompt 3)
+
+```
+  common/lib/art/       rng · palette · draw          PURE. Server-rendered. No 'use client', ever.
+  common/lib/motion/    anim · cursor · smooth ·      Needs the DOM; carries NO directive.
+                        preload · shell · glyphs      One React leaf in components/layout/ mounts it.
+  common/styles/        base · shell · panel ·        Real CSS, imported once by app/layout.tsx.
+                        chrome · i18n
+  common/components/    ui/ → ds/ → form/             Product code imports ds/ and form/, never ui/.
+                        variants/ · feedback/ · loader/
+```
+
+### The four motion invariants
+
+`common/lib/motion/anim.ts` carries all four, each because of a real failure, each with the
+comment that says why, and each with a test in `__tests__/anim.test.ts` — a comment does not
+fail a build when someone "simplifies" it.
+
+1. **CSS owns every resting state.** `animate()` defaults to `fill: 'backwards'`, never
+   `'forwards'`. A forwards-filled animation keeps overriding the cascade after it ends,
+   which is how a closed panel's leftovers reappear on the next open.
+2. **Await `anim.done`, never `anim.finished`.** A hidden document stops advancing its
+   animation timeline, so an animation started just before a tab switch never resolves.
+   `done` races the real promise against the animation's own worst case, so a transition
+   state machine can never be stranded mid-flight with its busy flag set.
+3. **One `requestAnimationFrame`.** Cursor, both inertia scrollers and any parallax subscribe
+   to the single ticker in `onTick()`. N competing rAF loops is the most common source of
+   jitter in sites like this.
+4. **Damping is frame-rate independent.** `damp(a, b, smoothing, dt)`, where `smoothing` is
+   the fraction remaining after one second — identical feel at 60Hz and 120Hz.
+
+### What changed in the shell port, and why
+
+`shell.ts` is the most delicate file in the repo, and its transition is unchanged — every
+duration, stagger step, class flip, the queue and the per-glyph FLIP. One structural change:
+the four things the static site imported directly (`mountPanel`/`unmountPanel`, the i18n
+dictionary, `NAV`, and `draw`) are **injected through `createShell`'s options**. Panels and
+i18n belong to prompts 4 and 5, and — more importantly — `shell.ts` ends up inside a
+`'use client'` boundary, so importing `draw` there would pull the generators back into the
+browser for drawings the server has already rendered. `ensureArt` therefore uses the
+server-rendered SVG already in `.col__art`; the lazy path survives only for a caller that
+passes `drawArt` and has no server render.
+
+**The FLIP target is always `.ch`.** In English that is one box per letter; in Persian it is
+one box holding the whole word, because Arabic-script letters join and wrapping each in its
+own inline-block renders the word as disconnected presentation forms. `canSplitGlyphs()` in
+`motion/glyphs.ts` is the check, ported intact from `legacy/js/core/i18n.js:190`. Same code
+path, same animation, one box instead of eight.
+
+Only `transform`, `opacity` and `clip-path` are ever animated — never `top`, `left`, `width`,
+`height` or `letter-spacing`. The tracking collapse is a per-glyph transform, not a
+letter-spacing transition.
+
+### Component tiers
+
+- `ui/` is **regenerable**: lowercase files, `Base*` exports, structure and a `data-slot`
+  marker, zero product decisions. Anything written there dies at the next regeneration.
+- `ds/` is the **public API**: PascalCase, stable props, `displayName`, one file per control.
+  Shipped: Button (with `asChild`), Input, Textarea, Select, Checkbox, Table, Dialog, Field,
+  Label.
+- `form/` binds `ds/` to react-hook-form and knows nothing about HTTP, actions or schemas.
+- **Style lives in `variants/*.ts`** (CVA) and every class list terminates in `cn()`, caller
+  `className` merged LAST.
+- **New tokens added here**, because the legacy site had no form controls and no failure
+  state: `--height-control`, `--min-width-control`, `--radius-control` (deliberately `0` —
+  nothing in this design is rounded), `--opacity-disabled`, and `--color-danger` /
+  `--danger`, a clay red inside the existing warm family at 6.3:1 on `--s-0`.
+- **Every custom utility that shadows a Tailwind group is registered** in `cn()`'s
+  `extendTailwindMerge` block. The group id for height is `h`, not `height` — getting it
+  wrong lets `h-control` and `h-12` both survive a merge, so CSS source order decides and the
+  override works in dev but not in the production bundle.
+- **Popover/dialog motion is hand-written** in `globals.css` as `motion-fade-in` /
+  `motion-pop-in` / `motion-slide-in`. `tailwindcss-animate` is not installed, so
+  `animate-in` / `fade-in-0` / `zoom-in-95` are inert classes in Tailwind v4 core. The
+  durations are `--d-*` tokens on purpose: the reduced-motion block collapses those to 1ms,
+  so the animations still run and still fire completion events without moving.
+- **`@source inline(...)` in `globals.css` enumerates every runtime-composed class** — what
+  `prefix()` emits and what the radix primitives set. v4's scanner reads source TEXT, so a
+  composed class is never generated and the style is missing in the production build only.
+  Adding a token to `placeholderTokens` or `focusTokens` means adding its prefixed forms
+  there in the same commit.
+
+### React Query's job here
+
+`app/providers.tsx` mounts one QueryClient. **Server data never enters it.** Public pages and
+dashboard lists read through Server Components behind `'use cache'`; writes go through Server
+Actions that purge a tag. React Query exists for the client-side mutation flows prompts 6 and
+7 add — pending state, optimistic updates, retry — and never as a second source of truth for
+something the server already rendered. Two copies of one record drift the moment either
+refetches.
+
+`@tanstack/react-query-devtools` sits in **`dependencies`, not `devDependencies`**, even
+though it renders nothing in production: `providers.tsx` reaches it through `next/dynamic`,
+and the bundler must resolve that import while compiling a module in the production render
+tree. Under `npm ci --omit=dev` a devDependency there fails the build with "Cannot find
+module", far from anything that looks related.
+
 ## Deviations from the architecture playbook
 
 Each is deliberate. Re-enable conditions are stated so the next agent does not "fix" them.
@@ -206,6 +330,14 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
   therefore absent, and its import and spread are deleted from `eslint.config.mjs` — a
   config referencing an uninstalled plugin cannot load at all. Re-enable when the `ds/`
   tier is stable and there is time for a11y stories.
+
+  **OUTSTANDING (owed, not waived):** `references/02-design-system.md` §7 requires a story per
+  `ds/` control, one per meaningful state. Prompt 3 shipped nine `ds/` controls with **no**
+  stories. What is NOT owed is the accessibility gate — a Storybook a11y panel was never the
+  gate anyway, and every `ds/` control has a real `jest-axe` test in `npm run test` today,
+  plus a `direction.test.tsx` covering `dir="rtl"`. When Storybook lands, the stories to
+  write are: Button, Input, Textarea, Select, Checkbox, Table, Dialog, Field, Label.
+
 - **`db → repository → service` replaces the HTTP transport ring** (A8's
   `http → api-client → services`). Landed in prompt 2 — see **The data layer** above.
   There is no backend to talk to and no wire response to zod-parse; the ring's invariants
