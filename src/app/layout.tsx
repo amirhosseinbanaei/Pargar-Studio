@@ -9,6 +9,23 @@
  */
 import type { Metadata } from 'next';
 import './globals.css';
+/**
+ * The ported legacy stylesheets, imported ONCE, here, in this order.
+ *
+ * They live in `src/common/styles/` rather than beside `globals.css` because
+ * they are shared assets and `app/` is composition only. Order is load-bearing
+ * and is the order the static site used: `base` resets, `shell`/`panel`/
+ * `chrome` build on it, and `i18n` comes LAST so it can override the Latin
+ * defaults without a single `!important`.
+ *
+ * `globals.css` must stay first of all: it declares the `--s-0`…`--a-glow`
+ * custom properties that every rule in these four files reads by name.
+ */
+import '@/common/styles/base.css';
+import '@/common/styles/shell.css';
+import '@/common/styles/panel.css';
+import '@/common/styles/chrome.css';
+import '@/common/styles/i18n.css';
 
 export const metadata: Metadata = {
   title: 'Kavan Studio',

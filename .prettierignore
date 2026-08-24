@@ -2,6 +2,13 @@
 # would rewrite files that are the reference record of how the site worked.
 legacy/
 
+# The five stylesheets ported verbatim from `legacy/css/` in prompt 3. Their RULES are
+# byte-identical to the originals — that is the whole claim the port rests on, and AGENTS.md
+# records it. Prettier would restyle 32KB of precisely tuned column geometry into a diff
+# nobody can review against the source it came from. The only edit any of them carries is a
+# prepended provenance header.
+src/common/styles/
+
 # Generated
 .next/
 node_modules/
