@@ -52,6 +52,147 @@ All four pass, or the change is not done.
   references them by name. That file says which token is which and why some are suffixed.
 - **Zero webfont bytes.** The geometric system stack in `--f-sans` is kept exactly as-is:
   no `next/font`, no CDN font CSS, so no FOIT and no CLS.
+- **Content services use `cacheLife('max')`** — no expiry timer. _(Open decision, resolved
+  in prompt 2.)_ This is studio content: it changes when an editor saves and at no other
+  moment, and every dashboard write purges its tags explicitly. A shorter profile would
+  re-run the query on a schedule to discover that nothing had changed, while still needing
+  the purge for the case that matters — a five-minute-stale project page after a save is a
+  bug at any profile.
+- **The project filter taxonomy is DERIVED from the rows that exist**, in
+  `getProjectFilters()`, not stored as a constant. _(Open decision, resolved in prompt 2.)_
+  It extends what `legacy/data/projects.js:424` already did for `type` to all four axes.
+  A hardcoded list goes stale in both directions: it offers a filter matching nothing the
+  first time a category empties, and hides a project the first time the dashboard adds a
+  type nobody listed. Order comes from the canonical arrays in `common/schemas/enums.ts`
+  (the legacy order is deliberate, not alphabetical), with unknown values appended rather
+  than dropped.
+
+## The data layer (prompt 2)
+
+Three rings, each importing only the one below. Skipping a ring is how an unparsed row
+reaches a page.
+
+```
+  services/     <resource>-service.ts       'use cache' + cacheLife + cacheTag; locale mapping
+      │
+  repositories/ <resource>-repository.ts    queries + THE zod parse. server-only.
+      │
+  db            services/db.ts + schema.ts  one libSQL client, per process. server-only.
+```
+
+Non-negotiables, all machine-checkable:
+
+- `src/common/services/db.ts` is the **only** file that opens a database connection, and it
+  reads its URL through `common/config/server-env`, never `process.env`.
+- Every file in the layer starts with `import 'server-only'`, so a client import fails the
+  build rather than leaking the connection string into a browser bundle.
+- A row is `.parse()`d in **exactly one place**, its repository. Nothing downstream casts.
+- Components never call the database and never build a query — they call a service.
+- Types are derived with `z.infer`. Read schemas tolerant at the leaves, strict at the
+  shape; write schemas exact (`z.strictObject`).
+
+### The six tables
+
+Defined in `src/common/services/schema.ts`; migrations are **generated and committed** to
+`drizzle/`. `drizzle-kit push` is not the deploy path and must not become one.
+
+| Table              | Rows | Holds                                                        |
+| ------------------ | ---- | ------------------------------------------------------------ |
+| `projects`         | 76   | the archive, 2013–2025                                       |
+| `design_works`     | 9    | objects, marks and details                                   |
+| `media`            | 14   | publications, awards, lectures, exhibitions                  |
+| `studio`           | 1    | the editorial block — singleton, `id` pinned to 1 by a CHECK |
+| `contact`          | 1    | the editable CONTENT of the contact page — same pinning      |
+| `contact_messages` | —    | the INBOX: submissions from the public form                  |
+
+`contact` and `contact_messages` are two different things that share a word, and both
+exist deliberately: one is page content an editor changes, the other is mail a stranger
+sends.
+
+### Per-locale columns
+
+A translated field is a **pair of columns on one row** — `title_en`, `title_fa` — never a
+translations table. What each resource translates is mirrored from the legacy Persian layer
+exactly, not guessed:
+
+| Table          | Per-locale fields                                                        |
+| -------------- | ------------------------------------------------------------------------ |
+| `projects`     | title, blurb, description, location, client                              |
+| `design_works` | title, blurb, client, scope, materials, description, team, facts         |
+| `media`        | title, outlet, blurb, author, excerpt, context, facts                    |
+| `studio`       | manifesto, founders, stats, team, alumni, awards, chapters (all of them) |
+| `contact`      | address, district, city, country, hours, careers, socials                |
+
+Everything else is a single shared column. In particular:
+
+- **Taxonomy values are NOT per-locale.** `status`, `scale`, `types`, `category` and media
+  `type` are canonical English. Their Persian is a UI dictionary
+  (`legacy/data/i18n.js:193`), so it lives with the interface; storing it per record would
+  give 76 places for one word to drift. `works.fa.js` translates `status` redundantly and
+  that value is deliberately dropped.
+- **`media.outlet` needs both columns anyway** — some records translate it, some keep the
+  Latin name ("ArchDaily"). Which is which is editorial, not a rule.
+- **`media.author` is the one nullable text pair.** Five records are awards and have no
+  byline; `''` would erase the difference between "nobody wrote it" and "not entered yet".
+- **`BRAND` and `NAV` are not in the database.** They are shell chrome — a wordmark and
+  five nav labels — and prompt 4 ports them as constants beside the shell.
+- Every JSON column stores a JSON **string** and is parsed by `jsonArray()` in the zod
+  schema. Never `mode: 'json'`, never a cast.
+
+### Cache tags — the complete list
+
+Declared in `src/common/services/cache-tags.ts` and imported from there, never written as
+a literal. **Prompts 6 and 7 purge these exact strings.** A tag set under one name and
+purged under another is a no-op: the save succeeds, the toast is green, and the public page
+stays stale until the next deploy.
+
+| Tag                  | Set by                                              |
+| -------------------- | --------------------------------------------------- |
+| `projects`           | `listProjects`, `getProject`, `getProjectFilters`   |
+| `project:<slug>`     | `getProject`, `listMediaForProject`                 |
+| `design-works`       | `listDesignWorks`, `getDesignWork`                  |
+| `design-work:<slug>` | `getDesignWork`                                     |
+| `media`              | `listMedia`, `getMediaEntry`, `listMediaForProject` |
+| `media:<slug>`       | `getMediaEntry`                                     |
+| `studio`             | `getStudio`                                         |
+| `contact`            | `getContact`                                        |
+| `contact-messages`   | **nothing** — reserved, see below                   |
+
+Singletons have no instance tag: there is one record, so the collection tag already
+identifies it, and a second name is a second thing to forget to purge.
+
+**`contact_messages` reads are never cached.** The dashboard inbox must be dynamic — a
+cached list shows "no new messages" while a message sits in the database, and the person
+who notices is the client who never got a reply. The tag name is reserved so a future
+cached read (an unread count in the shell) has one to use.
+
+### The seed
+
+`scripts/seed.ts`, run by `npm run db:seed`. It lives outside `src/` **because that is the
+only place allowed to import `legacy/`** — which is its entire job.
+
+- **Missing Persian falls back to English, at write time.** Where an overlay omits a key,
+  the English value is written into the `_fa` column — never `null`, never `''`. That
+  reproduces `legacy/js/core/i18n.js:154`, whose spread degraded to English rather than
+  throwing. A blank Persian page is a worse failure than untranslated text, and by writing
+  the fallback in, the read path needs no fallback branch at all.
+- **Strings are copied verbatim.** Not translated, re-wrapped or "spacing-fixed": the
+  Persian uses meaningful zero-width non-joiners, and numbers deliberately stay in Latin
+  digits because the interface converts them at render time
+  (`legacy/data/projects.fa.part1.js:3`).
+- **Idempotent**: delete-then-insert inside one transaction. `contact_messages` is NOT
+  deleted — re-seeding site content must never empty a real inbox.
+- Project `id`s are the legacy numeric ids, so a slug rename never orphans a record.
+  `sort_order` is the legacy array position (reverse-chronological); the dashboard edits it.
+
+Scripts: `db:generate` (write a migration from the schema), `db:migrate` (apply committed
+migrations), `db:seed`. The last two run under `tsx --conditions=react-server`, which is
+what resolves the `server-only` package to its empty build outside a React Server
+Components bundle.
+
+**Prompt 7 note:** deleting `legacy/` deletes `scripts/seed.ts` and the two tests in
+`src/common/services/__tests__/` that spawn it. Seed the production database before that
+commit, not after.
 
 ## Deviations from the architecture playbook
 
@@ -66,10 +207,10 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
   config referencing an uninstalled plugin cannot load at all. Re-enable when the `ds/`
   tier is stable and there is time for a11y stories.
 - **`db → repository → service` replaces the HTTP transport ring** (A8's
-  `http → api-client → services`) in prompt 2. There is no backend to talk to and no wire
-  response to zod-parse; the ring's invariants still hold, one layer lower. This is why
-  `common/constants/api.ts` exports no `API_URL` and `common/config/env.ts` declares no
-  API origin.
+  `http → api-client → services`). Landed in prompt 2 — see **The data layer** above.
+  There is no backend to talk to and no wire response to zod-parse; the ring's invariants
+  still hold, one layer lower. This is why `common/constants/api.ts` exports no `API_URL`
+  and `common/config/env.ts` declares no API origin.
 - **A single signed HttpOnly cookie replaces A9's three-legged JWT rotation** in prompt 6.
   There is one admin and no user table, so there is no refresh token to rotate and no
   session ring to single-flight. Re-enable the full ring only if multi-user auth arrives.
