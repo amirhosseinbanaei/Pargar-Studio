@@ -8,6 +8,14 @@ node_modules/
 package-lock.json
 next-env.d.ts
 
+# drizzle-kit's output: the migration SQL and the snapshot/journal it diffs the next
+# migration against. Reformatting the snapshot would make every subsequent `db:generate`
+# produce a diff against a file prettier rewrote, not against the schema.
+drizzle/
+
+# The local database file, if one is in the tree.
+*.db
+
 # Prompt artifacts — documents, not source.
 prompts/
 
