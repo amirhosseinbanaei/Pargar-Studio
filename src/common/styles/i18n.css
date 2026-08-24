@@ -1,0 +1,150 @@
+/* PORTED VERBATIM from `legacy/css/i18n.css` — rules unchanged.
+   Persian and RTL. Imported LAST so it overrides the Latin defaults with no !important.
+
+   These files are real CSS, not Tailwind utilities, and are imported once by
+   the site layout. They reference the token custom properties in
+   `src/app/globals.css` BY NAME (`var(--s-0)`, `var(--tr-wide)`, `var(--d-md)`),
+   which is why that file declares its tokens twice — the raw `:root` block
+   exists for these stylesheets, not only for the `@theme` utility mapping.
+
+   Do not convert these to utilities, do not add `!important`, and do not move a
+   rule into an inline <style>. Only `transform`, `opacity` and `clip-path` are
+   ever animated here; nothing animates `top`, `left`, `width`, `height` or
+   `letter-spacing`. Direction-sensitive rules use logical properties
+   (`margin-inline`, `padding-inline`, `start`/`end`) because RTL is a
+   first-class mode, not a variant. */
+
+/* ==========================================================================
+   KAVAN STUDIO — Persian and right-to-left
+   Loaded last so it can override the Latin defaults without !important.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Persian typography
+
+   Two things Latin and Arabic script do not share, and both matter here:
+
+   1. TRACKING. The wide letter-spacing that gives the English wordmark its
+      character is actively wrong in Persian — the letters join, and spacing
+      them apart severs the join. Every tracking token collapses to zero.
+   2. VERTICAL RHYTHM. Persian has taller ascenders, deeper descenders and
+      dots below the baseline. It needs more leading and a slightly larger
+      size to sit comfortably next to the same layout.
+   -------------------------------------------------------------------------- */
+
+html.is-fa {
+  --f-sans: "Vazirmatn", "IRANSansX", "IRANSans", "Shabnam", "Geeza Pro",
+            "Nadeem", "Al Bayan", "Noto Naskh Arabic", Tahoma, sans-serif;
+  --f-serif: "Vazirmatn", "IRANSansX", "Geeza Pro", "Al Bayan",
+             "Noto Naskh Arabic", Tahoma, serif;
+
+  --tr-wide: 0;
+  --tr-mid: 0;
+  --tr-tight: 0;
+  --tr-flat: 0;
+}
+
+html.is-fa body { line-height: 1.85; }
+
+/* Persian reads small at the same nominal size — nudge the scale up. */
+html.is-fa {
+  --fs-xs:  clamp(0.656rem, 0.61rem + 0.2vw, 0.75rem);
+  --fs-sm:  clamp(0.75rem, 0.7rem + 0.22vw, 0.844rem);
+  --fs-md:  clamp(0.844rem, 0.79rem + 0.24vw, 0.938rem);
+  --fs-lg:  clamp(1rem, 0.92rem + 0.35vw, 1.188rem);
+}
+
+html.is-fa .col__title,
+html.is-fa .wordmark,
+html.is-fa .detail__title,
+html.is-fa .card__title { text-transform: none; }
+
+/* A single glyph box, because Persian titles fly whole. */
+html.is-fa .ch { padding-right: 0; }
+html.is-fa .ch--space { width: 0.28em; }
+
+html.is-fa .prose,
+html.is-fa .sheet__lead,
+html.is-fa .person__bio,
+html.is-fa .detail__blurb { line-height: 2; }
+
+/* Latin runs inside Persian — outlet names, emails, coordinates — keep their
+   own direction so they do not scramble at a line boundary. */
+html.is-fa .lat {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: var(--f-sans);
+}
+
+/* --------------------------------------------------------------------------
+   Direction
+   -------------------------------------------------------------------------- */
+
+/* The five columns run right to left, so Projects sits under the reader's
+   first glance rather than their last. */
+[dir="rtl"] .cols { flex-direction: row-reverse; }
+
+[dir="rtl"] .stage.is-open .col.is-active .col__title { left: auto; right: 0; }
+
+[dir="rtl"] .closer { right: auto; left: 0; }
+[dir="rtl"] .closer__x { transform: scaleX(-1); }
+
+[dir="rtl"] .panel__rail { padding-right: 0; padding-inline-start: 0;
+  padding-inline-end: var(--sp-5); }
+[dir="rtl"] .panel__rail::after { right: auto; left: 0; }
+
+[dir="rtl"] .smooth__track,
+[dir="rtl"] .smooth__thumb { right: auto; left: 0; }
+
+[dir="rtl"] .spec__v,
+[dir="rtl"] .row__k { text-align: left; }
+
+[dir="rtl"] .detail__back svg,
+[dir="rtl"] .wordmark__glyph { transform: scaleX(-1); }
+[dir="rtl"] .stage.is-open .wordmark__glyph { transform: scaleX(-1) rotate(135deg); }
+
+[dir="rtl"] .cmap__note { left: auto; right: var(--sp-3); }
+[dir="rtl"] .detail__plate figcaption { left: auto; right: var(--sp-3); }
+
+[dir="rtl"] .u-skip { left: auto; right: var(--sp-3); }
+
+/* Under 860px the columns stack, so the row reversal must not apply. */
+@media (max-width: 860px) {
+  [dir="rtl"] .cols { flex-direction: column; }
+}
+
+/* --------------------------------------------------------------------------
+   The language switch
+   -------------------------------------------------------------------------- */
+
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tr-mid);
+  text-transform: uppercase;
+  color: var(--t-xlo);
+}
+.lang__b {
+  color: var(--t-xlo);
+  transition: color var(--d-xs) var(--e-out);
+}
+.lang__b:hover { color: var(--t-md); }
+.lang__b[aria-pressed="true"] { color: var(--a-1); }
+.lang__sep { opacity: 0.4; }
+
+/* The switch lives in the footer on wide screens and the masthead on narrow
+   ones, where the footer has no room for it. */
+.masthead .lang { display: none; }
+@media (max-width: 860px) {
+  .footbar .lang { display: none; }
+  .masthead .lang {
+    display: inline-flex;
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 5.5rem;
+    transform: translateY(-50%);
+  }
+  .stage.is-open .masthead .lang { display: none; }
+}
