@@ -10,6 +10,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "typegen": "next typegen",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/migrate.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "format": "prettier --write .",

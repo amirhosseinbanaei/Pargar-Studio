@@ -1,0 +1,136 @@
+CREATE TABLE `contact` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`postcode` text NOT NULL,
+	`phone` text NOT NULL,
+	`phone_href` text NOT NULL,
+	`email` text NOT NULL,
+	`press` text NOT NULL,
+	`lat` text NOT NULL,
+	`lng` text NOT NULL,
+	`address_en` text NOT NULL,
+	`address_fa` text NOT NULL,
+	`district_en` text NOT NULL,
+	`district_fa` text NOT NULL,
+	`city_en` text NOT NULL,
+	`city_fa` text NOT NULL,
+	`country_en` text NOT NULL,
+	`country_fa` text NOT NULL,
+	`hours_en` text NOT NULL,
+	`hours_fa` text NOT NULL,
+	`careers_en` text NOT NULL,
+	`careers_fa` text NOT NULL,
+	`socials_en` text NOT NULL,
+	`socials_fa` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
+	CONSTRAINT "contact_singleton" CHECK("contact"."id" = 1)
+);
+--> statement-breakpoint
+CREATE TABLE `contact_messages` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`email` text NOT NULL,
+	`subject` text NOT NULL,
+	`body` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`read_at` integer
+);
+--> statement-breakpoint
+CREATE TABLE `design_works` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`slug` text NOT NULL,
+	`category` text NOT NULL,
+	`year` integer NOT NULL,
+	`status` text NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`title_en` text NOT NULL,
+	`title_fa` text NOT NULL,
+	`blurb_en` text NOT NULL,
+	`blurb_fa` text NOT NULL,
+	`client_en` text NOT NULL,
+	`client_fa` text NOT NULL,
+	`scope_en` text NOT NULL,
+	`scope_fa` text NOT NULL,
+	`materials_en` text NOT NULL,
+	`materials_fa` text NOT NULL,
+	`description_en` text NOT NULL,
+	`description_fa` text NOT NULL,
+	`team_en` text NOT NULL,
+	`team_fa` text NOT NULL,
+	`facts_en` text NOT NULL,
+	`facts_fa` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `design_works_slug_unique` ON `design_works` (`slug`);--> statement-breakpoint
+CREATE TABLE `media` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`slug` text NOT NULL,
+	`type` text NOT NULL,
+	`year` integer NOT NULL,
+	`project_slug` text,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`title_en` text NOT NULL,
+	`title_fa` text NOT NULL,
+	`outlet_en` text NOT NULL,
+	`outlet_fa` text NOT NULL,
+	`blurb_en` text NOT NULL,
+	`blurb_fa` text NOT NULL,
+	`author_en` text,
+	`author_fa` text,
+	`excerpt_en` text NOT NULL,
+	`excerpt_fa` text NOT NULL,
+	`context_en` text NOT NULL,
+	`context_fa` text NOT NULL,
+	`facts_en` text NOT NULL,
+	`facts_fa` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `media_slug_unique` ON `media` (`slug`);--> statement-breakpoint
+CREATE TABLE `projects` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`slug` text NOT NULL,
+	`types` text NOT NULL,
+	`status` text NOT NULL,
+	`scale` text NOT NULL,
+	`year` integer NOT NULL,
+	`area` text NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`title_en` text NOT NULL,
+	`title_fa` text NOT NULL,
+	`blurb_en` text NOT NULL,
+	`blurb_fa` text NOT NULL,
+	`description_en` text NOT NULL,
+	`description_fa` text NOT NULL,
+	`location_en` text NOT NULL,
+	`location_fa` text NOT NULL,
+	`client_en` text NOT NULL,
+	`client_fa` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `projects_slug_unique` ON `projects` (`slug`);--> statement-breakpoint
+CREATE TABLE `studio` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`manifesto_en` text NOT NULL,
+	`manifesto_fa` text NOT NULL,
+	`founders_en` text NOT NULL,
+	`founders_fa` text NOT NULL,
+	`stats_en` text NOT NULL,
+	`stats_fa` text NOT NULL,
+	`team_en` text NOT NULL,
+	`team_fa` text NOT NULL,
+	`alumni_en` text NOT NULL,
+	`alumni_fa` text NOT NULL,
+	`awards_en` text NOT NULL,
+	`awards_fa` text NOT NULL,
+	`chapters_en` text NOT NULL,
+	`chapters_fa` text NOT NULL,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
+	CONSTRAINT "studio_singleton" CHECK("studio"."id" = 1)
+);
