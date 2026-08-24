@@ -103,6 +103,32 @@
   --ease-out-kavan: cubic-bezier(0.33, 1, 0.68, 1);
   --ease-in-kavan: cubic-bezier(0.55, 0, 1, 0.45);
 
+  /* ---- control metrics (added in prompt 3, for the ds/ tier) -----------
+     The legacy site had no form controls at all — it was a read-only archive —
+     so these are new, not ported. They exist as tokens rather than as literals
+     in each variant table so a select trigger and a text input can never end up
+     2px apart: `_shared.ts` composes `h-control`, `min-w-control` and
+     `rounded-control` and nothing hardcodes a height.
+
+     `--radius-control: 0` is a design decision, not a placeholder. Nothing in
+     this design is rounded: the shell is built from hairlines and square
+     plates, the cards have sharp corners, and a rounded input would be the only
+     curve on the page. */
+  --height-control: 2.75rem;
+  --min-width-control: 12rem;
+  --radius-control: 0;
+  --opacity-disabled: 0.5;
+
+  /* ---- destructive ----------------------------------------------------
+     Also new. The palette had no failure colour because nothing on the static
+     site could fail; the dashboard in prompts 6 and 7 has destructive actions
+     and invalid fields, and both need one. Chosen as a clay red inside the
+     existing warm family rather than a pure signal red, which would be the only
+     cold, saturated thing on the page. 6.3:1 on `--s-0` and 5.1:1 on the input
+     well `--s-4`, so it passes AA as body-sized text on either. */
+  --color-danger: #d97757;
+  --color-danger-quiet: #3a1f16;
+
   /* The ten-step `--sp-*` ramp is deliberately NOT mirrored into a Tailwind
      namespace. Its values (0.25 0.5 0.75 1 1.5 2 3 4 6 8rem) are every one
      already reachable on Tailwind's default 0.25rem multiplier — p-1 p-2 p-3
@@ -206,6 +232,15 @@
   --d-lg: 820ms;
   --d-xl: 1150ms;
 
+  /* ---- controls + destructive (prompt 3; see the @theme block above for
+     why these exist and why the radius is zero) ---------------------------- */
+  --height-control: 2.75rem;
+  --min-width-control: 12rem;
+  --radius-control: 0;
+  --opacity-disabled: 0.5;
+  --danger: #d97757;
+  --danger-quiet: #3a1f16;
+
   /* ---- layers ---------------------------------------------------------- */
   --z-art: 0;
   --z-rule: 5;
@@ -240,13 +275,107 @@
   }
 }
 
-/* `@source inline(...)` belongs here and is deliberately absent for now: v4's
-   scanner reads source TEXT, so any class composed at runtime (by a `prefix()`
-   helper, by a `data-[state=…]` selector a headless primitive sets, by string
-   concatenation) is never generated and its style is simply missing — in the
-   production build only. No component exists yet to compose one. Prompt 3
-   enumerates every dynamic state class its primitives emit here, and verifies by
-   grepping the built CSS in `.next/static/css/`. */
+/* ──────────────────────────────────────────────────────────────────────────
+   @source inline — the non-obvious one.
+
+   v4's scanner reads your SOURCE TEXT. A class composed at runtime — by the
+   `prefix()` helper in `common/components/variants/prefix.ts`, or by a
+   `data-[state=…]` selector a headless primitive sets — never appears literally
+   in a file, so the utility is NOT GENERATED and the style is simply missing. It
+   works in dev (where some other file happens to contain the literal) and breaks
+   in the production build, which is the worst possible failure timing.
+
+   Everything `prefix()` can emit is enumerated below, plus the primitive-driven
+   state classes. Verified by grepping `.next/static/css/` for them after a build.
+   Adding a token to `placeholderTokens` or `focusTokens` means adding its
+   prefixed forms here in the same commit.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* prefix('placeholder:', placeholderTokens) — ds/Input, ds/Textarea */
+@source inline('placeholder:text-t-xlo placeholder:tracking-tight-kavan');
+/* prefix('data-[placeholder]:', placeholderTokens) — ds/Select's trigger */
+@source inline('data-[placeholder]:text-t-xlo data-[placeholder]:tracking-tight-kavan');
+/* prefix('focus:', focusTokens) — every control that takes a caret */
+@source inline('focus:border-a-1 focus:ring-0 focus:outline-none');
+
+/* State classes the radix-ui primitives set on the DOM, which therefore appear
+   in no source file at all. */
+@source inline('data-[state=open]:motion-pop-in data-[state=closed]:motion-pop-out');
+@source inline('data-[state=open]:motion-fade-in data-[state=closed]:motion-fade-out');
+@source inline('data-[side=bottom]:motion-slide-in');
+@source inline('data-[state=open]:border-rule-md data-[state=open]:rotate-180');
+@source inline(
+  'data-[state=checked]:border-a-1 data-[state=checked]:bg-a-1 data-[state=checked]:text-a-1'
+);
+@source inline('data-[state=indeterminate]:border-a-1 data-[state=indeterminate]:bg-a-1');
+@source inline('data-[highlighted]:bg-s-4 data-[highlighted]:text-t-hi');
+@source inline(
+  'data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-disabled'
+);
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Popover and dialog motion.
+
+   Hand-written rather than pulled from `tailwindcss-animate` / `tw-animate-css`.
+   Those plugins are not installed, and the `animate-in` / `fade-in-0` /
+   `zoom-in-95` / `slide-in-from-top-2` classes they provide do not exist in
+   Tailwind v4 core — written without the plugin they are INERT, which is a
+   dialog that appears with no transition and no error anywhere to say why.
+   Four keyframes cover everything this design opens.
+
+   Two properties only, `opacity` and `transform`, same as the rest of the site.
+   The durations are the `--d-*` tokens on purpose: the reduced-motion block
+   above collapses those to 1ms, so these animations still RUN and still fire
+   their completion events for a visitor who asked for less motion — they simply
+   do not move. Hardcoding `320ms` here would opt this whole layer out of that.
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes kavan-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes kavan-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes kavan-pop-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(0.97);
+  }
+}
+@keyframes kavan-pop-out {
+  to {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(0.97);
+  }
+}
+@keyframes kavan-slide-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -0.5rem, 0);
+  }
+}
+
+@utility motion-fade-in {
+  animation: kavan-fade-in var(--d-sm) var(--e-out);
+}
+@utility motion-fade-out {
+  animation: kavan-fade-out var(--d-xs) var(--e-in);
+}
+/* The dialog panel is centred with a translate, so its own keyframes have to
+   carry that translate too — otherwise the scale animates from the top-left
+   corner of the viewport and the panel flies in from off-screen. */
+@utility motion-pop-in {
+  animation: kavan-pop-in var(--d-sm) var(--e-expo);
+}
+@utility motion-pop-out {
+  animation: kavan-pop-out var(--d-xs) var(--e-in);
+}
+@utility motion-slide-in {
+  animation: kavan-slide-in var(--d-sm) var(--e-expo);
+}
 
 /* The canvas. Declared here rather than on a component so the background is
    painted before any React code runs — the original site does the same with an
