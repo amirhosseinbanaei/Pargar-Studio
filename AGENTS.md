@@ -22,8 +22,8 @@ handling, session), read the matching guide in
 
 Layering is machine-enforced in `eslint.config.mjs`: `app → modules → common`, one way,
 no cross-module imports, modules consumed through their `index.ts` barrel only. Adding a
-module means adding its name to the `MODULES` array **first** — it is empty today, and a
-module with no entry there has no boundary rules at all.
+module means adding its name to the `MODULES` array **first** — `projects` is the only
+entry today, and a module with no entry there has no boundary rules at all.
 
 ## Verification
 
@@ -60,12 +60,14 @@ All four pass, or the change is not done.
   bug at any profile.
 - **The ported stylesheets live in `src/common/styles/`**, not beside `globals.css`.
   _(Open decision, resolved in prompt 3.)_ They are shared assets and `app/` is composition
-  only. `src/app/layout.tsx` imports them ONCE, in this order — `globals.css`, `base`,
-  `shell`, `panel`, `chrome`, `i18n` — and the order is load-bearing: `globals.css` must be
-  first because every rule in the other five reads its custom properties by name, and
-  `i18n.css` must be last so it can override the Latin defaults with no `!important`. Their
+  only. `src/app/[locale]/layout.tsx` — the one root layout, see prompt 4 — imports them
+  ONCE, in this order: `globals.css`, `base`, `shell`, `panel`, `chrome`, `route`, `i18n`.
+  The order is load-bearing: `globals.css` must be first because every rule in the others
+  reads its custom properties by name, and `i18n.css` must be last so it can override the
+  Latin defaults with no `!important`. Their
   rules are byte-identical to `legacy/css/`; each file carries only a prepended provenance
-  header.
+  header. `route.css` is the exception and is NOT a port — prompt 4 added it for the route
+  geometry `panel.css` cannot express; see that prompt's section below.
 - **The preloader survives, shortened.** _(Open decision, resolved in prompt 3.)_ Its timings
   live in one named `T` block at the top of `common/lib/motion/preload.ts`, with every legacy
   value recorded beside its replacement. The 1600ms ready-race became 600ms and the lift went
@@ -317,6 +319,184 @@ though it renders nothing in production: `providers.tsx` reaches it through `nex
 and the bundler must resolve that import while compiling a module in the production render
 tree. Under `npm ci --omit=dev` a devDependency there fails the build with "Cannot find
 module", far from anything that looks related.
+
+## Routes, locale and the projects module (prompt 4)
+
+The hash-plus-modal model is gone. `legacy/js/main.js:20` read a fragment and
+`legacy/js/ui/shell.js` opened the matching section as a panel over the same document, so
+every project was a state of one page. Sections, and every project in them, are real
+locale-prefixed routes now, server-rendered, one URL per record.
+
+```
+  src/app/[locale]/            THE root layout — <html lang dir class="is-fa">
+    (site)/                    masthead · footbar · motion boundary · error + loading
+      page.tsx                 the five-column index
+      projects/                the filtered list  (searchParams)
+      projects/[slug]/         one project        (generateStaticParams, 152 pages)
+  src/common/i18n/             messages · translator · digits · routing · tehran-time
+  src/common/components/layout/  the site chrome, and every 'use client' leaf in it
+  src/modules/projects/        the first feature module
+```
+
+### The locale is a URL segment
+
+`/en/...` and `/fa/...`, decided in `src/proxy.ts` and validated in the layout. Three things
+follow, and they are the reason most of the legacy language machinery has no successor:
+
+- **Each language is independently cacheable and crawlable.** The legacy site served one
+  document at one URL for both, so Persian was invisible to a search engine.
+- **`lang`, `dir` and `is-fa` are settled before the first byte**, from the segment. That is
+  exactly what the blocking inline script at `legacy/index.html:29` existed to do —
+  `legacy/README.md` records that a Persian visitor must never watch the layout flip after
+  the fact — and a Server Component gets it for free. `is-fa` is not decoration:
+  `i18n.css` keys the Persian tracking collapse on it.
+- **Switching language is a NAVIGATION**, so there is nothing to re-render in place.
+
+**`prefetchFa`, `loadFa` and `onLang` (`legacy/js/core/i18n.js:29–107`) therefore have no
+successor, and that is deliberate.** They existed because the Persian CONTENT layer was a
+~60KB lazily-imported module for a single-document site that had to swap languages without
+navigating. Content is per-locale COLUMNS collapsed by the service (`toLocaleProject`) here,
+so `/fa/projects/x` is a separate cached document that was always Persian — there is nothing
+to load on demand, no subscription to fire, and no overlay to merge
+(`legacy/js/core/i18n.js:154`). The stored `kavan.lang` preference has no successor either:
+the language is in the URL, which is a better memory than `localStorage` because it travels
+with a shared link.
+
+`getDictionary(locale)` replaces the module-level `let lang` singleton. That is not a style
+choice — two requests for two locales can render in one process at the same moment, and a
+module-scoped language would leak one visitor's language into another's HTML.
+
+- **Route slugs are English in both locales** (`/fa/projects`, not `/fa/پروژه‌ها`). Persian
+  slugs need a second slug column and a second static-params set; the URL is an identifier,
+  not copy.
+- **`/` redirects with a 307**, not a 308: the target depends on `Accept-Language`, and a
+  permanent redirect would pin a reader to whichever language they first resolved to.
+  English is the fallback, matching `legacy/js/core/i18n.js:97` — which also honoured
+  `navigator.language`, so `resolveLocale()` reads `Accept-Language`, the server-side form
+  of the same signal.
+- **Three interface keys were ADDED** to the ported dictionary, the only ones not in
+  `legacy/data/i18n.js`: `ui.sections`, `error.title` and `ui.retry` (plus
+  `error.notFound`). The legacy markup hardcoded an English `aria-label="Sections"`, and a
+  route that can fail needs failure copy the panel model never had. **Their Persian is
+  AUTHORED, not ported** — everything else in `messages.ts` is verbatim — and is flagged
+  here for a native reader to confirm.
+- The dictionary applies the corrections at `legacy/data/i18n.js:326`, not the values they
+  superseded: `ui.est` is `Est.` and `ui.projectsCount` is `Projects`, because the originals
+  baked the figure into the string and double-printed once the interface supplied it.
+
+### The two open decisions, resolved
+
+- **The per-glyph FLIP runs on route navigation. Kept.** `ShellTransition` injects
+  `createShell`'s `onChange` as the navigation: the transition plays on the outgoing view
+  with every duration, stagger and class flip unchanged, and the route commits at the moment
+  the old code would have mounted a panel. `mountPanel`/`unmountPanel` are no-ops (a section
+  is a route), and `router.prefetch` fires on `pointerdown` so the fetch overlaps the
+  animation instead of following it.
+
+  **Closing is a clean cut, and that is the honest half of this decision.** `Closer`
+  navigates; it does not play the transition in reverse, because the outgoing view on a
+  section route has no columns to fly back — there is nothing on screen to animate. A
+  half-played reverse is worse than no reverse.
+
+- **Detail pages are FULLY STATIC.** `generateStaticParams` over all 76 slugs in both
+  locales; the build emits 163 pages in about three seconds. `dynamicParams` stays at its
+  default `true` so a project the prompt-6 dashboard creates is reachable before the next
+  deploy — see the soft-404 note below, which is the price of that.
+
+### What prompt 4 changed inside `common/lib/motion/`
+
+Two changes, both forced by integration, neither touching the transition:
+
+- **`markTargets` moved out of `createShell`'s closure into `motion/marks.ts`.** The stepper
+  has two drivers now: the shell animates it during the transition off the index, and the
+  site layout places it on every section route, where no shell exists at all — a reader who
+  deep-links to `/en/projects` never plays a transition and must still see the right dot
+  grown. Two copies of that geometry is how the RTL mirroring ends up right in one place and
+  wrong in the other. Pure function, unit-tested, numbers unchanged.
+- **`ShellApi` gained `destroy()`.** On the static site the shell was created once and lived
+  as long as the document, so there was nothing to release. It is a React component now:
+  leaving the index and coming back through the Back button constructs a second one, and
+  without `destroy()` each round trip leaves another `keydown` handler on `window` and
+  another `ResizeObserver` on `.marks` — which lives in the layout and outlives the shell.
+  After three visits, one Escape runs three transitions on three detached trees.
+
+`ShellTransition` passes **`nav: () => []`**, and that is not laziness. `setTitles()` rewrites
+`.col__hit`'s `innerHTML` from it; those `.ch` boxes are server-rendered by `GlyphText` now
+and sit inside React-managed DOM, so an `innerHTML` write there replaces nodes React still
+holds. An empty list makes `setTitles` find no entry for any column and leave every one
+alone.
+
+### `src/common/styles/route.css` — the one new stylesheet
+
+The other five files in `common/styles/` are `legacy/css/` verbatim and describe a
+single-document site: `panel.css` positions a section's content as `.panel`, absolutely,
+inside the column it expanded from. A route has no column to sit inside, so `.route` supplies
+that geometry and everything below it — `.fgroup`, `.fopt`, `.grid`, `.card`, `.detail`,
+`.spec`, `.prose` — is reused from `panel.css` unchanged. It also restates the two rules that
+keyed off `aria-pressed`/`aria-expanded` for the `aria-current` links and `<details>` the
+route model uses, rather than editing the port.
+
+**The import order is now six files**: `globals` → `base` → `shell` → `panel` → `chrome` →
+`route` → `i18n`. `route` after `panel` so it can restate without touching it; `i18n` still
+last so the Persian overrides need no `!important`.
+
+`@media (scripting: none)` in that file unclips `.card__frame`. Cards rest at
+`clip-path: inset(0 0 100% 0)` and are wiped open by an IntersectionObserver; with scripting
+off that reveal never runs, so every server-rendered drawing on the page would be present in
+the HTML and invisible.
+
+### The projects module
+
+`'projects'` went into `MODULES` in `eslint.config.mjs` before the folder existed. The module
+owns its screens and its filter logic; `app/` imports the barrel and nothing deeper.
+
+- **Filters are `searchParams`, and every filter control is a `<Link>`.** No client state, no
+  client JavaScript, and a filtered view is linkable and back-button-correct — none of which
+  the legacy rail could do, because its state was a field on an object in a `WeakMap` keyed
+  by the panel element (`legacy/js/ui/panel.js:65`).
+- **`type` matches with `includes`, not equality.** A project carries more than one type;
+  written as equality it silently drops every multi-type project from every type filter.
+  Pinned by a test.
+- **Filtering happens on the server.** The legacy grid rendered all 76 cards and hid the
+  non-matching ones with `.is-out`; there is no reason to ship what you are about to hide.
+  `content-visibility: auto` with `contain-intrinsic-size` stays exactly as `panel.css` has
+  it — it is what makes 76 cards cost about what the dozen on screen cost.
+- **The option counts exclude their own axis** (`legacy/js/ui/panel.js:715`): the number
+  beside an option answers "how many would I get if I picked this".
+- **The card and the detail page draw the same picture**, because the generators are pure
+  and the seed is the slug — `drawingSet(slug, types)[0]` IS `kindFor(slug, types)`. That
+  identity is the one visible promise the art layer makes and it is easy to break by
+  accident, so `components/__tests__/drawing-identity.test.ts` asserts it.
+
+### Client leaves, and why each one is one
+
+Server Components are the default and the layout is one. Everything that carries
+`'use client'` is a leaf with a single reason: `Stage`, `SkipLink`, `SectionHint`, `Closer`
+and `LanguageSwitch` read the pathname; `MarkStepper` measures a box; `LiveClock` ticks;
+`SiteMotion` owns the cursor and the preloader; `ShellTransition` drives the FLIP;
+`CardReveal` adds one class. The clock's first value is computed on the SERVER behind
+`await connection()` and a `<Suspense>`, so it is correct in the HTML with no hydration
+rewrite — the legacy markup shipped a literal `—` and filled it in on boot.
+
+**The `is-intro` mask has no successor.** It was an inline `<style>` plus a blocking script
+in `legacy/index.html:18–44`, hiding the shell until the reveal could animate it in. The
+preloader now covers a page that is already finished, `revealShell()` fills backwards from
+hidden anyway, and removing a class that was never added is a no-op — so the render-blocking
+script is gone.
+
+### Known limitation: unknown slugs are a SOFT 404
+
+`/en/projects/<unknown>` renders the not-found UI correctly but answers **200**, not 404.
+This is Partial Prerendering, not a bug in the boundary: the route's static shell is flushed
+before `getProject()` has answered, so the status is already committed by the time
+`notFound()` runs. Verified against a production build; removing `(site)/loading.tsx` does
+not change it.
+
+The fix that WOULD give a hard 404 is `export const dynamicParams = false` on the detail
+route, and it is deliberately not taken: every slug would have to exist at build time, so a
+project created in the prompt-6 dashboard would 404 until the next deploy. Purging a cache
+tag creates content, not routes. **Re-evaluate when the dashboard's publish flow can trigger
+a rebuild**, or when Next.js can defer the status for a prerendered shell.
 
 ## Deviations from the architecture playbook
 
