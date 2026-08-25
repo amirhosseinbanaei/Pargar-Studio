@@ -5,7 +5,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getDictionary } from '@/common/i18n';
-import { isLocale, localeHref } from '@/common/i18n/routing';
+import { isLocale, localeAlternates, localeHref } from '@/common/i18n/routing';
 import { getProjectFilters, listProjects } from '@/common/services/project-service';
 import { ProjectsScreen, parseProjectFilters, type RawSearchParams } from '@/modules/projects';
 
@@ -19,7 +19,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!isLocale(locale)) notFound();
   const { t } = getDictionary(locale);
   // A bare title; the root layout's template supplies the suffix.
-  return { title: t('nav.projects'), alternates: { canonical: localeHref(locale, '/projects') } };
+  // `alternates` carries the canonical AND the `hreflang` pair, so each language's page
+  // points at its counterpart rather than competing with it.
+  return {
+    title: t('nav.projects'),
+    description: t('cap.projects'),
+    alternates: localeAlternates(locale, '/projects'),
+  };
 }
 
 export default async function ProjectsPage({ params, searchParams }: PageProps) {

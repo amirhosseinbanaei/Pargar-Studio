@@ -11,7 +11,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getDictionary } from '@/common/i18n';
-import { isLocale, localeHref } from '@/common/i18n/routing';
+import { isLocale, localeAlternates } from '@/common/i18n/routing';
 import { localeValues } from '@/common/schemas/locale';
 import { getProject, listProjects } from '@/common/services/project-service';
 import { ProjectDetail } from '@/modules/projects';
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: project.title,
     description: project.blurb,
-    alternates: { canonical: localeHref(locale, `/projects/${slug}`) },
+    alternates: localeAlternates(locale, `/projects/${slug}`),
     openGraph: { title: project.title, description: project.blurb, type: 'article' },
   };
 }

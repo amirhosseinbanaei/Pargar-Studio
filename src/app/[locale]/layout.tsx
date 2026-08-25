@@ -20,7 +20,7 @@
 import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { getDictionary } from '@/common/i18n';
-import { isLocale } from '@/common/i18n/routing';
+import { isLocale, localeAlternates } from '@/common/i18n/routing';
 import { localeValues } from '@/common/schemas/locale';
 import { env } from '@/common/config/env';
 import { Providers } from '../providers';
@@ -83,10 +83,7 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     description: t('cap.projects'),
     openGraph: { type: 'website', siteName: brand, title: home, locale },
     robots: { index: true, follow: true },
-    alternates: {
-      canonical: `/${locale}`,
-      languages: Object.fromEntries(localeValues.map(other => [other, `/${other}`])),
-    },
+    alternates: localeAlternates(locale),
   };
 }
 

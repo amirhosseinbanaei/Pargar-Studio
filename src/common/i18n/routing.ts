@@ -93,3 +93,26 @@ export function resolveLocale(acceptLanguage: string | null): Locale | null {
   }
   return null;
 }
+
+/**
+ * The `alternates` block every public route's metadata carries: this page's canonical URL,
+ * plus one `hreflang` entry per locale pointing at its counterpart.
+ *
+ * WHY IT IS A HELPER AND NOT TWO LINES PER ROUTE. The two halves have to agree — the
+ * canonical for `/fa/design/x` must be the Persian URL while `languages.en` points at the
+ * English one — and hand-writing them per route is how a page ends up declaring the other
+ * language's URL as its own canonical, which asks a search engine to drop one of the two
+ * documents this whole locale scheme exists to publish separately.
+ *
+ * `path` is locale-less (`/design/kavan-identity`), the same shape `localeHref` takes,
+ * because route slugs are English in both locales.
+ */
+export function localeAlternates(
+  locale: Locale,
+  path = '/',
+): { canonical: string; languages: Record<string, string> } {
+  return {
+    canonical: localeHref(locale, path),
+    languages: Object.fromEntries(localeValues.map(other => [other, localeHref(other, path)])),
+  };
+}
