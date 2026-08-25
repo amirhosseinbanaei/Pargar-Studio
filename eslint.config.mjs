@@ -54,7 +54,7 @@ import nextTs from 'eslint-config-next/typescript';
  * every violation is load-bearing. Prompts 5–7 add the rest the same way, one name at a
  * time.
  */
-const MODULES = ['projects'];
+const MODULES = ['projects', 'design', 'media', 'studio', 'contact'];
 
 /* ────────────────────────────────────────────────────────────────────────────── *
  *  Reusable restriction patterns.                                                *
