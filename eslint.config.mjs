@@ -53,8 +53,14 @@ import nextTs from 'eslint-config-next/typescript';
  * boundary retrofitted onto a grown tree costs roughly ten times as much, because by then
  * every violation is load-bearing. Prompts 5–7 add the rest the same way, one name at a
  * time.
+ *
+ * `dashboard` was added by prompt 6 the same way, and it is the module where the rule
+ * earns the most: it is the only module that WRITES, so it is the one whose actions the
+ * other six will be tempted to reach into directly when prompt 7 repeats the CRUD pattern
+ * for design, media, studio, contact and messages. It may not — those screens belong to
+ * `dashboard` too, and anything genuinely shared between them is promoted to `common/`.
  */
-const MODULES = ['projects', 'design', 'media', 'studio', 'contact'];
+const MODULES = ['projects', 'design', 'media', 'studio', 'contact', 'dashboard'];
 
 /* ────────────────────────────────────────────────────────────────────────────── *
  *  Reusable restriction patterns.                                                *
