@@ -48,12 +48,13 @@ import nextTs from 'eslint-config-next/typescript';
  * all — it may import any other module, and lint stays green forever. "Add the name to
  * MODULES" is therefore step 1 of creating a module, before the folder exists.
  *
- * EMPTY ON PURPOSE. No module exists yet; prompts 3–6 add them one name at a time. A
- * boundary declared against zero files is free, and the same boundary retrofitted onto a
- * grown tree costs roughly ten times as much, because by then every violation is
- * load-bearing.
+ * `projects` was added by prompt 4 BEFORE `src/modules/projects/` existed, which is the
+ * only order that works: a boundary declared against zero files is free, and the same
+ * boundary retrofitted onto a grown tree costs roughly ten times as much, because by then
+ * every violation is load-bearing. Prompts 5–7 add the rest the same way, one name at a
+ * time.
  */
-const MODULES = [];
+const MODULES = ['projects'];
 
 /* ────────────────────────────────────────────────────────────────────────────── *
  *  Reusable restriction patterns.                                                *
