@@ -109,6 +109,24 @@ export type Project = ReturnType<typeof toLocaleProject>;
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
+ * The bounds shared by this schema and the dashboard's FORM schema
+ * (`modules/dashboard/schemas/project-form.ts`), exported so there is exactly one copy of
+ * each.
+ *
+ * The failure this prevents is not hypothetical: prompt 5 shipped `min(10)` in the contact
+ * form and `min(1)` in the action that backs it, and a nine-character message was accepted
+ * by the server the form had just refused. A bound that appears twice drifts; a bound that
+ * appears once cannot.
+ *
+ * The slug is also the SEED for the project's generated drawings
+ * (`legacy/data/projects.js:5`), so its pattern must stay URL- and RNG-safe forever:
+ * lowercase ASCII, digits and single hyphens only.
+ */
+export const PROJECT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const PROJECT_YEAR_MIN = 1900;
+export const PROJECT_YEAR_MAX = 2200;
+
+/**
  * `strictObject`: an unexpected key on a write is tampering or a mass-assignment attempt,
  * not an additive release to tolerate.
  */
@@ -116,20 +134,26 @@ export const projectCreateSchema = z.strictObject({
   slug: z
     .string()
     .min(1)
-    /**
-     * The slug is also the seed for the project's generated drawings
-     * (`legacy/data/projects.js:5`), so it must stay URL- and RNG-safe forever. Lowercase
-     * ASCII, digits and single hyphens only.
-     */
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'lowercase words separated by single hyphens'),
+    .regex(PROJECT_SLUG_PATTERN, 'lowercase words separated by single hyphens'),
   types: z.array(projectTypeEnum).min(1),
   status: projectStatusEnum,
   scale: projectScaleEnum,
-  year: z.number().int().min(1900).max(2200),
+  year: z.number().int().min(PROJECT_YEAR_MIN).max(PROJECT_YEAR_MAX),
   area: z.string(),
   sortOrder: z.number().int().default(0),
 
   titleEn: z.string().min(1),
+  /**
+   * STILL REQUIRED, even though the dashboard lets an editor leave Persian blank.
+   *
+   * Those two facts are not in tension — they are the same decision seen from either end.
+   * The seed writes the English value into the `_fa` column wherever an overlay omits a
+   * key (`scripts/seed.ts`, reproducing `legacy/js/core/i18n.js:154`), and prompt 6's
+   * create/update actions do exactly the same thing with an empty Persian field. So the
+   * fallback is applied at the point content is AUTHORED, and by the time a payload
+   * reaches this schema both columns are populated. That is precisely what lets
+   * `pickLocale` have no fallback branch and `/fa/...` never render a blank page.
+   */
   titleFa: z.string().min(1),
   blurbEn: z.string(),
   blurbFa: z.string(),
