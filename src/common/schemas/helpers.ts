@@ -110,3 +110,30 @@ export function tolerantEnum<const T extends readonly [string, ...string[]]>(
 ) {
   return z.enum(values).catch(fallback);
 }
+
+/**
+ * A JSON-encoded column -> a real array.
+ *
+ * ADDED IN PROMPT 2. This project's data source is its own libSQL database rather than an
+ * HTTP backend, and SQLite has no array type, so list-valued fields (`types`, `team`,
+ * `facts`, `socials`…) are stored as TEXT holding a JSON string. This is the boundary that
+ * turns that string back into data, and it is the reason nothing downstream ever writes
+ * `JSON.parse(row.types) as string[]` — a cast is an unverifiable claim, and a row written
+ * by a hand-run SQL statement is exactly the case that breaks it.
+ *
+ * Tolerant on both failure modes, per the leaf rule above: unparseable JSON and a payload
+ * of the wrong shape both degrade to `[]` rather than throwing a `ZodError` that blanks the
+ * whole route. An empty facts list costs a table; a thrown parse costs the page.
+ *
+ * The input is passed through untouched when it is not a string, so an already-decoded
+ * array (a test fixture, a write payload) parses identically.
+ */
+export const jsonArray = <S extends z.ZodTypeAny>(item: S) =>
+  z.preprocess(value => {
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return [];
+    }
+  }, z.array(item).catch([]));

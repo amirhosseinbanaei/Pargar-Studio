@@ -36,9 +36,15 @@ const serverEnvSchema = z.object({
    * a `libsql://` URL without it fails at connect time, which is where that check belongs
    * — the driver knows the pairing rule and this schema does not.
    *
+   * An EMPTY STRING is normalized to `undefined` before validation, because that is how
+   * "unset" is spelled in a dotenv file and `.env.example` ships exactly that
+   * (`TURSO_AUTH_TOKEN=`). Without the preprocess, `z.string().min(1).optional()` rejects
+   * `''` and a checkout that copied the documented contract verbatim fails to boot on a
+   * key it was told to leave blank.
+   *
    * CONSUMED BY: prompt 2 (the `db` ring under `common/services`).
    */
-  TURSO_AUTH_TOKEN: z.string().min(1).optional(),
+  TURSO_AUTH_TOKEN: z.preprocess(v => (v === '' ? undefined : v), z.string().min(1).optional()),
   /**
    * The single admin password the dashboard authenticates against. There is one admin and
    * no user table; this value IS the credential.
