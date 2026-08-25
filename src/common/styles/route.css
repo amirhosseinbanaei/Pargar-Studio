@@ -1,0 +1,129 @@
+/* NOT A PORT. This file is new in prompt 4, and it is the only new stylesheet the route
+   migration needed.
+
+   The other five files in this folder are `legacy/css/` verbatim, and they describe a
+   single-document site: `panel.css` positions a section's content as `.panel`, absolutely,
+   INSIDE the column it expanded from. With real routes there is no column to sit inside —
+   the content is the page — so the geometry that used to come from `.panel` comes from
+   `.route` here, and everything below it (`.fgroup`, `.fopt`, `.grid`, `.card`, `.detail`,
+   `.spec`, `.prose`) is reused from `panel.css` unchanged.
+
+   It is imported AFTER `panel.css` so it can restate the two-pane grid without touching
+   it, and BEFORE `i18n.css` so the Persian overrides still come last with no `!important`.
+
+   Same rules as the ported files: token custom properties by name, logical properties for
+   anything directional, and only `transform`, `opacity` and `clip-path` animated. */
+
+/* ==========================================================================
+   A section route's content region — the panel geometry, minus the panel.
+   ========================================================================== */
+
+.route {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(var(--nav-w-min), var(--nav-w)) 1fr;
+  gap: var(--sp-6);
+  padding-top: var(--sp-5);
+}
+
+/* A route with nothing to filter runs full width — `panel--solo`'s rule, by another name. */
+.route--solo { grid-template-columns: 1fr; }
+.route--solo .route__rail { display: none; }
+
+.route__rail {
+  position: relative;
+  min-height: 0;
+  padding-inline-end: var(--sp-5);
+  overflow-y: auto;
+  /* The rail is short and the page scroller is the main region's; a rail that scrolled the
+     document would push the grid out of view to reach the last filter. */
+  overscroll-behavior: contain;
+}
+.route__rail::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: 0;
+  width: 1px;
+  background: var(--rule);
+}
+
+.route__main {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The rail stacks above the content on narrow screens, matching `RAIL_STACKED` in
+   `legacy/js/ui/panel.js:70`. */
+@media (max-width: 900px) {
+  .route {
+    grid-template-columns: 1fr;
+    gap: var(--sp-4);
+  }
+  .route__rail {
+    overflow: visible;
+    padding-inline-end: 0;
+    padding-bottom: var(--sp-4);
+  }
+  .route__rail::after {
+    top: auto;
+    inset-inline: 0;
+    bottom: 0;
+    width: auto;
+    height: 1px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Filters are links now, not buttons
+   -------------------------------------------------------------------------- */
+
+/* `panel.css` colours the active option off `[aria-pressed="true"]`, which is the right
+   attribute for a toggle button and the wrong one for a link. The rule is restated for
+   `[aria-current]` rather than edited there, because prompt 5's contact form still uses
+   real buttons and `panel.css` stays a verbatim port. */
+.fopt[aria-current="true"] { color: var(--a-1); }
+.fopt[aria-current="true"] .fopt__n { color: var(--a-2); }
+.lang__b[aria-current="true"] { color: var(--a-1); }
+
+/* Filter options are anchors; give them the button's box back. */
+a.fopt,
+a.frow-clear { text-decoration: none; }
+
+/* The rail's groups are `<details>` on a route: an accordion that works with no
+   JavaScript at all. `panel.css` styles `.fgroup__head[aria-expanded]`; a `<summary>`
+   carries its state on the parent instead, so the same two rules are restated for it. */
+.fgroup__head::-webkit-details-marker { display: none; }
+.fgroup__head { cursor: pointer; list-style: none; }
+details[open] > .fgroup__head { color: var(--t-hi); }
+details[open] > .fgroup__head .fgroup__caret { transform: rotate(45deg); }
+/* `<details>` shows and hides its own body, so the grid-collapse trick in `panel.css`
+   would fight it: force the open state on the body it reveals. */
+details > .fgroup__body { grid-template-rows: 1fr; }
+
+/* --------------------------------------------------------------------------
+   Detail route
+   -------------------------------------------------------------------------- */
+
+/* `.detail__back` is a button in `panel.css` because a detail view swapped in place.
+   It is a link here, to the list route. */
+a.detail__back { text-decoration: none; }
+
+/* --------------------------------------------------------------------------
+   No JavaScript
+   -------------------------------------------------------------------------- */
+
+/* Card frames rest at `clip-path: inset(0 0 100% 0)` and are wiped open when they enter
+   the viewport — which needs an IntersectionObserver. With scripting off that reveal never
+   runs, so every drawing on the page would be clipped to nothing: server-rendered SVG,
+   present in the HTML, and invisible. `scripting: none` unclips them, so the grid degrades
+   to "no wipe" rather than to "no artwork". */
+@media (scripting: none) {
+  .card__frame { clip-path: inset(0 0 0 0); }
+  .preload,
+  .cursor { display: none; }
+}
