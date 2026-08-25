@@ -22,8 +22,9 @@ handling, session), read the matching guide in
 
 Layering is machine-enforced in `eslint.config.mjs`: `app → modules → common`, one way,
 no cross-module imports, modules consumed through their `index.ts` barrel only. Adding a
-module means adding its name to the `MODULES` array **first** — `projects` is the only
-entry today, and a module with no entry there has no boundary rules at all.
+module means adding its name to the `MODULES` array **first** — `projects`, `design`,
+`media`, `studio` and `contact` are the five entries today, and a module with no entry
+there has no boundary rules at all.
 
 ## Verification
 
@@ -497,6 +498,163 @@ route, and it is deliberately not taken: every slug would have to exist at build
 project created in the prompt-6 dashboard would 404 until the next deploy. Purging a cache
 tag creates content, not routes. **Re-evaluate when the dashboard's publish flow can trigger
 a rebuild**, or when Next.js can defer the status for a prerendered shell.
+
+## The editorial routes and the one write (prompt 5)
+
+The public site is complete. All five columns on the index lead to real routes in both
+locales, and the last of them writes to the database.
+
+```
+  src/app/[locale]/(site)/
+    design/            list (one facet) + [slug]   9 works
+    media/             list (one facet) + [slug]  14 entries
+    studio/            one editorial page          singleton
+    contact/           one page + THE form         singleton + contact_messages
+  src/app/sitemap.ts   210 URLs, read from the services
+  src/app/robots.ts    allows the site, disallows the dashboard prompt 6 has not built yet
+  src/common/components/collection/   what projects, design and media share
+```
+
+### Four modules, and what was promoted instead of shared sideways
+
+`design`, `media`, `studio` and `contact` went into `MODULES` in `eslint.config.mjs`
+BEFORE their folders existed. No module imports another; where two wanted the same thing
+it was **promoted to `common/`**, which is the only sanctioned direction.
+
+`src/common/components/collection/` is the new folder, and the line it draws is: a piece
+belongs there when its BEHAVIOUR is shared, not when its markup merely rhymes.
+
+| Promoted                   | From                            | Why it could not stay                                                                                                                                          |
+| -------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CardReveal`               | `modules/projects`              | `.card__frame` rests at `clip-path: inset(0 0 100% 0)`. A grid without it renders every drawing INVISIBLY — so it is required behaviour, not a projects detail |
+| `DetailPlates`             | `modules/projects`              | Carries the seed contract (first plate at the bare seed = the card's picture). Three copies is three chances to "tidy" one into `seed:0`                       |
+| `SpecRow`                  | `modules/projects`              | The empty-value rule. Three copies is three chances for one to print `Client —`                                                                                |
+| `BackLink`                 | `modules/projects`              | One arrow, one `route.css` rule for the anchor form of it                                                                                                      |
+| `FacetRail`                | new                             | Design and Media each filter on ONE axis; the projects rail's cross-axis counting is meaningless with one axis, so this is a sibling, not a generalization     |
+| `GridSkeleton`             | new                             | Shape-accurate fallback for both small lists                                                                                                                   |
+| `Lat`                      | new, `common/components/layout` | `legacy/js/ui/panel.js:47`'s helper. Names the intent; the `.lat` rule is already in the ported `i18n.css`                                                     |
+| `parseFacet` / `facetHref` | new, `common/utils/facets.ts`   | Pure URL work, no resource knowledge                                                                                                                           |
+
+`ProjectDetail` was rewired onto the promoted four. That is the only change to the projects
+module in this prompt, and it is a promotion rather than an edit: same markup, same seeds,
+same test.
+
+### The editorial routes
+
+- **Design and Media keep their single filter rail** (`legacy/js/ui/panel.js:215` and
+  `:279`), as `<details>` plus links — same model as the projects rail, one axis instead of
+  four, and the option list is DERIVED from the rows that exist rather than hardcoded.
+- **A media card's drawing is seeded from the PROJECT, not the entry**
+  (`legacy/js/ui/panel.js:263`), so a press cutting carries the same picture the building
+  does. The list route therefore reads the archive as well — one cached call, not fourteen.
+- **Every related-project link is resolved before it is rendered.** The route looks the
+  slug up and hands the component the project or `null`; a record pointing at a project
+  that has been un-published renders with NO link rather than an href that 404s. The join
+  is deliberately not a foreign key, so tolerating a miss is the read side of that
+  decision. All 11 links in the seeded data resolve; 3 entries have no project at all.
+- **`outlet` is bidi-isolated everywhere it appears.** It is Latin in some records and
+  Persian in others (`legacy/data/works.fa.js:283` keeps "ArchDaily"), so the rule cannot
+  be applied by language — it is applied always, and is a no-op in English.
+- **The facts table renders from the record, in its own order.** Both halves of a
+  `{ k, v }` pair are translated (`legacy/data/works.fa.js:28`), so a hardcoded label list
+  would print English keys on the Persian page and drop any pair an editor adds.
+- **Studio is one page with an anchor rail.** The alumni DO render — `legacy/js/ui/panel.js:438`
+  prints all forty under "Previously", and the assumption that they might be hidden is
+  settled by the source. What is NOT reproduced is the scroll-spy: the rail is plain
+  anchors, so no entry claims `aria-current`. Asserting the reader is in the first section
+  when they may be anywhere is worse than asserting nothing.
+- **Portraits are seeded from the ENGLISH name.** `seedOf` keeps only `[a-z0-9]`, so a
+  Persian name collapses to `'-'` and all twenty-two people would share one portrait on
+  `/fa/studio` — invisible to anyone testing in English. The studio route therefore reads
+  the record twice, in the requested locale and in English, and zips them by index exactly
+  as `legacy/js/ui/panel.js:396` did. Pinned by `modules/studio/lib/__tests__/seeds.test.ts`.
+- **`brand.meaning` moved from `constants/site.ts` into the dictionary.** It is translated
+  (`legacy/data/studio.fa.js:10`) and a constant cannot be bilingual.
+
+### The contact form — the only Server Action in the public site
+
+`modules/contact/actions/contact-message-actions.ts`. It returns an `ActionResult` and
+never throws for an expected failure, re-validates its input, takes no identity, and calls
+a service (`createContactMessage`) rather than a repository.
+
+- **The client branches on `status`, never on message text.** 429 gets its own copy, 422
+  binds field errors, everything else is one sentence. Matching on a message would work in
+  exactly one of the two languages.
+- **Server field errors are re-localized BY FIELD NAME.** The action answers 422 with the
+  wire schema's messages, which are English by design; the form looks the FIELD up in a
+  table and prints its own sentence. Same rule as `references/04-actions-and-mutations.md`
+  §5.1 — branch on which field the backend named, not on the status alone.
+- **`ContactForm` takes a `locale`, not a `Dictionary`.** A dictionary is an object of
+  FUNCTIONS and cannot cross the server/client boundary; `@/common/i18n` is client-safe, so
+  the leaf builds its own, exactly as `(site)/error.tsx` does.
+- **Tier 2, not tier 1**, though four flat fields would normally be tier 1: `FormButton`
+  gates on `isValid`, which needs per-keystroke validation, and the zod messages have to
+  come from the dictionary — which means a schema built per render, not a module constant.
+- **Two schemas, one set of bounds.** `schemas/contact-form.ts` carries localized copy for
+  typing; `schemas/contact-submission.ts` is exact and carries none. Both read
+  `schemas/limits.ts`, and `schemas/__tests__/agreement.test.ts` asserts they judge every
+  edge case the same way. They drifted once during this prompt — `min(10)` in the form,
+  `min(1)` inherited by the action — and a nine-character body was accepted by the server
+  the form had just refused.
+- **NO EMAIL IS SENT.** The dashboard inbox in prompt 7 is where messages are read. Adding
+  SMTP is a deploy-time concern with its own credentials and failure modes, and a send that
+  fails must not lose a message that was successfully stored. **If email delivery turns out
+  to be required for launch, it changes prompt 7's scope.**
+- **No cache tag is purged, and that was checked rather than assumed.** `contact_messages`
+  is never cached and no public page reads the inbox; the contact PAGE reads the `contact`
+  singleton, a different table this write never touches. An `updateTag` here would purge
+  nothing.
+
+### The two open decisions, resolved
+
+- **The rate limit is IN-MEMORY, per IP.** `modules/contact/lib/rate-limit.ts`: five
+  submissions per ten minutes, a true sliding window, bounded key count, and a refused
+  attempt is not recorded (or a reader who hit the limit once could never wait their way
+  back in). A table would hold across a fleet and survive a restart, and it would cost a
+  database write on every submission — so the flood writes to the database whether or not
+  it is allowed through. This is a studio's contact form, not a credential endpoint. The
+  honest failure mode is stated in that file: on a multi-instance deploy the effective
+  limit is `5 × instances` and a cold start forgets everything. On a single instance it is
+  simply exact. Re-evaluate if the site is ever fronted by more than one instance AND the
+  inbox actually gets flooded; the fix is a table behind the same function.
+- **The site plan is seeded from a FIXED STRING**, `kavan-dezashib-site` — not the
+  coordinates and not the address, so editing the address in the dashboard cannot silently
+  redraw the plan. The legacy source settles the other half of that question too: the
+  generator is **`court`**, not `contour` (`legacy/js/ui/panel.js:508`), and there was
+  never an embedded map — a drawn courtyard with a pin over it, captioned with the
+  coordinates, and therefore no third-party script, no consent question and no tile bill.
+- **Abuse resistance is a honeypot plus that limiter, and NO captcha.** A third-party
+  captcha is a third-party script on every contact page, a consent question, and an
+  accessibility tax paid by every honest reader. The honeypot answers SUCCESS and writes
+  nothing: a 422 would tell a script which field to stop filling.
+
+### Two deliberate divergences from the legacy markup
+
+- **The socials are text, not links.** `legacy/js/ui/panel.js:499` rendered them as
+  `<a href="#">`. A placeholder href is a dead link, and the record carries a platform name
+  and a handle but no URL — inventing `https://instagram.com/<handle>` would trade a link
+  that goes nowhere for one that may go somewhere wrong. They become anchors when the
+  dashboard grows a URL column.
+- **The studio rail is anchors with no scroll-spy** — see above.
+
+### A bug this prompt found and fixed
+
+`studio.awards` rendered as an EMPTY LIST, in both locales, with no error anywhere.
+`legacy/data/studio.js:89` writes an award's year as a NUMBER (`year: 2024`) while
+`:104` writes a chapter's as a STRING, and the seed copies both verbatim; `awardSchema.year`
+was `looseString`, so every award failed its parse — and `jsonArray` degrades a failed
+payload to `[]` on purpose (a leaf must not blank a page), so six awards vanished silently.
+The leaf is now `looseYear`, which accepts either spelling and normalizes to a string, and
+`common/schemas/__tests__/studio.test.ts` pins it. **The tolerance that keeps one bad row
+from blanking a page is also what hides a schema that never matched** — worth remembering
+when adding a `jsonArray` column.
+
+### Authored Persian, still owed a native reader
+
+Prompt 4 flagged `ui.sections`, `ui.retry`, `error.title` and `error.notFound`. Prompt 5
+adds the fifteen `form.*` keys: the legacy site had no form of any kind, so none of them
+are ports. `brand.meaning` is NOT in that list — it is verbatim from
+`legacy/data/studio.fa.js:10`.
 
 ## Deviations from the architecture playbook
 
