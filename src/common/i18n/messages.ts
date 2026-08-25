@@ -173,6 +173,28 @@ export const en = {
   'contact.press': 'Press',
   'contact.findUs': 'Find us',
 
+  /* -- the contact form (prompt 5) ----------------------------------- *
+   * The legacy site had no form of any kind, so none of these keys are  *
+   * ports: the Persian below is AUTHORED, like `ui.sections` and the    *
+   * `error.*` pair in prompt 4, and is flagged in AGENTS.md for a       *
+   * native reader to confirm.                                          */
+  'form.write': 'Write to us',
+  'form.intro': 'A message here reaches the studio directly. We answer within a few working days.',
+  'form.name': 'Name',
+  'form.email': 'Email',
+  'form.subject': 'Subject',
+  'form.message': 'Message',
+  'form.send': 'Send message',
+  'form.sent': 'Thank you — your message has reached the studio.',
+  'form.failed': 'The message could not be sent. Please try again.',
+  'form.tooMany':
+    'Several messages have already come from this connection. Please try again later.',
+  'form.errName': 'Please enter your name.',
+  'form.errEmail': 'Please enter a valid email address.',
+  'form.errSubject': 'Please enter a subject.',
+  'form.errMessage': 'Please write at least a few words.',
+  'form.errLong': 'This is longer than the studio inbox accepts.',
+
   /* -- media and design detail --------------------------------------- */
   'media.excerpt': 'Excerpt',
   'media.note': 'Note',
@@ -183,6 +205,12 @@ export const en = {
   /* -- brand and shell chrome (legacy/data/i18n.js:288) --------------- */
   'brand.name': 'Kavan Studio',
   'brand.tagline': 'Architecture & Design',
+  /**
+   * `legacy/data/studio.js:14`. It lives here rather than in `constants/site.ts` because
+   * it is TRANSLATED (`legacy/data/studio.fa.js:10`) and a constant cannot be bilingual;
+   * the studio page prints it under "The name".
+   */
+  'brand.meaning': 'kavān — the arc a thing travels through',
   'ui.irst': 'IRST',
   'ui.opened': 'section opened',
   'ui.returned': 'Returned to index',
@@ -334,6 +362,23 @@ export const fa: Record<MessageKey, string> = {
   'contact.press': 'روابط رسانه‌ای',
   'contact.findUs': 'روی نقشه',
 
+  /* -- the contact form (prompt 5, AUTHORED) ------------------------- */
+  'form.write': 'برای ما بنویسید',
+  'form.intro': 'پیام شما مستقیم به دفتر می‌رسد. معمولاً ظرف چند روز کاری پاسخ می‌دهیم.',
+  'form.name': 'نام',
+  'form.email': 'ایمیل',
+  'form.subject': 'موضوع',
+  'form.message': 'پیام',
+  'form.send': 'ارسال پیام',
+  'form.sent': 'سپاسگزاریم — پیام شما به دفتر رسید.',
+  'form.failed': 'پیام ارسال نشد. لطفاً دوباره تلاش کنید.',
+  'form.tooMany': 'از این اتصال چند پیام فرستاده شده است. لطفاً بعداً دوباره تلاش کنید.',
+  'form.errName': 'لطفاً نام خود را وارد کنید.',
+  'form.errEmail': 'لطفاً یک نشانی ایمیل معتبر وارد کنید.',
+  'form.errSubject': 'لطفاً موضوع را وارد کنید.',
+  'form.errMessage': 'لطفاً دست‌کم چند کلمه بنویسید.',
+  'form.errLong': 'این متن از اندازه‌ای که صندوق دفتر می‌پذیرد بلندتر است.',
+
   /* -- media and design detail --------------------------------------- */
   'media.excerpt': 'گزیده',
   'media.note': 'یادداشت',
@@ -344,6 +389,8 @@ export const fa: Record<MessageKey, string> = {
   /* -- brand and shell chrome ---------------------------------------- */
   'brand.name': 'استودیو کاوان',
   'brand.tagline': 'معماری و طراحی',
+  'brand.meaning':
+    'کاوان — کمانی که هر چیز مسیرش را در آن می‌پیماید؛ هم‌خانواده پرگار: یکی دایره را می‌کشد، دیگری گشودگی همان دایره است',
   'ui.irst': 'به وقت تهران',
   'ui.opened': 'باز شد',
   'ui.returned': 'بازگشت به فهرست',

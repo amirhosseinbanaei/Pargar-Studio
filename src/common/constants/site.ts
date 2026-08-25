@@ -22,9 +22,12 @@ export const BRAND = {
   short: 'KAVAN',
   city: 'Tehran',
   founded: 2007,
-  /* kavān — the arc a thing travels through. A sibling to pargar, the drafting compass:
-     one draws the circle, the other is the sweep of it. */
-  meaning: 'kavān — the arc a thing travels through',
+  /**
+   * `meaning` MOVED TO THE DICTIONARY in prompt 5, as `brand.meaning`. The studio page
+   * prints it under "The name", and `legacy/data/studio.fa.js:10` translates it — a
+   * constant cannot be bilingual, and keeping an English copy here beside the Persian one
+   * there would be two truths with one of them always wrong.
+   */
 } as const;
 
 export interface NavSection {
