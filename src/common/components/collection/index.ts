@@ -13,4 +13,6 @@
 export { BackLink, type BackLinkProps } from './BackLink';
 export { CardReveal } from './CardReveal';
 export { DetailPlates, type DetailPlatesProps } from './DetailPlates';
+export { FacetRail, type FacetOption, type FacetRailProps } from './FacetRail';
+export { GridSkeleton, type GridSkeletonProps } from './GridSkeleton';
 export { SpecRow, type SpecRowProps } from './SpecRow';
