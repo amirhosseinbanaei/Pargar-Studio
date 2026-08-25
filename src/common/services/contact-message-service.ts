@@ -16,7 +16,7 @@
  */
 import 'server-only';
 import * as contactMessageRepo from './contact-message-repository';
-import type { ContactMessage } from '@/common/schemas/contact-message';
+import type { ContactMessage, ContactMessageCreate } from '@/common/schemas/contact-message';
 
 /** Newest first. */
 export async function listContactMessages(): Promise<ContactMessage[]> {
@@ -25,4 +25,27 @@ export async function listContactMessages(): Promise<ContactMessage[]> {
 
 export async function listUnreadContactMessages(): Promise<ContactMessage[]> {
   return contactMessageRepo.listUnread();
+}
+
+/**
+ * Store one submission from the public contact form (prompt 5).
+ *
+ * THE ONE WRITE IN THIS RING A STRANGER CAN REACH, which is why the boundary is guarded
+ * twice: the Server Action parses its input with the exact schema before calling this, and
+ * the repository parses again immediately before the insert. That is not belt-and-braces
+ * for its own sake — the action is a public HTTP endpoint whose caller controls every
+ * argument, and this function is reachable from any future server code that skips it.
+ *
+ * NO CACHE TAG IS PURGED, and that is checked rather than assumed: nothing caches this
+ * table. `contact_messages` reads are deliberately uncached (see the header above), and no
+ * public page reads the inbox at all — the contact PAGE reads the `contact` singleton,
+ * which is a different table that this write does not touch. An `updateTag` here would
+ * purge a cache that does not exist.
+ *
+ * NO EMAIL IS SENT. The dashboard inbox in prompt 7 is where messages are read; adding
+ * SMTP is a deploy-time concern with its own credentials and failure modes, and a send
+ * that fails must not lose a message that was successfully stored. See AGENTS.md.
+ */
+export async function createContactMessage(input: ContactMessageCreate): Promise<ContactMessage> {
+  return contactMessageRepo.create(input);
 }
