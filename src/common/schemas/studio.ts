@@ -34,16 +34,37 @@ export const statSchema = z.object({
   value: looseString,
 });
 
+/**
+ * A year, whichever way the record spells it.
+ *
+ * FIXED IN PROMPT 5, and it was a silent one. `legacy/data/studio.js:89` writes an award's
+ * year as a NUMBER (`year: 2024`) and a chapter's as a STRING (`year: '2007'`) — the two
+ * arrays disagree in the source, and the seed copies both verbatim. A `looseString` leaf
+ * therefore failed on every award, and because `jsonArray` degrades an unparseable payload
+ * to `[]` rather than throwing (which is the right call for a leaf), the studio page
+ * rendered `<div class="rows"></div>`: six awards, no error, no empty state, nothing in the
+ * gate to notice. The tolerance that keeps one bad row from blanking a page is also what
+ * hides a schema that never matched.
+ *
+ * Normalizing to a string here rather than to a number is deliberate: the value is
+ * displayed and digit-shaped by `num()`, never compared or sorted, and `'2024'` is what
+ * every other year in this file already is.
+ */
+const looseYear = z
+  .union([z.string(), z.number()])
+  .nullable()
+  .transform(v => (v === null ? '' : String(v)));
+
 export const awardSchema = z.object({
-  /** A string, not a number: the legacy data writes years as `'2024'` throughout. */
-  year: looseString,
+  year: looseYear,
   title: looseString,
   project: looseString,
   body: looseString,
 });
 
 export const chapterSchema = z.object({
-  year: looseString,
+  /** A string in the source today; `looseYear` so a numeric one cannot blank the timeline. */
+  year: looseYear,
   text: looseString,
 });
 
