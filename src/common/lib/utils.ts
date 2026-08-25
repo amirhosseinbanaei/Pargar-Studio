@@ -44,6 +44,17 @@ const twMerge = extendTailwindMerge({
       // Same failure, same fix, for the five motion easings.
       ease: [{ ease: ['expo', 'quint', 'inout-kavan', 'out-kavan', 'in-kavan'] }],
 
+      // The control metrics added in prompt 3. Each SHADOWS a built-in Tailwind
+      // group, which is exactly the case the file header describes: without
+      // these lines tailwind-merge cannot know `h-control` and `h-12` are the
+      // same group, so BOTH survive `cn(inputVariants(), 'h-12')` and the
+      // winner is decided by CSS source order — an override that works in dev
+      // and breaks in the production bundle.
+      h: [{ h: ['control'] }],
+      'min-w': [{ 'min-w': ['control'] }],
+      rounded: [{ rounded: ['control'] }],
+      opacity: [{ opacity: ['disabled'] }],
+
       // NOT listed, deliberately, because they already resolve correctly on the built-in
       // arbitrary-value matchers: the colour ramps (`bg-s-3`, `text-t-md`, `border-rule`,
       // `text-a-1`). Adding them would be noise that has to be maintained. Re-probe with
