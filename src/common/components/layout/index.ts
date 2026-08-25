@@ -20,6 +20,7 @@ export { Closer, type CloserProps } from './Closer';
 export { Footbar, type FootbarProps } from './Footbar';
 export { GlyphText, type GlyphTextProps } from './GlyphText';
 export { LanguageSwitch, type LanguageSwitchProps } from './LanguageSwitch';
+export { Lat, type LatProps } from './Lat';
 export { LiveClock, type LiveClockProps } from './LiveClock';
 export { MarkStepper, type MarkStepperProps } from './MarkStepper';
 export { Masthead, type MastheadProps } from './Masthead';

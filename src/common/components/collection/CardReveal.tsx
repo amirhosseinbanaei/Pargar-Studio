@@ -1,7 +1,14 @@
-// src/modules/projects/components/CardReveal.tsx
+// src/common/components/collection/CardReveal.tsx
 'use client';
 /**
  * The wipe that opens a card's drawing as it scrolls into view.
+ *
+ * PROMOTED IN PROMPT 5, from `modules/projects/components/`. Three modules render the
+ * same `.card` grid now — projects, design and media — and `.card__frame` rests at
+ * `clip-path: inset(0 0 100% 0)`, so a grid without this component renders every drawing
+ * invisibly. That makes it shared behaviour, not a projects detail; a sideways import
+ * from design into projects is banned, and duplicating an observer in three modules is
+ * how two of the three end up with a different `rootMargin`.
  *
  * `panel.css` rests `.card__frame` at `clip-path: inset(0 0 100% 0)` and opens it when the
  * card gains `.is-in`. On the legacy site that class was added by the same observer

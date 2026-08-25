@@ -6,10 +6,10 @@
  * which adds a class — the cards, their drawings, the filter links and the counts are all
  * in the HTML.
  */
+import { CardReveal } from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
 import type { Project } from '@/common/schemas/project';
 import { filterProjects, type ProjectFilters } from '../lib/filters';
-import { CardReveal } from './CardReveal';
 import { ProjectCard } from './ProjectCard';
 import { ProjectFilterRail, type FilterTaxonomy } from './ProjectFilterRail';
 
