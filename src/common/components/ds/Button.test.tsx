@@ -33,12 +33,19 @@ describe('Button', () => {
   });
 
   it('asChild renders the child element instead of nesting <a> inside <button>', () => {
+    // An EXTERNAL href on purpose. `@next/next/no-html-link-for-pages` errors on a bare
+    // `<a>` whose href matches a real route in `app/`, and it started doing so the moment
+    // prompt 4 created `/projects` — this assertion is about `asChild` not nesting an
+    // anchor inside a button, and has nothing to do with internal navigation.
     const { container } = render(
       <Button asChild>
-        <a href="/projects">Projects</a>
+        <a href="https://example.com/projects">Projects</a>
       </Button>,
     );
     expect(container.querySelector('button')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute(
+      'href',
+      'https://example.com/projects',
+    );
   });
 });
