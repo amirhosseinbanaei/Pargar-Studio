@@ -25,8 +25,8 @@ export const mediaRowSchema = z.object({
   type: z.string(),
   year: z.number(),
   /**
-   * The related project's slug, or `null` for the four entries about the practice rather
-   * than a building. Nullable, NOT optional: the column always exists, and making the key
+   * The related project's slug, or `null` for the three entries about the practice rather
+   * than a building (the brick essay, the Pars lecture and the biennale). Nullable, NOT optional: the column always exists, and making the key
    * optional would ripple a `?` through every consumer.
    */
   projectSlug: z.string().nullable(),
