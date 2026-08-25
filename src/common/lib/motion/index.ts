@@ -31,6 +31,7 @@ export {
   type Spring,
 } from './anim';
 export { canSplitGlyphs } from './glyphs';
+export { markTargets, MARK_GAP, MARK_ACTIVE_SCALE, MARK_SECTIONS, type MarkTarget } from './marks';
 export { initCursor, type CursorHandle } from './cursor';
 export { smoothScroll, type SmoothScroller } from './smooth';
 export { endIntro, runPreload, revealShell } from './preload';

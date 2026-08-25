@@ -37,6 +37,7 @@
  */
 import { animate, stagger, flip, wait, EASE, reduced, round } from './anim';
 import { canSplitGlyphs } from './glyphs';
+import { markTargets } from './marks';
 import type { CursorHandle } from './cursor';
 
 const esc = (s: string): string =>
@@ -89,6 +90,19 @@ export interface ShellApi {
   close: (opts?: { push?: boolean }) => void;
   warmArt: () => void;
   relang: () => Promise<void>;
+  /**
+   * Release every listener and observer this shell installed.
+   *
+   * ADDED IN PROMPT 4, and it is not optional there. On the static site the shell was
+   * created once and lived exactly as long as the document, so there was nothing to
+   * release and no code path that could have called this. With real routes the shell is a
+   * React component that MOUNTS AND UNMOUNTS: leaving the home page and coming back
+   * through the browser's Back button constructs a second one. Without this, each round
+   * trip leaves another `keydown` handler bound to `window` — so after three visits, one
+   * press of Escape runs three transitions on three detached DOM trees, and the shell that
+   * is actually on screen is not necessarily the one that answers.
+   */
+  destroy: () => void;
   readonly openId: string | null;
   readonly busy: boolean;
 }
@@ -258,7 +272,6 @@ export function createShell(options: ShellOptions): ShellApi {
      they compress into a centred stepper showing which section you are in.
      ====================================================================== */
   const markHost = document.querySelector<HTMLElement>('.marks');
-  const GAP = 18;
 
   // The marks are placed by CSS at 0/20/…/100% of this box, so its width is
   // the only measurement the stepper needs. It is tracked rather than read on
@@ -275,27 +288,12 @@ export function createShell(options: ShellOptions): ShellApi {
   });
   if (markHost) markRO.observe(markHost);
 
-  function markTargets(activeIndex: number | null): { x: number; s: number; k: number }[] {
-    const w = markW || (markHost?.getBoundingClientRect().width ?? 0);
-    const rest = marks.map((_, k) => (k / 5) * w);
-
-    if (activeIndex == null) return marks.map((_, k) => ({ x: 0, s: 1, k }));
-
-    const start = (w - GAP * 4) / 2;
-    // The stepper is positioned left-to-right, but in Persian the columns run
-    // right-to-left, so the dot that grows is mirrored to match what the
-    // reader actually sees.
-    const active = isRTL() ? 4 - activeIndex : activeIndex;
-    return marks.map((_, k) => {
-      if (k === 0) return { x: 0, s: 1, k }; // lead mark holds
-      const idx = k - 1; // 0..4
-      return { x: start + idx * GAP - rest[k], s: idx === active ? 2.6 : 1, k };
-    });
-  }
-
   function moveMarks(activeIndex: number | null, duration: number = OPEN_MS): Promise<unknown> {
     markState = activeIndex;
-    const targets = markTargets(activeIndex);
+    // The geometry — including the RTL mirroring — lives in `./marks`, because the site
+    // layout has to place the same stepper on every section route, where no shell exists.
+    const w = markW || (markHost?.getBoundingClientRect().width ?? 0);
+    const targets = markTargets(activeIndex, w, isRTL(), marks.length);
     return Promise.all(
       targets.map((tg, k) => {
         const m = marks[k];
@@ -532,13 +530,19 @@ export function createShell(options: ShellOptions): ShellApi {
     }
   });
 
-  closer?.addEventListener('click', () => close());
-  home?.addEventListener('click', e => {
+  // `#closer` and `#home` live in the MASTHEAD, which is part of the site layout and
+  // therefore outlives this shell across a navigation. Their handlers are named so
+  // `destroy()` can take them off again; the ones bound to `colsWrap` are dropped with the
+  // subtree React unmounts.
+  const onCloserClick = (): void => close();
+  const onHomeClick = (e: Event): void => {
     e.preventDefault();
     close();
-  });
+  };
+  closer?.addEventListener('click', onCloserClick);
+  home?.addEventListener('click', onHomeClick);
 
-  addEventListener('keydown', e => {
+  const onKeydown = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && openId) {
       e.preventDefault();
       close();
@@ -559,19 +563,31 @@ export function createShell(options: ShellOptions): ShellApi {
       cols[next]?.querySelector<HTMLElement>('.col__hit')?.focus();
       e.preventDefault();
     }
-  });
+  };
+  addEventListener('keydown', onKeydown);
 
   // The mark stepper re-places itself through its ResizeObserver; the cursor
   // only needs its cached target rect invalidated.
   let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener(
-    'resize',
-    () => {
-      clearTimeout(rt);
-      rt = setTimeout(() => cursor?.refresh?.(), 120);
-    },
-    { passive: true },
-  );
+  const onResize = (): void => {
+    clearTimeout(rt);
+    rt = setTimeout(() => cursor?.refresh?.(), 120);
+  };
+  addEventListener('resize', onResize, { passive: true });
+
+  function destroy(): void {
+    // Queued work first: a transition still in flight would otherwise reach for
+    // elements React has already detached.
+    queued = null;
+    colsWrap.removeEventListener('pointerover', onPointerOver);
+    colsWrap.removeEventListener('pointerout', onPointerOut);
+    closer?.removeEventListener('click', onCloserClick);
+    home?.removeEventListener('click', onHomeClick);
+    removeEventListener('keydown', onKeydown);
+    removeEventListener('resize', onResize);
+    clearTimeout(rt);
+    markRO.disconnect();
+  }
 
   /**
    * Re-render everything language-dependent. The open panel is rebuilt from
@@ -601,6 +617,7 @@ export function createShell(options: ShellOptions): ShellApi {
     close,
     warmArt,
     relang,
+    destroy,
     get openId() {
       return openId;
     },
