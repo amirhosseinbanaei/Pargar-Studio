@@ -38,8 +38,19 @@ const clientEnvSchema = z.object({
    * the site ships zero image files — every drawing is generated as SVG at runtime. It
    * also feeds the image-optimizer allowlist in `next.config.ts`, which fails closed to
    * an empty list while this is unset.
+   *
+   * AN EMPTY STRING IS NORMALIZED TO `undefined` BEFORE VALIDATION, exactly as
+   * `TURSO_AUTH_TOKEN` is in `./server-env`. That is how "unset" is spelled in a dotenv
+   * file, and `.env.example` ships precisely that (`NEXT_PUBLIC_MEDIA_URL=`) under a
+   * comment telling the reader to leave it empty. Without the preprocess,
+   * `z.url().optional()` rejects `''` with "Invalid URL" — so a checkout that copied the
+   * documented contract verbatim fails to BUILD, on a key it was told to leave blank, with
+   * an error that names the variable but not the reason.
+   *
+   * Found by prompt 6, whose build was the first to run against a `.env.local` copied from
+   * the example rather than hand-written.
    */
-  NEXT_PUBLIC_MEDIA_URL: z.url().optional(),
+  NEXT_PUBLIC_MEDIA_URL: z.preprocess(v => (v === '' ? undefined : v), z.url().optional()),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
