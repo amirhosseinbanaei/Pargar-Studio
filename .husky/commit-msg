@@ -1,0 +1,10 @@
+# Target path: <repo-root>/.husky/commit-msg
+#
+# Validates the commit message against commitlint.config.ts. "$1" is the path to the
+# message file git passes to this hook — quote it; paths can contain spaces.
+#
+# `--no-install` is deliberate: without it, npx may go to the network mid-commit to fetch
+# a missing binary, so a commit hangs (or fails offline) for a reason that looks nothing
+# like a lint problem. If it errors with "command not found", the dev dependency is
+# genuinely missing — run `npm install`, do not delete the flag.
+npx --no-install commitlint --edit "$1"

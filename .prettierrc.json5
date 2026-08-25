@@ -1,0 +1,43 @@
+// Target path: <repo-root>/.prettierrc.json5
+//
+// NAME DEVIATION FROM THE TEMPLATE, and it is not cosmetic: Prettier 3.9 parses an
+// EXTENSIONLESS `.prettierrc` as YAML, not JSON5, so the comments below make the file
+// unloadable ("Implicit keys need to be on a single line"). The `.json5` suffix is what
+// selects the JSON5 parser. Do not rename it back to keep the comments.
+//
+// Prettier owns FORMATTING; ESLint owns CORRECTNESS. Never add formatting rules to
+// ESLint: the overlap produces fights where `eslint --fix` and `prettier --write` undo
+// each other on every save, and the file churns forever.
+{
+  // The utility-class sorter MUST be LAST in this array. It overrides Prettier's printer,
+  // so any plugin listed after it wins and class sorting silently stops happening. With
+  // one plugin this is invisible — it bites the day someone adds an import sorter.
+  plugins: ['prettier-plugin-tailwindcss'],
+
+  // Points the sorter at the CSS entry that declares the theme. Required for CSS-first
+  // (v4-style) setups; without it your custom utilities sort as "unknown" and drift to
+  // the end of every class list, which reads as random churn in reviews.
+  tailwindStylesheet: './src/app/globals.css',
+
+  // Every class-composing helper you use must be listed, or the classes INSIDE those
+  // calls go unsorted — which, in a design-system codebase, is most of them.
+  tailwindFunctions: ['clsx', 'cva', 'cn'],
+
+  // Props that receive class strings but are not named `className`. None yet; prompt 3's
+  // `ds/` tier adds a `classNames` slot object, which is per-key and not a bare string.
+  tailwindAttributes: [],
+
+  semi: true,
+  singleQuote: true,
+  // Cleaner diffs: adding an item touches one line, not two.
+  trailingComma: 'all',
+  // Wide enough that a typed React prop signature is not shredded across four lines.
+  printWidth: 100,
+  tabWidth: 2,
+  useTabs: false,
+  arrowParens: 'avoid',
+  bracketSpacing: true,
+  // Prevents the mixed-line-ending diff war on cross-platform teams: without it, one
+  // Windows checkout rewrites every file it touches.
+  endOfLine: 'lf',
+}
