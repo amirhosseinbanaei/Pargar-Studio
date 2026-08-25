@@ -23,8 +23,8 @@ handling, session), read the matching guide in
 Layering is machine-enforced in `eslint.config.mjs`: `app → modules → common`, one way,
 no cross-module imports, modules consumed through their `index.ts` barrel only. Adding a
 module means adding its name to the `MODULES` array **first** — `projects`, `design`,
-`media`, `studio` and `contact` are the five entries today, and a module with no entry
-there has no boundary rules at all.
+`media`, `studio`, `contact` and `dashboard` are the six entries today, and a module with
+no entry there has no boundary rules at all.
 
 ## Verification
 
@@ -656,6 +656,214 @@ adds the fifteen `form.*` keys: the legacy site had no form of any kind, so none
 are ports. `brand.meaning` is NOT in that list — it is verbatim from
 `legacy/data/studio.fa.js:10`.
 
+## Auth and the dashboard (prompt 6)
+
+The write side. `/dashboard` is behind a login, the shell has navigation to all six content
+areas, and projects are fully manageable — list, create, edit, delete, reorder — in both
+languages, through Server Actions that purge the exact tags prompt 2 declared.
+
+```
+  src/common/services/session.ts        THE only module that touches the auth cookie
+  src/common/config/session-cookie.ts   its name + attributes, dependency-free so proxy.ts can read them
+  src/common/config/private-routes.ts   PRIVATE_ROUTES — read by proxy.ts AND robots.ts
+  src/proxy.ts                          leg 1: the coarse dashboard gate. leg 2: locale routing
+  src/app/(dashboard)/                  a SECOND root layout, outside [locale]
+  src/modules/dashboard/                the shell, the reusable CRUD pieces, projects
+```
+
+### The auth model
+
+**One administrator, one password, one signed cookie.** No user table, no roles, no
+registration, no password reset. Losing the password means changing `ADMIN_PASSWORD`.
+
+- **`session.ts` is the only module that reads or writes the cookie.** Its name and shared
+  attributes live in `common/config/session-cookie.ts` — dependency-free — because
+  `proxy.ts` cannot import `server-only` or `next/headers` and needs the name for a
+  presence check. Same split the architecture's own template makes for its token reader.
+- **The cookie is `base64url(payload).base64url(HMAC-SHA256(payload, SESSION_SECRET))`.**
+  The payload is not encrypted and holds nothing secret; the HMAC is what stops a client
+  MINTING one. Both the signature check and the password check use a constant-time
+  comparison over SHA-256 digests — hashing first is not decoration, it makes the buffers
+  equal length so `timingSafeEqual` cannot throw and cannot leak the secret's length.
+- **Session expiry is SEVEN DAYS** (`SESSION_MAX_AGE_SECONDS`). This is a studio's content
+  editor: the cost of a short expiry is a person signed out on every visit, which trains
+  them to keep the password somewhere convenient. **There is no per-session revocation** —
+  no session table — so rotating `SESSION_SECRET` is the log-everyone-out mechanism, and it
+  is one environment variable.
+- **`secure` is derived from the REQUEST**, never from `NODE_ENV`: `x-forwarded-proto` →
+  `origin`/`referer` → omit. A `Secure` cookie delivered over plain http is silently
+  discarded by the browser, so sign-in "succeeds" and the next request is anonymous — and it
+  passes review because localhost is exempt.
+- **`readSession()` returns a discriminated result**, never a throw:
+  `valid | anonymous | expired | invalid{malformed|bad-signature}`. The server keeps the
+  distinction; **every caller collapses it to 401**, because telling someone their signature
+  parsed but their expiry did not is telling them their forgery is close.
+- **Cookie writes happen only in Server Actions** (`modules/dashboard/actions/session-actions.ts`).
+  Never during a Server Component render — the response headers are already committed, so the
+  write throws and the failure surfaces far from its cause.
+- **Failed logins are rate-limited** in memory, ten per fifteen minutes, per first-hop
+  `x-forwarded-for`. Only FAILURES count and a success clears the window, which is the whole
+  difference from the contact form's limiter and why the two are not one function.
+
+### There are THREE gates, and only one of them is authorization
+
+| Gate                   | Where                                      | Answers                       | Is it the boundary?                                                                                                    |
+| ---------------------- | ------------------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| The proxy              | `src/proxy.ts`                             | "is a session cookie PRESENT" | **No** — a coarse UX gate. Presence is trivially forged, and an action can be POSTed without ever passing through it   |
+| The shell layout       | `(dashboard)/dashboard/(shell)/layout.tsx` | "does the cookie VERIFY"      | No — it stops the chrome rendering. Catches what the proxy structurally cannot: a cookie present but expired or forged |
+| **Every write action** | `readSession()` as its first statement     | "does the cookie verify"      | **Yes.** A Server Action is a public HTTP endpoint with a stable id in the client bundle, reachable with `curl`        |
+
+**The proxy does NOT bounce an already-authenticated visitor off the login page.** That
+mirror gate lives on the login page itself, which calls `readSession()`. Written in the
+proxy it would send a visitor holding an EXPIRED cookie to `/dashboard`, whose shell finds
+it dead and sends them back — an infinite redirect loop that first appears seven days after
+somebody signs in.
+
+**The proxy injects REQUEST headers** — `NextResponse.next({ request: { headers } })`.
+`NextResponse.next({ headers })` sets RESPONSE headers, which overwrites a Server Action
+response's `text/x-component` content type and breaks EVERY action in the app with an
+opaque client-side error that points nowhere near this file.
+
+### A page-level gate, because a layout is not enough
+
+**Every dashboard page's first statement is `await requireDashboardSession()`**, before its
+service call. This is not belt-and-braces on the layout check — it fixes a real leak found
+by `curl` during this prompt's own verification:
+
+> A request to `/dashboard/projects` with a FORGED cookie came back **200 with all 76 project
+> rows in the RSC payload**, alongside `NEXT_REDIRECT;replace;/dashboard/login`. A layout and
+> its page render CONCURRENTLY: the layout's redirect fired, but the page had already awaited
+> its read and produced its payload. The client router honours the redirect, so nobody ever
+> SEES it — the bytes still go over the wire.
+
+Gating inside the page makes the check and the read sequential, so the query never runs.
+`__tests__/require-session.test.ts` asserts both the helper's behaviour and — structurally,
+by scanning `src/app/(dashboard)/**/page.tsx` — that every page actually calls it.
+
+**Prompt 7 must keep this rule.** For projects the exposure was nil, because those rows are
+already public at `/en/projects`. That is luck. `contact_messages` is an inbox of messages
+strangers sent the studio, and the identical pattern there leaks something never public.
+
+### The dashboard route group
+
+`src/app/(dashboard)/` — a **second root layout**, deliberately outside `[locale]`. The
+public site is bilingual and the locale is a URL segment; the dashboard is an admin tool with
+one interface language, and putting it under `[locale]` would make `/en/dashboard` and
+`/fa/dashboard` — two URLs and two caches for one tool with one user. The proxy gates
+`/dashboard` before its locale leg runs, so nothing there is ever locale-prefixed.
+
+- **The interface language is ENGLISH.** _(Open decision, resolved in prompt 6.)_ Every field
+  label maps directly onto a database column name and onto the vocabulary in this file, which
+  is what keeps the tool debuggable when somebody has to describe a problem. Persian was
+  defensible but would need the full RTL treatment from `legacy/css/i18n.css` applied to the
+  chrome — and the CONTENT is bilingual regardless, since the Persian field sits beside the
+  English one on every form. `dir="ltr"`, no `is-fa`, **no language switch**.
+- **`(shell)` is a nested route group** so `/dashboard/login` renders on a bare document with
+  no navigation and no "signed in as" header, while every other route gets both. It adds no
+  path segment.
+- **Nothing under `(dashboard)` is cached.** No `'use cache'`, no `cacheLife`, no `cacheTag`
+  anywhere. The dashboard reads go through the UNCACHED half of `project-service.ts`
+  (`listProjectRows`, `getProjectRow`, `getProjectRowById`), which return the bilingual
+  `ProjectRow` rather than a locale-collapsed `Project` — an editor shown the value they just
+  replaced cannot tell a stale cache from a failed save, and will save again.
+- **`loading.tsx` is load-bearing, not decoration.** Cache Components needs a Suspense
+  boundary above dynamic work, and every screen here is dynamic by design.
+- It imports `globals.css` — the shared token layer — and **none of the five ported
+  stylesheets**: those describe a five-column editorial index and a Persian document.
+
+### The cache tags these actions purge
+
+The exact strings, all from `common/services/cache-tags.ts`, never as literals:
+
+| Action                | Purges                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `createProjectAction` | `projects`, `project:<new-slug>`                                                     |
+| `updateProjectAction` | `projects`, `project:<new-slug>`, **and `project:<old-slug>` when the slug changed** |
+| `deleteProjectAction` | `projects`, `project:<slug>` — the slug read BEFORE the delete                       |
+| `moveProjectAction`   | `projects`, `project:<moved>`, `project:<displaced>`                                 |
+
+- **`updateTag`, never `revalidateTag`.** `updateTag` expires immediately and the same
+  request reads fresh; `revalidateTag` serves stale while it refreshes, which to an editor is
+  indistinguishable from a save that did not work. If `revalidateTag` is ever genuinely
+  needed it MUST pass a cache-life profile as its second argument — the single-argument form
+  is deprecated on 16 and still compiles, which is exactly why it survives review.
+- **A slug change moves the instance tag.** The old slug exists nowhere after the write, so
+  `updateProjectAction` READS THE ROW BEFORE UPDATING IT purely to capture it. Purging only
+  the new slug leaves the old detail page cached forever, behind `cacheLife('max')`, at a URL
+  that no longer resolves.
+- **Purging happens only inside `if (result.ok)`.** Discarding a valid cache on a failed
+  write makes every reader pay for a refetch that changes nothing.
+- Verified end to end against the seeded database: creating a project took `/en/projects` and
+  `/fa/projects` from 76 cards to 77 with no rebuild and no restart, editing a Persian title
+  changed `/fa/projects/<slug>` and left `/en` untouched, renaming left nothing at the old
+  URL, reordering changed the public order, and deleting took both lists back to 76.
+
+### Every write action, without exception
+
+1. **Re-authorize** — `readSession()` FIRST, before the parse, so an anonymous caller learns
+   nothing about the accepted shape and no parsing is done for someone never allowed in.
+   Never move it below the parse to make a test pass; mock the session instead.
+2. **Re-validate** against `projectSubmissionSchema` (`strictObject`), returning
+   `{ ok: false, status: 422, body: z.flattenError(...).fieldErrors }`.
+3. **Call a SERVICE** through `toActionResult` — never a repository, never a hand-rolled catch.
+4. **Purge the tags**, on success only.
+5. **Return a discriminated `ActionResult`.** Never throw for an expected failure: a throw is
+   sanitized crossing the RPC boundary and the status and body that field-binding needs are gone.
+
+`id` is a legal argument — it names the RECORD, not the caller. A user, tenant or owner id
+never is.
+
+### The two open decisions, resolved
+
+- **Persian fields are OPTIONAL on save.** Only `titleEn` is required. `withPersianFallback`
+  in `modules/dashboard/schemas/project-form.ts` writes the English value into an empty `_fa`
+  column before the write — exactly what `scripts/seed.ts` already does for a missing
+  translation, and what `legacy/js/core/i18n.js:154` did before it. Requiring both would
+  block the studio from publishing until somebody had translated it. Because the fallback is
+  applied at AUTHOR time, the read path still needs no fallback branch: `pickLocale` stays two
+  lines and `/fa/projects/<slug>` never renders a hole. Whitespace-only counts as empty; the
+  stored value is never trimmed, because several Persian values carry meaningful ZWNJs.
+- **Deleting a project deletes the row outright.** No `deleted_at`, no undo window — that
+  would be a schema change. The confirmation dialog is the only safety net, which is why it
+  NAMES the record.
+
+### What prompt 7 reuses
+
+Prompt 7 repeats this CRUD pattern for design, media, studio, contact and messages. These are
+built to be reused rather than copied, and are exported from `@/modules/dashboard`:
+
+| Piece                                         | What it owns                                                                                                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RecordForm`                                  | The form scaffold: submit lifecycle, 401/422/404 branching, binding an `ActionResult`'s `fieldErrors` onto inputs, the focus move, the result region. A new editor is a schema, a resolver, some fields and one `onSave` |
+| `RecordTable` + `sortRows` + `parseSortState` | The list table with URL-driven sorting. `key: null` preserves the collection's natural order                                                                                                                             |
+| `DeleteRecordDialog`                          | The confirmation. Names the record, stays OPEN on failure, `useTransition` so it does not close onto a stale list                                                                                                        |
+| `ResultRegion`                                | The inline outcome region, rendering the one normalized `{ status, code, message, fieldErrors }` shape                                                                                                                   |
+| `LocaleFieldPair`                             | English and Persian side by side, `dir="rtl"` + `lang="fa"` on the Persian INPUT only. Every remaining area has translated columns                                                                                       |
+| `RowReorder`                                  | Two arrows, disabled at the boundaries AND whenever the table is sorted by a column                                                                                                                                      |
+| `requireDashboardSession`                     | The page-level gate above                                                                                                                                                                                                |
+| `DASHBOARD_AREAS`                             | The six areas. **Flip `available: true` and add the route folder** — that is the whole navigation change                                                                                                                 |
+
+`FormCheckboxGroup` is deliberately NOT exported: one consumer, and promotion happens on the
+second. `design_works.category` and `media.type` are both single-valued, so prompt 7 may
+never need it; if it does, move the file to `common/components/form/`.
+
+**Reordering sends an INTENT, not an order.** `moveProjectAction` takes `{ id, direction }`
+and the SERVICE computes the new positions from the current rows, renumbering by index rather
+than swapping two values — a swap is a silent no-op the moment two rows share a `sort_order`.
+A client posting 76 ids in a new order would silently revert anything changed since the page
+loaded. A new project is placed FIRST, at `min(sortOrder) - 1`, which costs one read instead
+of 76 writes.
+
+### A bug this prompt found and fixed
+
+`NEXT_PUBLIC_MEDIA_URL` had no empty-string preprocess in `common/config/env.ts`, while its
+sibling `TURSO_AUTH_TOKEN` in `server-env.ts` did — and `.env.example` ships
+`NEXT_PUBLIC_MEDIA_URL=` under a comment saying to leave it empty. So a checkout that copied
+the documented contract verbatim failed `npm run build` with "Invalid URL", naming the
+variable but not the reason. Fixed with the same preprocess the sibling uses. **The tolerance
+that makes a key optional is not the same as accepting how "unset" is spelled in a dotenv
+file** — worth remembering when adding an optional variable.
+
 ## Deviations from the architecture playbook
 
 Each is deliberate. Re-enable conditions are stated so the next agent does not "fix" them.
@@ -681,9 +889,10 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
   There is no backend to talk to and no wire response to zod-parse; the ring's invariants
   still hold, one layer lower. This is why `common/constants/api.ts` exports no `API_URL`
   and `common/config/env.ts` declares no API origin.
-- **A single signed HttpOnly cookie replaces A9's three-legged JWT rotation** in prompt 6.
-  There is one admin and no user table, so there is no refresh token to rotate and no
-  session ring to single-flight. Re-enable the full ring only if multi-user auth arrives.
+- **A single signed HttpOnly cookie replaces A9's three-legged JWT rotation.** Landed in
+  prompt 6 — see **Auth and the dashboard** below. There is one admin and no user table, so
+  there is no refresh token to rotate and no session ring to single-flight. Re-enable the
+  full ring only if multi-user auth arrives.
 - **No production error tracker.** `common/observability/dev-log.ts` stays dev-only; its
   three reporting call sites report nowhere. Reason and re-enable condition are in that
   file.
