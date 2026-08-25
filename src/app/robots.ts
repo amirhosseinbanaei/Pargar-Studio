@@ -5,11 +5,11 @@
  * The public site is entirely indexable — that is the reason the locale is a URL segment
  * at all. Two things are not:
  *
- *  - `/dashboard` and everything under it, which PROMPT 6 creates. It is disallowed here
- *    BEFORE it exists, on purpose: a private route that goes live in the same deploy as
- *    the rule that hides it is a private route that was public for one crawl. The
- *    authoritative gate is the session check on the route itself — `robots.txt` is a
- *    request, not a fence, and anything that relies on it for privacy is already broken.
+ *  - `/dashboard` and everything under it, disallowed here since before it existed, on
+ *    purpose: a private route that goes live in the same deploy as the rule that hides it
+ *    is a private route that was public for one crawl. The authoritative gate is the
+ *    session check on the route itself — `robots.txt` is a request, not a fence, and
+ *    anything that relies on it for privacy is already broken.
  *  - `/api/`, which serves data rather than documents. Nothing there is a page, so
  *    indexing one is a result nobody can use.
  *
@@ -19,14 +19,7 @@
  */
 import type { MetadataRoute } from 'next';
 import { env } from '@/common/config/env';
-
-/**
- * Where the dashboard will live. A literal here and a literal in prompt 6's route folder
- * is one duplication too many — when that route lands it should export this path and this
- * file should import it, exactly as `references/10-routing-and-app-shell.md` §8 has
- * `robots.ts` reading the same list the gate uses.
- */
-const DASHBOARD_PATH = '/dashboard';
+import { PRIVATE_ROUTES } from '@/common/config/private-routes';
 
 export default function robots(): MetadataRoute.Robots {
   const base = env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
@@ -34,7 +27,15 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: [`${DASHBOARD_PATH}/`, DASHBOARD_PATH, '/api/'],
+      /**
+       * DERIVED FROM THE SAME ARRAY THE GATE READS, as prompt 6 promised when it left a
+       * literal here. `src/proxy.ts` decides what needs a session from `PRIVATE_ROUTES`;
+       * this file decides what a crawler is asked to skip from the same array, so the two
+       * cannot disagree. Both spellings of each prefix are emitted — the bare path and the
+       * subtree — because `Disallow: /dashboard/` alone leaves `/dashboard` itself
+       * crawlable.
+       */
+      disallow: [...PRIVATE_ROUTES.flatMap(route => [route, `${route}/`]), '/api/'],
     },
     sitemap: `${base}/sitemap.xml`,
   };
