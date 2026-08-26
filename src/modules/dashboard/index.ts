@@ -80,6 +80,12 @@ export { DesignWorkForm, type DesignWorkFormProps } from './components/DesignWor
 export { MediaListScreen, type MediaListScreenProps } from './components/MediaListScreen';
 export { MediaForm, type MediaFormProps, type MediaProjectOption } from './components/MediaForm';
 
+/* ── Studio ────────────────────────────────────────────────────────────────────── */
+export { StudioForm, type StudioFormProps } from './components/StudioForm';
+
+/* ── Contact ───────────────────────────────────────────────────────────────────── */
+export { ContactForm, type ContactFormProps } from './components/ContactForm';
+
 /* ── The page-level gate ───────────────────────────────────────────────────────── */
 /**
  * Called at the TOP of every dashboard page, before its service call. The layout's check
@@ -112,6 +118,8 @@ export {
   moveMediaAction,
   updateMediaAction,
 } from './actions/media-actions';
+export { updateStudioAction } from './actions/studio-actions';
+export { updateContactAction } from './actions/contact-actions';
 
 /* ── Query parsing, for the list route ─────────────────────────────────────────── */
 export {

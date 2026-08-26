@@ -62,14 +62,14 @@ export const DASHBOARD_AREAS = [
     label: 'Studio',
     table: 'studio',
     summary: 'The editorial block: manifesto, founders, team, alumni and awards. One record.',
-    available: false,
+    available: true,
   },
   {
     segment: 'contact',
     label: 'Contact',
     table: 'contact',
     summary: 'The contact page’s own content — address, hours, careers, socials. One record.',
-    available: false,
+    available: true,
   },
   {
     segment: 'messages',
