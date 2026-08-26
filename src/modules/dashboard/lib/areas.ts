@@ -55,7 +55,7 @@ export const DASHBOARD_AREAS = [
     label: 'Media',
     table: 'media',
     summary: 'Publications, awards, lectures and exhibitions.',
-    available: false,
+    available: true,
   },
   {
     segment: 'studio',

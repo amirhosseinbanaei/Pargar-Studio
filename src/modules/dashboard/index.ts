@@ -76,6 +76,10 @@ export {
 } from './components/DesignWorkListScreen';
 export { DesignWorkForm, type DesignWorkFormProps } from './components/DesignWorkForm';
 
+/* ── Media ─────────────────────────────────────────────────────────────────────── */
+export { MediaListScreen, type MediaListScreenProps } from './components/MediaListScreen';
+export { MediaForm, type MediaFormProps, type MediaProjectOption } from './components/MediaForm';
+
 /* ── The page-level gate ───────────────────────────────────────────────────────── */
 /**
  * Called at the TOP of every dashboard page, before its service call. The layout's check
@@ -102,6 +106,12 @@ export {
   moveDesignWorkAction,
   updateDesignWorkAction,
 } from './actions/design-work-actions';
+export {
+  createMediaAction,
+  deleteMediaAction,
+  moveMediaAction,
+  updateMediaAction,
+} from './actions/media-actions';
 
 /* ── Query parsing, for the list route ─────────────────────────────────────────── */
 export {
