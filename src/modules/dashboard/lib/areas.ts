@@ -48,7 +48,7 @@ export const DASHBOARD_AREAS = [
     label: 'Design',
     table: 'design_works',
     summary: 'Objects, marks and details — the design works shown at /design.',
-    available: false,
+    available: true,
   },
   {
     segment: 'media',

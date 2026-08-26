@@ -55,10 +55,26 @@ export { DeleteRecordDialog, type DeleteRecordDialogProps } from './components/D
 export { ResultRegion, type ResultRegionProps } from './components/ResultRegion';
 export { LocaleFieldPair, type LocaleFieldPairProps } from './components/LocaleFieldPair';
 export { RowReorder, type RowReorderProps } from './components/RowReorder';
+export {
+  RepeatableListField,
+  type RepeatableListFieldProps,
+} from './components/RepeatableListField';
+export {
+  RepeatableGroupField,
+  type RepeatableGroupColumn,
+  type RepeatableGroupFieldProps,
+} from './components/RepeatableGroupField';
 
 /* ── Projects ──────────────────────────────────────────────────────────────────── */
 export { ProjectListScreen, type ProjectListScreenProps } from './components/ProjectListScreen';
 export { ProjectForm, type ProjectFormProps } from './components/ProjectForm';
+
+/* ── Design ────────────────────────────────────────────────────────────────────── */
+export {
+  DesignWorkListScreen,
+  type DesignWorkListScreenProps,
+} from './components/DesignWorkListScreen';
+export { DesignWorkForm, type DesignWorkFormProps } from './components/DesignWorkForm';
 
 /* ── The page-level gate ───────────────────────────────────────────────────────── */
 /**
@@ -80,6 +96,12 @@ export {
   moveProjectAction,
   updateProjectAction,
 } from './actions/project-actions';
+export {
+  createDesignWorkAction,
+  deleteDesignWorkAction,
+  moveDesignWorkAction,
+  updateDesignWorkAction,
+} from './actions/design-work-actions';
 
 /* ── Query parsing, for the list route ─────────────────────────────────────────── */
 export {
