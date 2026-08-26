@@ -13,27 +13,51 @@
  *    `'["Residential"]'`; if it reached a component as that string, `types.map(...)` would
  *    iterate characters and `types.includes('Villa')` would be a substring test that
  *    silently returns the wrong answer for a filter.
+ *
+ * ─── A MIGRATED, NOT SEEDED, TEMPORARY DATABASE ───────────────────────────────────
+ * Prompt 7 deletes `legacy/` and, with it, `scripts/seed.ts` and the fixture helper this
+ * file used to import to spawn it (`seeded-database.ts`) — that script's entire job was
+ * porting `legacy/data/*.js`, which no longer exists. This suite now spawns ONLY
+ * `db:migrate` against a throwaway file database and writes its OWN fixture row through
+ * `projectRepository.create` — the repository under test is the one thing establishing the
+ * fixture, so this asserts the exact contract described above with no dependency on any
+ * particular content ever having existed.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { seedTemporaryDatabase, type SeededDatabase } from './seeded-database';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-let database: SeededDatabase;
+let dir: string;
 
 /**
- * Imported lazily, after `seedTemporaryDatabase` has stubbed the environment: the module
- * binds its connection URL at import time, so a static import at the top of the file would
- * open whichever database `.env.local` names.
+ * Imported lazily, after the environment has been stubbed: the module binds its connection
+ * URL at import time, so a static import at the top of the file would open whichever
+ * database `.env.local` names.
  */
 async function projectRepository() {
   return import('../project-repository');
 }
 
 beforeAll(() => {
-  database = seedTemporaryDatabase();
+  dir = mkdtempSync(join(tmpdir(), 'kavan-test-db-'));
+  const url = `file:${join(dir, 'test.db')}`;
+
+  vi.stubEnv('TURSO_DATABASE_URL', url);
+  vi.stubEnv('TURSO_AUTH_TOKEN', '');
+  vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'http://localhost:3000');
+  vi.stubEnv('ADMIN_PASSWORD', 'test-password');
+  vi.stubEnv('SESSION_SECRET', 'test-session-secret-at-least-32-characters-long');
+
+  // Inherits the stubbed environment above, same as the deleted `seeded-database.ts` did —
+  // that is what stops a developer's local `kavan.db` from becoming the database under test.
+  execFileSync('npm', ['run', '--silent', 'db:migrate'], { stdio: 'pipe' });
 }, 120_000);
 
 afterAll(() => {
-  database.cleanup();
+  vi.unstubAllEnvs();
+  rmSync(dir, { recursive: true, force: true });
 });
 
 describe('projectRepository.bySlug', () => {
@@ -46,8 +70,28 @@ describe('projectRepository.bySlug', () => {
   it('decodes the JSON types column into an array of strings', async () => {
     const repo = await projectRepository();
 
-    // Two types on one project — legacy/data/projects.js:31 — so this also proves the
-    // multi-value case rather than an array that happens to hold one item.
+    // Two types on one row, so this also proves the multi-value case rather than an array
+    // that happens to hold one item.
+    await repo.create({
+      slug: 'darrous-court-residence',
+      types: ['Residential', 'Interior Design'],
+      status: 'Completed',
+      scale: 'Medium',
+      year: 2021,
+      area: '1,450 m²',
+      sortOrder: 0,
+      titleEn: 'Darrous Court Residence',
+      titleFa: 'خانه حیاط دروس',
+      blurbEn: '',
+      blurbFa: '',
+      descriptionEn: '',
+      descriptionFa: '',
+      locationEn: '',
+      locationFa: '',
+      clientEn: '',
+      clientFa: '',
+    });
+
     const project = await repo.bySlug('darrous-court-residence');
 
     expect(Array.isArray(project?.types)).toBe(true);

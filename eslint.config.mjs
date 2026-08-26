@@ -90,27 +90,6 @@ const DS_ONLY = {
     'Import from common/components/ds or common/components/form, never ui/ directly — ui/ holds unbranded generated primitives that ds/ re-skins, so a regeneration would silently restyle product screens.',
 };
 
-/**
- * PROJECT-SPECIFIC ZONE. `legacy/` is the original static site, kept verbatim as a
- * read-only reference for prompts 2–6 and deleted in prompt 7.
- *
- * The failure this prevents: `legacy/` is untyped vanilla ES modules that assume a
- * browser, a `<script type="module">` entry point and hash routing. One import of
- * `legacy/data/projects.js` to "save re-typing the seed data" makes a tree that is
- * scheduled for deletion a build dependency of the app — and prompt 7 then cannot delete
- * it without breaking the build. Read those files with your eyes; port the values into
- * `src/` or into the prompt-2 seed script deliberately.
- *
- * `no-restricted-imports` matches the SPECIFIER TEXT, so the relative spellings are
- * listed explicitly: the `@/` alias resolves to `src/` only and can never reach `legacy/`,
- * which means every real violation would be a `../../legacy/...` climb.
- */
-const NO_LEGACY = {
-  group: ['legacy', 'legacy/**', '**/legacy', '**/legacy/**', '@/../legacy/**'],
-  message:
-    'Nothing under src/ may import from legacy/. It is a read-only reference that prompt 7 deletes; port the value into src/ (or into the prompt-2 seed script) instead of linking against it.',
-};
-
 const eslintConfig = [
   // (2) Global ignores — alone in this object, nothing else may be added here.
   {
@@ -121,10 +100,6 @@ const eslintConfig = [
       'build/**',
       'coverage/**',
       'next-env.d.ts',
-      // The original static site, kept byte-for-byte. Linting it would report hundreds of
-      // findings on code nobody is permitted to edit, which trains everyone to ignore
-      // lint output. NO_LEGACY below is the rule that actually matters here.
-      'legacy/**',
       // The prompt artifacts this work was generated from; documents, not source.
       'prompts/**',
     ],
@@ -142,17 +117,6 @@ const eslintConfig = [
    *  Reminder (1): each zone below declares its COMPLETE pattern set.                *
    * ══════════════════════════════════════════════════════════════════════════════ */
 
-  // Zone 0 — the src/ baseline. Every file under src/ is covered by the legacy ban, even
-  // the ones that sit in no other zone (src/test/**, src/instrumentation.ts, src/proxy.ts).
-  // It is FIRST so the zones below, which restate NO_LEGACY, replace it rather than the
-  // other way round.
-  {
-    files: ['src/**'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_LEGACY] }],
-    },
-  },
-
   // Zone A — one generated zone per module. Empty until MODULES has a name in it.
   ...MODULES.map(name => ({
     files: [`src/modules/${name}/**`],
@@ -169,7 +133,6 @@ const eslintConfig = [
             },
             NO_APP,
             DS_ONLY,
-            NO_LEGACY,
           ],
         },
       ],
@@ -183,7 +146,7 @@ const eslintConfig = [
       'no-restricted-imports': [
         'error',
         {
-          patterns: [NO_MODULES_FROM_COMMON, NO_APP, DS_ONLY, NO_LEGACY],
+          patterns: [NO_MODULES_FROM_COMMON, NO_APP, DS_ONLY],
         },
       ],
     },
@@ -203,7 +166,7 @@ const eslintConfig = [
       'no-restricted-imports': [
         'error',
         {
-          patterns: [NO_MODULES_FROM_COMMON, NO_APP, NO_LEGACY],
+          patterns: [NO_MODULES_FROM_COMMON, NO_APP],
         },
       ],
     },
@@ -225,7 +188,6 @@ const eslintConfig = [
                 'Import the module barrel (@/modules/<name>), not its internals — a deep import makes every internal file de-facto public, so renaming a component becomes a repo-wide diff. If the export you need is missing, add it to the barrel deliberately.',
             },
             DS_ONLY,
-            NO_LEGACY,
           ],
         },
       ],

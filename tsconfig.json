@@ -67,8 +67,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  // `legacy/` is the original static site, kept verbatim as reference material (deleted in
-  // prompt 7). It is untyped vanilla ES modules and is never part of this program — with
-  // `allowJs` on, including it would fail the type gate on code nobody is allowed to edit.
-  "exclude": ["node_modules", "legacy"]
+  "exclude": ["node_modules"]
 }
