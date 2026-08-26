@@ -864,6 +864,347 @@ variable but not the reason. Fixed with the same preprocess the sibling uses. **
 that makes a key optional is not the same as accepting how "unset" is spelled in a dotenv
 file** — worth remembering when adding an optional variable.
 
+## The rest of the dashboard, deployment and the audit (prompt 7)
+
+Every content area is now editable from the dashboard, `legacy/` is deleted, the app builds
+and runs in a container against Turso, CI runs the four-command gate, and Part C of the
+adoption playbook has been run against the finished repo. This is the last prompt in the
+sequence.
+
+```
+  src/app/(dashboard)/dashboard/(shell)/design/       CRUD, create + edit + delete + reorder
+  src/app/(dashboard)/dashboard/(shell)/media/         same shape, plus a related-project select
+  src/app/(dashboard)/dashboard/(shell)/studio/        singleton editor, one route, no [id]
+  src/app/(dashboard)/dashboard/(shell)/contact/       singleton editor, same shape
+  src/app/(dashboard)/dashboard/(shell)/messages/      the inbox: list, read, mark-read, delete
+  src/modules/dashboard/components/RepeatableListField.tsx    string[] editor
+  src/modules/dashboard/components/RepeatableGroupField.tsx   array-of-objects editor
+  src/modules/dashboard/schemas/shared.ts              year bounds + the Persian-fallback helpers
+  Dockerfile, .dockerignore, compose.yaml, .github/workflows/ci.yml, scripts/ci-fixture.ts
+```
+
+### Design and media follow the projects pattern exactly
+
+`createDesignWorkAction` / `updateDesignWorkAction` / `deleteDesignWorkAction` /
+`moveDesignWorkAction` and their media equivalents are `project-actions.ts` with the field
+names changed: re-authorize, re-validate against a `strictObject` submission schema, call a
+service through `toActionResult`, purge on success only. `design-work-service.ts` and
+`media-service.ts` grew the same "dashboard half" `project-service.ts` already had —
+bilingual `*Row` reads, no cache, `create`/`update`/`delete`/`move` — for the reasons
+recorded under prompt 6.
+
+**No search or filter rail for design (9 rows) or media (14 rows), and that is a scope
+decision, not an omission.** `ProjectListScreen` filters 76 rows across four taxonomy axes
+because a table that size is genuinely hard to scan; nine and fourteen rows are not. The
+sortable `RecordTable` header and the reorder arrows are the whole list experience these two
+tables need. Revisit if either collection grows enough that a flat list stops being legible.
+
+### The related-project field is a select, populated by the ROUTE
+
+`schemas/media-form.ts`'s `projectSlug` is a `<select>`, never free text — a hand-typed slug
+that does not match a real project produces a dead link on `/en/media/<slug>`, which prompt 5
+built "resolve the link before rendering it, tolerate a miss" specifically to survive at READ
+time; the WRITE side should not manufacture the exact typo that behaviour exists for. The
+options come from `listProjectRows()`, called by `media/[slug]/page.tsx` and `media/new/page.tsx`
+(Server Components) and passed to the `'use client'` `MediaForm` as a prop, because a client
+form cannot import a `server-only` service. The HTML `<select>` cannot hold `null`, so the form
+spells "no related project" as `''` (`NO_RELATED_PROJECT`) and the submission schema converts
+that to `null` on the way in.
+
+### `RepeatableListField` and `RepeatableGroupField` — one generic pair, not six bespoke editors
+
+`design_works.team` / `studio.team` / `studio.alumni` are `string[]` columns;
+`design_works.facts`, `media.facts`, `studio.founders`, `studio.stats`, `studio.awards`,
+`studio.chapters` and `contact.socials` are all arrays of small, flat objects. Building a
+bespoke editor per field would be nine near-identical components differing only in which
+keys they know about — nine places for one bug (a lost `Remove` handler, a swapped
+`k`/`v`) to land once and need fixing nine times. `RepeatableGroupField` takes a `columns`
+list of `{ key, label, multiline? }` and is schema-agnostic beyond that, which is what lets
+one component describe six different row shapes. Both are built on react-hook-form's
+`useFieldArray`, not a hand-rolled `useState` array, so add/remove stays inside the form's
+normal dirty/validate lifecycle. Neither ships a raw JSON textarea — the one thing this
+prompt was explicitly built to avoid, because a JSON blob in a text field is how a studio
+breaks its own site at 11pm.
+
+Both live in `modules/dashboard/components/`, not `common/components/form/`, on the same
+promote-on-second-consumer rule `FormCheckboxGroup` already documents: the day a resource
+outside `dashboard` needs either one, it moves unchanged.
+
+**Order preservation was verified, not assumed**, after an end-to-end check first appeared to
+show an appended award landing FIRST rather than last. The cause was the verification
+script's own selector — `input[placeholder="Title"]` matches both the English AND the
+Persian column, since `AWARD_COLUMNS`' labels are plain English strings used for both
+locales' inputs, and once more than one row existed the script filled an EXISTING row
+instead of the newly appended one. Re-run with a locator scoped to the "Awards · English"
+`FormItem` confirmed `append()` places the new row last and the public page renders it
+there — `useFieldArray.append` behaves exactly as documented. Recorded here because the
+same placeholder-collision would trip up the next person who tries to script this form.
+
+### Persian is optional here too, generalized to lists
+
+Same resolved decision as projects (prompt 6): only `titleEn` is required, everywhere.
+`withPersianFallback` in each area's form schema fills an empty Persian TEXT column with its
+English counterpart (`fallbackText`, `modules/dashboard/schemas/shared.ts`) and — new in this
+prompt — fills an empty Persian LIST wholesale from the English one (`fallbackList`), rather
+than trying to merge per item. A studio publishing a new object should not be blocked on
+translating its team or its facts table before the record can save at all. Per-ITEM content is
+not filled in: an editor who adds a row and leaves it blank gets the blank row back, exactly as
+a lone Persian text field left blank would.
+
+The dashboard's OWN submission schemas (`design-work-form.ts`, `media-form.ts`,
+`studio-form.ts`, `contact-form.ts`) are deliberately more lenient than
+`common/schemas/*.ts`'s `*CreateSchema`s — e.g. `titleFa` has no `.min(1)` here, though the
+common schema's inferred TYPE says `string`. This is not a drift: the common schemas are
+never `.parse()`d in the dashboard write path at all (the repositories only parse the OUTPUT
+row, per prompt 2's rule), so they function purely as a TypeScript type anchor that
+`withPersianFallback`'s return value is checked against structurally. The zod `.min(1)` in
+`ProjectCreate`/`DesignWorkCreate`/etc. is therefore decorative outside the seed and outside
+any future code path that actually calls `.parse()` on them — worth knowing before assuming
+those schemas are a runtime gate on this path.
+
+### The studio and contact editors are singletons: no list, no create, no delete
+
+**Resolved: one submit for the whole record**, not one action per collection
+(`studioSubmissionSchema` / `contactSubmissionSchema` cover the entire row). `/studio` and
+`/contact` are each read as ONE page — the manifesto sits above the founders which sit above
+the numbers — and a partial save could leave the public page showing a combination the editor
+never previewed. `updateStudioAction` and `updateContactAction` take no id at all: `studio`
+and `contact` are pinned to id 1 by a CHECK constraint, and `updateStudio`/`updateContact`
+always target that row. Neither service exposes a dashboard-facing `create*`: offering one
+risks a second attempt at row 1, which the database would refuse with a constraint error
+instead of the field-level message a form should give. If the database is unseeded,
+`getStudioRow()`/`getContactRow()` return `null` and the page renders a plain "run
+`npm run db:migrate`" message rather than a broken form — there is nothing to build a create
+form's `defaultValues` from.
+
+`RepeatableGroupField` is reused for `founders`, `stats`, `awards`, `chapters` and `socials`;
+`RepeatableListField` is reused for `team` and `alumni`. No third variant was built.
+
+### The messages inbox
+
+`/dashboard/messages` lists `contact_messages` newest-first (already the repository's native
+order — no column here is sortable in the UI, and `RecordTable` renders it with `key: null`
+throughout to preserve that order rather than re-sorting). Unread rows carry a visual marker
+(`text-t-hi` + a dot, `aria-hidden`) plus an `sr-only "(unread)"` word, so the state is never
+colour-only.
+
+**Marking a message read fires from a mounted CLIENT component, not from the route's own
+render.** The tempting alternative — have `messages/[id]/page.tsx` call
+`markContactMessageRead` while it renders — has a real failure mode: `next/link` prefetches a
+route on hover/viewport by default, so a reader merely scanning the inbox and pausing over a
+row would silently mark it read before ever opening it. Prefetching fetches the RSC payload
+ahead of time; it does not mount or hydrate client components, so a `useEffect` in
+`MessageDetailScreen` only fires on an actual, real navigation. This also keeps the write
+inside the module's one mutation mechanism — a Server Action — rather than carving out a
+second one (a route-render side effect) for this single case.
+
+**No cache tag is purged, anywhere in `contact-message-actions.ts`, and that is checked by a
+test, not assumed.** `contact_messages` is declared in `cache-tags.ts` but deliberately never
+cached (prompt 2) and no public page reads it — the public contact PAGE reads the `contact`
+singleton, a different table these actions never touch. `__tests__/contact-message-actions.test.ts`
+reads the action file's own source and asserts it contains no `updateTag(` call and no
+`next/cache` import, the same pinning technique `require-session.test.ts` uses for the
+session gate, so a purge added here later without updating that test fails immediately.
+
+### The cache tags this prompt's actions purge
+
+| Action(s)                                                     | Purges                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `create`/`update`/`delete`/`moveDesignWorkAction`             | `design-works`, `design-work:<slug>`, and `design-work:<old-slug>` on a rename |
+| `create`/`update`/`delete`/`moveMediaAction`                  | `media`, `media:<slug>`, and `media:<old-slug>` on a rename                    |
+| `updateStudioAction`                                          | `studio` only — a singleton has no instance tag                                |
+| `updateContactAction`                                         | `contact` only                                                                 |
+| `markContactMessageReadAction` / `deleteContactMessageAction` | **nothing** — see above                                                        |
+
+Verified end to end against the seeded database (§8 of the prompt this section answers):
+editing a design work's Persian title changed `/fa/design/<slug>` immediately and left
+`/en/design/<slug>` untouched; choosing a related project on a media entry produced a working
+link on its public detail page; editing the studio manifesto changed `/en/studio` immediately;
+an award added through `RepeatableGroupField` rendered on the public page in append order;
+submitting the public contact form produced an unread row that opening marked read and
+deleting removed. `docker compose`'s equivalent (a container built from this repo, run
+against a database reached the same way Turso would be) served the site and reflected a
+dashboard write on the public page from inside that same container — see the container
+section below for what stood in for the real Turso credentials this environment does not
+have.
+
+### Deleting `legacy/`
+
+Every prompt that needed it had read it: prompt 2 seeded from `legacy/data/`, prompt 3 ported
+`legacy/js/` and `legacy/css/`, prompts 4 and 5 reproduced its layouts. `git rm -r legacy/`
+landed in the same commit as `scripts/seed.ts` and the two tests that depended on it
+(`seed.test.ts` directly, `project-repository.test.ts` indirectly through the now-deleted
+`seeded-database.ts` fixture helper) — confirmed by grep before deleting anything, and by
+running `npm run typecheck && npm run lint && npm run build && npm run test` clean afterward.
+`project-repository.test.ts` was rewritten rather than deleted: it now migrates a throwaway
+database and writes its own fixture row through `projectRepository.create`, so the
+null-for-missing-slug and JSON-column-decodes-to-array contracts are still covered, with no
+dependency on `legacy/` or any particular content having existed.
+
+**The seed reproduced every record before deletion, and that was confirmed, not assumed:**
+`npx tsx --conditions=react-server scripts/seed.ts` printed `projects 76 · design_works 9 ·
+media 14 · studio 1 · contact 1 · contact_messages 0 (left untouched)` immediately before the
+`git rm`, matching every count AGENTS.md already declared.
+
+**`scripts/seed.ts` has no successor, and `npm run db:seed` is gone from `package.json`.**
+Its entire job was porting `legacy/data/*.js` into the database; once that tree is gone there
+is nothing left to seed FROM. The database is now the only copy of the studio's content —
+the README documents restoring a new environment from a `turso db shell ... .dump` backup
+instead of re-running a migration script with no data source. **The production Turso database
+must be seeded from `scripts/seed.ts` BEFORE this commit is deployed for the first time** —
+run it from the last commit that still has both `scripts/seed.ts` and `legacy/` (available in
+git history), against production credentials, before or as part of rolling this prompt out.
+This repository was not deployed to a real Turso instance as part of this work — see the
+container section below.
+
+### The container needs no volume, and Cache Components needed a real database at BUILD time too
+
+`Dockerfile` / `.dockerignore` / `compose.yaml` are the architecture skill's templates,
+adapted for the one structural difference this app has from the template's assumed shape:
+there is no HTTP backend and no `api` service, so `compose.yaml` has one service, not two, and
+nothing here needs the "browser URL vs. container-internal URL" split the template exists to
+teach — `TURSO_DATABASE_URL` is the same value everywhere. `Dockerfile`'s `ARG`/`ENV` set is
+`NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_MEDIA_URL` (public, build-time) and
+`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` (also build-time — see below); `ADMIN_PASSWORD` and
+`SESSION_SECRET` are baked in the builder stage as fixed, non-secret placeholder strings,
+never as `ARG`s, so a real credential is never even offered the chance to land in a layer.
+
+**A bug this prompt found and fixed: `public/` did not exist.** This app ships zero image
+files, so no prior prompt had ever needed a `public/` directory — and the Dockerfile
+template's `COPY --from=builder /app/public ./public` failed the image build outright with
+"not found" the first time it was tried. Fixed by adding `public/.gitkeep`; Next's standalone
+trace and the Dockerfile both need the directory to exist even though it holds nothing.
+
+**`generateStaticParams` needs the database to hold real rows at BUILD time, not just at
+runtime — verified by trying it empty.** With `cacheComponents: true`, Next 16 fails the build
+outright if any `generateStaticParams` returns zero results ("all generateStaticParams
+functions must return at least one result"); this app's project/design/media detail routes
+derive their params from the database, so `docker build` needs `TURSO_DATABASE_URL` (and
+`TURSO_AUTH_TOKEN` if it is a `libsql://` URL) to be REACHABLE and non-empty from wherever the
+build runs, not only from the running container — both are therefore `ARG`s in the builder
+stage, unlike a typical REST-backed app where only `NEXT_PUBLIC_*` values need to be. This is
+the same constraint that shaped the CI fixture below.
+
+**Verified locally with a substitution, not against real Turso — recorded rather than
+glossed over.** This environment has no Turso credentials, so the container verification used
+a local `file:` database (the seeded dev `kavan.db`) passed through a bind-mounted volume as
+a stand-in for the network Turso connection production actually uses; `TURSO_DATABASE_URL` is
+read identically either way; only the write path being local-disk instead of network-Turso is
+different. `docker build` with that substitution produced 245 static pages matching the
+seeded counts; the running container answered `/api/health` with `200 {"ok":true}` and
+Docker's own `HEALTHCHECK` reported `healthy`; and a dashboard sign-in, a design-work edit,
+and its immediate appearance on `/fa/design/<slug>` all succeeded against that same running
+container. One operational finding from that run, specific to the substitution and NOT a
+product defect: a bind-mounted host file must be writable by the container's non-root
+`appuser` (uid 1001) — the container runs as non-root deliberately (Dockerfile), and a
+read-only mount produced "Network error, no response" on save with nothing useful in
+`docker logs` (a production Next server logs no per-request access log by default, unlike
+`next dev`). Irrelevant to a real deploy, where Turso is reached over the network and there is
+no local file whose permissions matter — recorded here so the next person debugging a
+container-local write failure checks the mount before the code.
+
+### CI needed its own fixture, because `scripts/seed.ts` cannot survive to serve it
+
+`.github/workflows/ci.yml` runs the four-command gate on every push, minus the
+`build-storybook` step the template appends (no component workshop in this project — see
+Deviations, below). The harder problem was the database: `npm run build` needs a non-empty
+one (previous section), but `scripts/seed.ts` is deleted in the SAME history CI has to keep
+building against every push AFTER this one — a workflow step that shells out to a deleted
+script breaks the very next push. `scripts/ci-fixture.ts` is the answer: it is NOT a seed —
+no legacy data, no bilingual editorial content, no claim of being real — it migrates a
+throwaway `file:` database and writes exactly one minimal row per table
+`generateStaticParams` reads (one project, one design work, one media entry) through the same
+repositories the app uses. Verified locally before committing: `npm run build` against that
+fixtured throwaway database produced 53 static pages and exit code 0, where the same build
+against a migrated-but-EMPTY database failed outright with the `generateStaticParams` error
+above. It is intentionally not wired to any `package.json` script name a developer would run
+by habit — it exists solely for CI, per `references/11-tooling-and-gates.md` §10's rule that
+`scripts/` may hold ad-hoc operational tooling nothing in `src/` imports from.
+
+### The two open decisions, resolved
+
+- **Studio and contact save the whole record in one submit, not one action per collection.**
+  See "The studio and contact editors are singletons," above. Recommended in the prompt and
+  taken as recommended, because a partial save could show a combination of new and old
+  content the editor never previewed on a page that is read as one continuous document.
+- **A database backup belongs in the deploy sequence: yes.** `README.md`'s deploy steps open
+  with `turso db shell <database-name> ".dump" > backup-$(date +%F).sql`, before migrations
+  run. Taken as recommended: once `legacy/` is gone, the live database is the only copy of the
+  studio's content, and the cost of the step is one documented command.
+
+### Outstanding — owed, not fixed here
+
+Nothing new. The one debt this repository already carried into this prompt is unchanged and
+still owed: `references/02-design-system.md` §7's a11y stories for the nine `ds/` controls
+(Button, Input, Textarea, Select, Checkbox, Table, Dialog, Field, Label), deferred under the
+no-Storybook decision recorded below. This prompt added no `ds/`-tier component —
+`RepeatableListField` and `RepeatableGroupField` are `dashboard`-module components, not `ds/`
+primitives — so it neither pays down nor adds to that debt.
+
+### The Part C conformance audit
+
+Run against the finished repository. **Zero unmet blockers.** Every check below was executed
+directly (grep commands from the playbook's "how to verify" column, or read the source where
+a grep cannot settle the question) rather than inferred; a hit that turned out to be a
+docstring or a test-mock forwarding call is called out as a false positive rather than
+silently dropped.
+
+**Verified this pass, all PASS**, spanning the checks most likely to have moved under this
+prompt's diff and every blocker in the checklist:
+
+`BND-01` `BND-02` (all six modules) `BND-03` `BND-04` `BND-05` `BND-08` (all six) `BND-11` ·
+`DS-01` `DS-11` · `SCH-01` `SCH-10` · `ACT-01` `ACT-03` `ACT-05` `ACT-07` `ACT-09` `ACT-15`
+`ACT-16` · `ERR-06` `ERR-11` · `RTE-02` `RTE-09` (single `(dashboard)/loading.tsx` covers
+every nested route, including all five new areas) · `STA-09` · `TST-10` · `TOOL-01` `TOOL-11`
+· `DATA-16`.
+
+Two of those are worth a sentence each, because the grep alone is inconclusive:
+
+- **`ACT-15`/`ACT-16`** (the two the prompt asked to be checked with particular care): every
+  tag in `CACHE_TAGS` is purged by at least one action (`contactMessages` is the sole,
+  documented exception — declared, never cached, never purged, exactly as prompt 2 specified)
+  and `grep -rn "revalidateTag([^,)]*)" src` matches only the two dashboard action TEST FILES'
+  own mock definitions (`revalidateTag: (...args) => revalidateTag(...args)`, a passthrough
+  spy, never invoked with a literal single tag) — no production code calls the deprecated
+  single-argument form anywhere.
+- **`RTE-02`**: the raw grep also flags `DesignWorkListScreen.tsx` / `MediaListScreen.tsx` /
+  `ProjectListScreen.tsx` reading `searchParams.sort` without `await`. Each is reading an
+  ALREADY-AWAITED plain object passed down as a prop from its `page.tsx` (`const [rows,
+params] = await Promise.all([...service call..., searchParams])`), not the Next.js promise
+  itself — a false positive the heuristic cannot distinguish, confirmed by reading each
+  `page.tsx`.
+
+**Inherited, not re-verified item-by-item this pass:** every Part C item not listed above —
+principally the `DS-`, `FRM-`, `STA-` and `TST-` items describing the `ds/`/`form/` tiers, the
+React Query wiring and the mock layer, none of which this prompt touched. These were sound as
+of prompt 6 (no contrary evidence found while working through this prompt) and this audit did
+not re-derive them from scratch; a future full re-audit should still walk the complete
+checklist rather than trust this note indefinitely.
+
+**Score, computed only over the items actually verified in this pass** (blockers excluded
+per the rubric — they gate rather than score): 7 majors met, 0 unmet; the minors checked
+(`BND-11`, `RTE-09`) both met. `(3×7 + 1×2) / (3×7 + 1×2) = 1.00` on that subset. This is a
+narrower claim than "the repository scores 1.00 on Part C" — it says the highest-risk slice
+this prompt could have broken did not break, not that all ~100 items were individually
+re-scored.
+
+**Deviations, each recorded rather than silently accepted, and NOT counted as failures**:
+
+- No search/filter rail for design or media (see above) — a scope decision proportional to
+  9 and 14 rows, not a missing feature.
+- `contact-message-actions.ts` purges no cache tag — by design, pinned by a test (see above).
+- Marking a message read happens client-side on mount, not in the route's own render — see
+  above; the alternative has a real prefetch-triggered false-positive-read failure mode.
+- `scripts/seed.ts`, `legacy/` and their two dependent tests are gone; `scripts/ci-fixture.ts`
+  stands in for CI's throwaway database, and is explicitly NOT a seed script reborn.
+- The dashboard's own submission schemas are more lenient than `common/schemas/*.ts`'s
+  `*CreateSchema`s on Persian fields — not a drift, because the latter are never `.parse()`d
+  on this path (see "Persian is optional here too," above).
+- Container verification substituted a local `file:` database for network Turso, for the
+  reason stated above (no Turso credentials in this environment); the production Turso
+  database must still be seeded from `scripts/seed.ts` before this prompt's first real
+  deploy, from the commit before this one.
+
 ## Deviations from the architecture playbook
 
 Each is deliberate. Re-enable conditions are stated so the next agent does not "fix" them.
@@ -896,6 +1237,19 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
 - **No production error tracker.** `common/observability/dev-log.ts` stays dev-only; its
   three reporting call sites report nowhere. Reason and re-enable condition are in that
   file.
+- **`legacy/` was a temporary reference and is now gone.** Landed in prompt 7 — see
+  "Deleting `legacy/`" above. It was never part of the running application; every prompt
+  that needed it ported the value it needed into `src/` or into `scripts/seed.ts` (itself
+  deleted alongside it) and read the rest with eyes only. Nothing to re-enable; the content
+  lives in the database and the code lives in `src/`, permanently.
+- **CI seeds a minimal fixture, not real content** (`scripts/ci-fixture.ts`, prompt 7).
+  Cache Components requires every `generateStaticParams` to return at least one result, so
+  CI's throwaway database needs SOME rows in `projects`/`design_works`/`media` before
+  `npm run build` will succeed — but the one thing that used to provide rows,
+  `scripts/seed.ts`, is deleted along with its sole data source. The fixture script writes
+  one minimal, clearly-fake row per table through the same repositories the app uses. Not a
+  gap: it exists to satisfy a build-time constraint, not to stand in for real data anywhere
+  a person would see it.
 
 ## Bans
 
