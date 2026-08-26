@@ -27,6 +27,25 @@ export async function listUnreadContactMessages(): Promise<ContactMessage[]> {
   return contactMessageRepo.listUnread();
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════════ *
+ *  THE DASHBOARD HALF (prompt 7) — still uncached, for the same reason `list` above  *
+ *  is: an inbox that shows a cached "read" state is wrong the moment it is stale.    *
+ * ═════════════════════════════════════════════════════════════════════════════════ */
+
+/** Scans the list rather than adding a `byId` query — an inbox is not a large table. */
+export async function getContactMessageById(id: number): Promise<ContactMessage | null> {
+  return (await contactMessageRepo.list()).find(row => row.id === id) ?? null;
+}
+
+/** `null` if the id no longer exists. Idempotent — see `markRead` in the repository. */
+export async function markContactMessageRead(id: number): Promise<ContactMessage | null> {
+  return contactMessageRepo.markRead(id);
+}
+
+export async function deleteContactMessage(id: number): Promise<boolean> {
+  return contactMessageRepo.remove(id);
+}
+
 /**
  * Store one submission from the public contact form (prompt 5).
  *

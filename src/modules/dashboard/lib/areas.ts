@@ -76,7 +76,7 @@ export const DASHBOARD_AREAS = [
     label: 'Messages',
     table: 'contact_messages',
     summary: 'The inbox. Everything a stranger has sent through the public form.',
-    available: false,
+    available: true,
   },
 ] as const satisfies readonly DashboardArea[];
 

@@ -86,6 +86,13 @@ export { StudioForm, type StudioFormProps } from './components/StudioForm';
 /* ── Contact ───────────────────────────────────────────────────────────────────── */
 export { ContactForm, type ContactFormProps } from './components/ContactForm';
 
+/* ── Messages ──────────────────────────────────────────────────────────────────── */
+export { MessageListScreen, type MessageListScreenProps } from './components/MessageListScreen';
+export {
+  MessageDetailScreen,
+  type MessageDetailScreenProps,
+} from './components/MessageDetailScreen';
+
 /* ── The page-level gate ───────────────────────────────────────────────────────── */
 /**
  * Called at the TOP of every dashboard page, before its service call. The layout's check
@@ -120,6 +127,10 @@ export {
 } from './actions/media-actions';
 export { updateStudioAction } from './actions/studio-actions';
 export { updateContactAction } from './actions/contact-actions';
+export {
+  deleteContactMessageAction,
+  markContactMessageReadAction,
+} from './actions/contact-message-actions';
 
 /* ── Query parsing, for the list route ─────────────────────────────────────────── */
 export {
