@@ -1,0 +1,3 @@
+This project ships zero image files — every drawing is generated as SVG at runtime
+(src/common/lib/art/). This directory exists only so Next's standalone output trace and
+the Dockerfile's `COPY .../public ./public` have a real directory to find; see AGENTS.md.

@@ -1,0 +1,36 @@
+# Without this file the build context includes the host's node_modules and .next —
+# slow to upload, and it can poison the image with host-built native modules that then
+# crash only in the container.
+
+node_modules
+.next
+out
+coverage
+
+.git
+.gitignore
+
+# Not needed inside the image, and changing them would bust the build cache for nothing.
+Dockerfile
+.dockerignore
+compose.yaml
+.github
+
+*.log
+
+# The local dev database file. Production reaches Turso over the network; a stray local
+# file would never be used but would still bloat the build context.
+*.db
+*.db-*
+
+# Real env files are EXCLUDED and the example is kept. Secrets belong in the
+# orchestrator's environment, never baked into an image layer — `docker history` reads a
+# layer's build args and copied files straight back out.
+.env
+.env.*
+!.env.example
+
+.vscode
+.idea
+.DS_Store
+*.md

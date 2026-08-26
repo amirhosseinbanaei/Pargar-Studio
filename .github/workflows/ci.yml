@@ -1,0 +1,85 @@
+# CI RUNS THE LOCAL GATE. Not a superset, not a subset — the SAME commands in the SAME
+# order, with the same env. The moment CI can pass where local fails (or the reverse),
+# developers learn to treat CI failures as noise, and the gate stops being a gate.
+#
+# PROJECT DEVIATION FROM THE TEMPLATE: no `build-storybook` step. There is no component
+# workshop in this project (AGENTS.md records it as deferred, not rejected), so the step
+# the template appends is dropped rather than left in place pointing at a script that does
+# not exist.
+#
+# PROJECT DEVIATION: the database. This app's data source is its own libSQL database, not
+# an HTTP backend, so there is no `NEXT_PUBLIC_API_MOCKING` flag and no request-mock front-db
+# to enable. `npm run build` needs a REAL, NON-EMPTY database to read from: Cache Components
+# requires every `generateStaticParams` to return at least one result or the build fails
+# outright (verified against the installed package — an empty array is a build error, not a
+# zero-page route). `scripts/seed.ts` was deleted alongside `legacy/`, its one-time data
+# source (AGENTS.md), so this workflow migrates a throwaway `file:` database and writes one
+# minimal row per table `generateStaticParams` reads through `scripts/ci-fixture.ts` — not a
+# seed, just enough rows for the build to have something to generate a page for. CI discards
+# this database immediately after the job ends.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # One job on purpose. A matrix of parallel jobs is a performance optimization that costs
+  # a shared node_modules and a coherent failure story ("which of the five is the real
+  # cause?"). Split only when the wall clock actually justifies it.
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # A CI-local throwaway database — never the production Turso instance.
+      TURSO_DATABASE_URL: file:./ci.db
+      TURSO_AUTH_TOKEN: ''
+      # Shape-satisfying values `common/config/server-env.ts` requires at import time.
+      # Nothing at build time authenticates against them; only their length/presence is
+      # checked, and no real secret belongs in a CI log.
+      ADMIN_PASSWORD: ci-placeholder-password
+      SESSION_SECRET: ci-placeholder-session-secret-at-least-32-chars
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # Caches ~/.npm keyed on the lockfile. Do NOT cache `.next/` across runs unless
+          # the win is measured — a stale build cache produces failures that reproduce on
+          # no developer machine.
+          cache: npm
+
+      # `npm ci`, never `npm install`: `ci` installs exactly the lockfile, while `install`
+      # may resolve new versions — CI would then be testing a dependency tree nobody has
+      # locally, and a green CI would prove nothing about a developer's machine.
+      - run: npm ci
+
+      # Generated route types do not exist on a clean checkout. Without this step `tsc`
+      # reports confident nonsense about page/layout props that nobody can reproduce
+      # locally (where the dev server has already generated them).
+      - name: Generate route types
+        run: npm run typegen
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `--max-warnings 0`: a warning nobody is required to fix accumulates until real
+      # errors hide inside it. Every rule is either an error or off.
+      - name: Lint
+        run: npm run lint -- --max-warnings 0
+
+      - name: Migrate and fixture the throwaway database
+        run: npx tsx --conditions=react-server scripts/ci-fixture.ts
+
+      - name: Test
+        run: npm run test
+
+      # Public env vars go on the BUILD step, not the job — they are inlined into the
+      # client bundle here and must match what the real deploy build uses, or the same
+      # source yields two different bundles.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXT_PUBLIC_MEDIA_URL: ''

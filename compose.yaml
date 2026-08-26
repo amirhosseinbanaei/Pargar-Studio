@@ -1,0 +1,49 @@
+# Local full-stack composition against a real Turso database over the network.
+#
+# THIS PROJECT HAS NO SEPARATE BACKEND SERVICE AND NO VOLUME. Unlike the architecture
+# skill's generic template — which composes a `web` container against a local `api`
+# container — this app's only data dependency is Turso, reached directly over the network
+# from both the build (static generation needs real rows) and the running container. There
+# is therefore no "browser-facing URL vs. container-internal URL" split to encode here: the
+# `TURSO_DATABASE_URL` is the same value everywhere, and no local file needs a volume to
+# survive a restart.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # BUILD TIME — inlined into the client bundle. Static generation ALSO reads the
+        # database during the build (`generateStaticParams` for every project, design work
+        # and media detail page), so TURSO_DATABASE_URL/TURSO_AUTH_TOKEN must be reachable
+        # from wherever `docker compose build` runs, not only from inside this network.
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        NEXT_PUBLIC_MEDIA_URL: ${NEXT_PUBLIC_MEDIA_URL:-}
+        TURSO_DATABASE_URL: ${TURSO_DATABASE_URL}
+        TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:-}
+
+    restart: unless-stopped
+
+    # Published port. Behind a shared reverse proxy, replace `ports:` with
+    # `expose: ['3000']` and attach that proxy's external network instead.
+    ports: ['3000:3000']
+
+    # RUNTIME, server-only values. Never committed; see .env.example. Reads the same
+    # .env.local a `npm run dev` checkout already has.
+    env_file: [.env.local]
+
+    environment:
+      NODE_ENV: production
+
+    # PID 1 reaper: without it, signals never reach Node, so `docker stop` waits out its
+    # full 10-second timeout on every deploy and in-flight requests are killed.
+    init: true
+
+    # Cheap and belongs on every service: blocks setuid escalation inside the container.
+    security_opt: ['no-new-privileges:true']
+
+    networks: [app]
+
+networks:
+  app:
