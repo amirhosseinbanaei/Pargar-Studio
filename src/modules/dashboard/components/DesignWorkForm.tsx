@@ -15,7 +15,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormInput, FormSelect } from '@/common/components/form';
-import { designCategoryValues, designStatusValues } from '@/common/schemas/enums';
+import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
+import { withCurrentValues } from '@/common/utils/taxonomy';
+import { axisOptions, toControlOptions } from '../lib/taxonomy-options';
 import type { DesignWorkRow } from '@/common/schemas/design-work';
 import {
   createDesignWorkAction,
@@ -38,8 +40,6 @@ import { DeleteRecordDialog } from './DeleteRecordDialog';
 
 const LIST_PATH = '/dashboard/design';
 
-const toOptions = (values: readonly string[]) => values.map(value => ({ value, label: value }));
-
 const FACT_COLUMNS = [
   { key: 'k', label: 'Key' },
   { key: 'v', label: 'Value' },
@@ -48,15 +48,35 @@ const FACT_COLUMNS = [
 export interface DesignWorkFormProps {
   /** Absent on the create screen. */
   designWork?: DesignWorkRow;
+  /**
+   * Every design term, read from `taxonomy_terms` by the ROUTE and passed in — a client form
+   * cannot import a `server-only` service. See `ProjectForm` for the full note.
+   */
+  terms: readonly TaxonomyTermRow[];
 }
 
-export function DesignWorkForm({ designWork }: DesignWorkFormProps) {
+export function DesignWorkForm({ designWork, terms }: DesignWorkFormProps) {
   const router = useRouter();
   const editing = designWork !== undefined;
 
+  // The record's own values are merged in, so a retired or undeclared value is displayed and
+  // saved back unchanged rather than silently rewritten — see `ProjectForm`.
+  const categoryOptions = withCurrentValues(
+    axisOptions(terms, 'category'),
+    designWork ? [designWork.category] : [],
+  );
+  const statusOptions = withCurrentValues(
+    axisOptions(terms, 'status'),
+    designWork ? [designWork.status] : [],
+  );
+
   const defaultValues: DesignWorkFormValues = designWork
     ? toDesignWorkFormValues(designWork)
-    : EMPTY_DESIGN_WORK_FORM;
+    : {
+        ...EMPTY_DESIGN_WORK_FORM,
+        category: categoryOptions[0]?.value ?? '',
+        status: statusOptions[0]?.value ?? '',
+      };
 
   return (
     <div className="flex max-w-[64rem] flex-col gap-8">
@@ -135,13 +155,13 @@ export function DesignWorkForm({ designWork }: DesignWorkFormProps) {
             <FormSelect<DesignWorkFormValues>
               name="category"
               label="Category"
-              options={toOptions(designCategoryValues)}
+              options={toControlOptions(categoryOptions)}
               required
             />
             <FormSelect<DesignWorkFormValues>
               name="status"
               label="Status"
-              options={toOptions(designStatusValues)}
+              options={toControlOptions(statusOptions)}
               required
             />
           </div>

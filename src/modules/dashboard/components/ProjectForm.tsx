@@ -27,8 +27,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormInput, FormSelect } from '@/common/components/form';
-import { projectScaleValues, projectStatusValues, projectTypeValues } from '@/common/schemas/enums';
 import type { ProjectRow } from '@/common/schemas/project';
+import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
+import { withCurrentValues } from '@/common/utils/taxonomy';
+import { axisOptions, toControlOptions } from '../lib/taxonomy-options';
 import {
   createProjectAction,
   deleteProjectAction,
@@ -49,20 +51,51 @@ import { DeleteRecordDialog } from './DeleteRecordDialog';
 
 const LIST_PATH = '/dashboard/projects';
 
-const toOptions = (values: readonly string[]) => values.map(value => ({ value, label: value }));
-
 export interface ProjectFormProps {
   /** Absent on the create screen. */
   project?: ProjectRow;
+  /**
+   * Every project term, read from `taxonomy_terms` by the ROUTE and passed in.
+   *
+   * A prop rather than an import, because this is a `'use client'` component and a client
+   * form cannot import a `server-only` service — the same reason `MediaForm` takes its
+   * related-project options from the route. It is also what makes a term added a minute ago
+   * selectable here with no rebuild: the route reads the table on every request, because
+   * nothing under `(dashboard)` is cached.
+   */
+  terms: readonly TaxonomyTermRow[];
 }
 
-export function ProjectForm({ project }: ProjectFormProps) {
+export function ProjectForm({ project, terms }: ProjectFormProps) {
   const router = useRouter();
   const editing = project !== undefined;
 
+  /**
+   * The record's OWN values are merged into every option list, so a value whose term was
+   * retired — or never declared — is still displayed and still saved back unchanged.
+   * Without this a select would render blank on it and saving the form would quietly rewrite
+   * a field the editor never touched.
+   */
+  const typeOptions = withCurrentValues(axisOptions(terms, 'type'), project?.types ?? []);
+  const statusOptions = withCurrentValues(
+    axisOptions(terms, 'status'),
+    project ? [project.status] : [],
+  );
+  const scaleOptions = withCurrentValues(
+    axisOptions(terms, 'scale'),
+    project ? [project.scale] : [],
+  );
+
   const defaultValues: ProjectFormValues = project
     ? toProjectFormValues(project)
-    : EMPTY_PROJECT_FORM;
+    : {
+        ...EMPTY_PROJECT_FORM,
+        // The create form opens on the first term of each axis rather than on a blank
+        // select. There is no hardcoded first value any more, so "first" means the position
+        // the studio put it in.
+        status: statusOptions[0]?.value ?? '',
+        scale: scaleOptions[0]?.value ?? '',
+      };
 
   return (
     <div className="flex max-w-[64rem] flex-col gap-8">
@@ -149,13 +182,13 @@ export function ProjectForm({ project }: ProjectFormProps) {
             <FormSelect<ProjectFormValues>
               name="status"
               label="Status"
-              options={toOptions(projectStatusValues)}
+              options={toControlOptions(statusOptions)}
               required
             />
             <FormSelect<ProjectFormValues>
               name="scale"
               label="Scale"
-              options={toOptions(projectScaleValues)}
+              options={toControlOptions(scaleOptions)}
               required
             />
             <FormInput<ProjectFormValues>
@@ -169,8 +202,8 @@ export function ProjectForm({ project }: ProjectFormProps) {
             name="types"
             label="Types"
             required
-            options={toOptions(projectTypeValues)}
-            description="A project can carry more than one. These drive the public filter rail."
+            options={toControlOptions(typeOptions)}
+            description="A project can carry more than one. These drive the public filter rail, and the list of them is editable in the taxonomy panel above the project list."
           />
         </section>
 

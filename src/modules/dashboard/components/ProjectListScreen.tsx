@@ -21,6 +21,8 @@
  */
 import Link from 'next/link';
 import type { ProjectRow } from '@/common/schemas/project';
+import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
+import type { TaxonomyUsage } from '@/common/services/taxonomy-service';
 import { Button } from '@/common/components/ds';
 import {
   filterProjectRows,
@@ -38,6 +40,7 @@ import {
   type SortState,
 } from './RecordTable';
 import { ProjectListFilters } from './ProjectListFilters';
+import { TaxonomyEditor } from './TaxonomyEditor';
 import { ProjectRowActions } from './ProjectRowActions';
 
 const LIST_PATH = '/dashboard/projects';
@@ -45,9 +48,13 @@ const LIST_PATH = '/dashboard/projects';
 export interface ProjectListScreenProps {
   rows: readonly ProjectRow[];
   searchParams: RawSearchParams;
+  /** Every taxonomy term for this subject, for the editor above the list. */
+  terms: readonly TaxonomyTermRow[];
+  /** How many records use each value, per axis. */
+  usage: TaxonomyUsage;
 }
 
-export function ProjectListScreen({ rows, searchParams }: ProjectListScreenProps) {
+export function ProjectListScreen({ rows, searchParams, terms, usage }: ProjectListScreenProps) {
   const query = parseProjectListQuery(searchParams);
   const filtered = filterProjectRows(rows, query);
 
@@ -81,6 +88,14 @@ export function ProjectListScreen({ rows, searchParams }: ProjectListScreenProps
           <Link href={`${LIST_PATH}/new`}>New project</Link>
         </Button>
       </header>
+
+      {/*
+        THE TERM EDITOR, above the list and collapsed. On this page rather than on a settings
+        page because that is what makes the relationship between a term and the records using
+        it visible — the count beside each term is counted from the very rows in the table
+        below, and "can I delete this?" is answerable without leaving the screen.
+      */}
+      <TaxonomyEditor subject="project" terms={terms} usage={usage} />
 
       <ProjectListFilters
         action={LIST_PATH}

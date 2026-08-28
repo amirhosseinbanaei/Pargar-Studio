@@ -39,6 +39,19 @@ export interface DeleteRecordDialogProps {
   onDeleted?: () => void;
   /** Overrides the trigger, for a table row that wants something smaller. */
   trigger?: React.ReactNode;
+  /**
+   * A screen-specific sentence for a REFUSAL this dialog cannot know about.
+   *
+   * It is consulted after 401 and 404 and before the generic normalizer, and it branches on
+   * the status and the named keys of the body — never on message text, which is the rule
+   * every other failure path here follows.
+   *
+   * The case it exists for is the taxonomy editor's in-use delete: the action answers 409
+   * with `{ count }`, and the useful sentence names the number and points at the visible
+   * toggle, which is the non-destructive thing the person actually wanted. A generic
+   * "conflict" would leave them retrying a delete that will never succeed.
+   */
+  resolveRefusal?: (failure: { status: number; body?: unknown }) => string | null;
 }
 
 export function DeleteRecordDialog({
@@ -47,6 +60,7 @@ export function DeleteRecordDialog({
   onConfirm,
   onDeleted,
   trigger,
+  resolveRefusal,
 }: DeleteRecordDialogProps) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
@@ -84,6 +98,13 @@ export function DeleteRecordDialog({
         setMessage('That record no longer exists. Close this and refresh the list.');
         return;
       }
+
+      const refusal = resolveRefusal?.({ status: result.status, body: result.body });
+      if (refusal) {
+        setMessage(refusal);
+        return;
+      }
+
       setError(mapError({ status: result.status, body: result.body }));
     });
   };

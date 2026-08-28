@@ -23,6 +23,9 @@
  *  - `LocaleFieldPair` — English and Persian side by side. Every one of the five remaining
  *    areas has translated columns, so every one of them needs this.
  *
+ * Prompt 9 added a sixth, `TaxonomyEditor`, on the same rule: three subjects need the same
+ * term editor, and three copies would be three places to fix one bug.
+ *
  * `FormCheckboxGroup` is deliberately NOT in that list: it has one consumer, and
  * `references/01-layering-and-boundaries.md` promotes on the second. If prompt 7 finds a
  * second, it moves to `common/components/form/` rather than being exported from here.
@@ -64,6 +67,14 @@ export {
   type RepeatableGroupColumn,
   type RepeatableGroupFieldProps,
 } from './components/RepeatableGroupField';
+/**
+ * The term editor (prompt 9). ONE component, mounted three times with a different `subject`
+ * — on `/dashboard/projects`, `/dashboard/design` and `/dashboard/media`, above each list.
+ * It is on each subject's own page rather than on a settings page because that is what makes
+ * the relationship between a term and the records using it visible, and what makes "can I
+ * delete this?" answerable without leaving the screen.
+ */
+export { TaxonomyEditor, type TaxonomyEditorProps } from './components/TaxonomyEditor';
 
 /* ── Projects ──────────────────────────────────────────────────────────────────── */
 export { ProjectListScreen, type ProjectListScreenProps } from './components/ProjectListScreen';
@@ -125,6 +136,13 @@ export {
   moveMediaAction,
   updateMediaAction,
 } from './actions/media-actions';
+export {
+  createTaxonomyTermAction,
+  deleteTaxonomyTermAction,
+  moveTaxonomyTermAction,
+  setTaxonomyTermVisibilityAction,
+  updateTaxonomyTermAction,
+} from './actions/taxonomy-actions';
 export { updateStudioAction } from './actions/studio-actions';
 export { updateContactAction } from './actions/contact-actions';
 export {

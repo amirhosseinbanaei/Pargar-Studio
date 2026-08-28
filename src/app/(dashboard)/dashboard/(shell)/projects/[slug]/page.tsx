@@ -18,6 +18,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProjectRow } from '@/common/services/project-service';
+import { listTaxonomyRows } from '@/common/services/taxonomy-service';
 import { ProjectForm, requireDashboardSession } from '@/modules/dashboard';
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -34,8 +35,8 @@ export default async function EditProjectPage({ params }: PageProps) {
   await requireDashboardSession();
 
   const { slug } = await params;
-  const project = await getProjectRow(slug);
+  const [project, terms] = await Promise.all([getProjectRow(slug), listTaxonomyRows('project')]);
   if (!project) notFound();
 
-  return <ProjectForm project={project} />;
+  return <ProjectForm project={project} terms={terms} />;
 }

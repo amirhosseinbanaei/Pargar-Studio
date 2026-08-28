@@ -14,7 +14,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormInput, FormSelect } from '@/common/components/form';
-import { mediaTypeValues } from '@/common/schemas/enums';
+import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
+import { withCurrentValues } from '@/common/utils/taxonomy';
+import { axisOptions, toControlOptions } from '../lib/taxonomy-options';
 import type { MediaRow } from '@/common/schemas/media';
 import { createMediaAction, deleteMediaAction, updateMediaAction } from '../actions/media-actions';
 import {
@@ -33,8 +35,6 @@ import { DeleteRecordDialog } from './DeleteRecordDialog';
 
 const LIST_PATH = '/dashboard/media';
 
-const toOptions = (values: readonly string[]) => values.map(value => ({ value, label: value }));
-
 const FACT_COLUMNS = [
   { key: 'k', label: 'Key' },
   { key: 'v', label: 'Value' },
@@ -49,13 +49,23 @@ export interface MediaFormProps {
   /** Absent on the create screen. */
   media?: MediaRow;
   projectOptions: readonly MediaProjectOption[];
+  /**
+   * Every media term, read from `taxonomy_terms` by the ROUTE and passed in — a client form
+   * cannot import a `server-only` service. See `ProjectForm` for the full note.
+   */
+  terms: readonly TaxonomyTermRow[];
 }
 
-export function MediaForm({ media, projectOptions }: MediaFormProps) {
+export function MediaForm({ media, projectOptions, terms }: MediaFormProps) {
   const router = useRouter();
   const editing = media !== undefined;
 
-  const defaultValues: MediaFormValues = media ? toMediaFormValues(media) : EMPTY_MEDIA_FORM;
+  // The record's own value is merged in — see `ProjectForm`.
+  const typeOptions = withCurrentValues(axisOptions(terms, 'type'), media ? [media.type] : []);
+
+  const defaultValues: MediaFormValues = media
+    ? toMediaFormValues(media)
+    : { ...EMPTY_MEDIA_FORM, type: typeOptions[0]?.value ?? '' };
 
   const relatedProjectOptions = [
     { value: NO_RELATED_PROJECT, label: '— No related project —' },
@@ -142,7 +152,7 @@ export function MediaForm({ media, projectOptions }: MediaFormProps) {
             <FormSelect<MediaFormValues>
               name="type"
               label="Type"
-              options={toOptions(mediaTypeValues)}
+              options={toControlOptions(typeOptions)}
               required
             />
             <FormSelect<MediaFormValues>

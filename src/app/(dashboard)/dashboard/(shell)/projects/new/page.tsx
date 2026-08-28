@@ -12,6 +12,7 @@
  * down rather than left to be discovered.
  */
 import type { Metadata } from 'next';
+import { listTaxonomyRows } from '@/common/services/taxonomy-service';
 import { ProjectForm, requireDashboardSession } from '@/modules/dashboard';
 
 export const metadata: Metadata = {
@@ -19,10 +20,12 @@ export const metadata: Metadata = {
 };
 
 export default async function NewProjectPage() {
-  // This page reads nothing, so there is no payload to protect — the gate is here anyway,
-  // so that "every dashboard page starts with this line" is a rule with no exceptions to
-  // remember. An exception is what the next page copies.
+  // The gate FIRST, and before the read — see `requireDashboardSession`. This page reads the
+  // taxonomy now, so the payload it protects is real rather than theoretical.
   await requireDashboardSession();
 
-  return <ProjectForm />;
+  // A client form cannot import a `server-only` service, so the route reads the terms and
+  // hands them down. Uncached, so a term added a minute ago is selectable immediately.
+  const terms = await listTaxonomyRows('project');
+  return <ProjectForm terms={terms} />;
 }

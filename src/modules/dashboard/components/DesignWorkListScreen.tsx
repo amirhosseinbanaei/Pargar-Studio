@@ -11,6 +11,8 @@
  */
 import Link from 'next/link';
 import type { DesignWorkRow } from '@/common/schemas/design-work';
+import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
+import type { TaxonomyUsage } from '@/common/services/taxonomy-service';
 import { Button } from '@/common/components/ds';
 import {
   parseSortState,
@@ -20,15 +22,25 @@ import {
   type SortState,
 } from './RecordTable';
 import { DesignWorkRowActions } from './DesignWorkRowActions';
+import { TaxonomyEditor } from './TaxonomyEditor';
 
 const LIST_PATH = '/dashboard/design';
 
 export interface DesignWorkListScreenProps {
   rows: readonly DesignWorkRow[];
   searchParams: Record<string, string | string[] | undefined>;
+  /** Every taxonomy term for this subject, for the editor above the list. */
+  terms: readonly TaxonomyTermRow[];
+  /** How many records use each value, per axis. */
+  usage: TaxonomyUsage;
 }
 
-export function DesignWorkListScreen({ rows, searchParams }: DesignWorkListScreenProps) {
+export function DesignWorkListScreen({
+  rows,
+  searchParams,
+  terms,
+  usage,
+}: DesignWorkListScreenProps) {
   const columns = buildColumns();
   const sort = parseSortState(
     columns,
@@ -64,6 +76,9 @@ export function DesignWorkListScreen({ rows, searchParams }: DesignWorkListScree
           <Link href={`${LIST_PATH}/new`}>New design work</Link>
         </Button>
       </header>
+
+      {/* The term editor, above the list and collapsed — see `ProjectListScreen`. */}
+      <TaxonomyEditor subject="design" terms={terms} usage={usage} />
 
       <RecordTable
         columns={columns.map(column =>
