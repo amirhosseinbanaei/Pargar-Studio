@@ -30,6 +30,7 @@ import {
 } from '../schemas/media-form';
 import { RecordForm, RecordFormCancel } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
+import { ImageUploadField } from './ImageUploadField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
 
@@ -184,6 +185,31 @@ export function MediaForm({ media, projectOptions, terms }: MediaFormProps) {
               required={'required' in field ? field.required : false}
             />
           ))}
+        </section>
+
+        <section className="flex flex-col gap-6 border-t border-rule pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
+            <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
+              Optional, and one image at most. With no cover this entry keeps the drawing seeded
+              from its RELATED PROJECT rather than from itself, so a cutting about a building shows
+              the building. A description is required in both languages once there is a cover.
+            </p>
+          </div>
+
+          <ImageUploadField<MediaFormValues>
+            name="coverImage"
+            label="Cover image"
+            itemLabel="cover"
+            description="Overrides the related project's drawing for this entry only."
+          />
+
+          <LocaleFieldPair<MediaFormValues>
+            label="Cover description"
+            en="coverAltEn"
+            fa="coverAltFa"
+            description="What the image shows. Required once there is a cover."
+          />
         </section>
 
         <section className="flex flex-col gap-6 border-t border-rule pt-8">

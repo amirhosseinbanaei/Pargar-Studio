@@ -21,6 +21,7 @@ vi.mock('@/common/config/server-env', () => ({
     SESSION_SECRET,
     TURSO_DATABASE_URL: 'file:./test.db',
     TURSO_AUTH_TOKEN: undefined,
+    UPLOAD_DIR: '/tmp/kavan-test-uploads',
   },
 }));
 

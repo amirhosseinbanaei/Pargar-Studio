@@ -34,6 +34,8 @@ import {
 } from '../schemas/design-work-form';
 import { RecordForm, RecordFormCancel } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
+import { ImageUploadField } from './ImageUploadField';
+import { GalleryField } from './GalleryField';
 import { RepeatableListField } from './RepeatableListField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
@@ -187,6 +189,37 @@ export function DesignWorkForm({ designWork, terms }: DesignWorkFormProps) {
               required={'required' in field ? field.required : false}
             />
           ))}
+        </section>
+
+        <section className="flex flex-col gap-6 border-t border-rule pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
+            <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
+              Optional. A work with no cover keeps the drawing generated from its slug and steered
+              by its category. Every image you do add needs a description in both languages — the
+              Persian one is not filled in from the English, because it is heard rather than read.
+            </p>
+          </div>
+
+          <ImageUploadField<DesignWorkFormValues>
+            name="coverImage"
+            label="Cover image"
+            itemLabel="cover"
+            description="Shown on the card and as the first plate on the work's page, in place of the generated drawing."
+          />
+
+          <LocaleFieldPair<DesignWorkFormValues>
+            label="Cover description"
+            en="coverAltEn"
+            fa="coverAltFa"
+            description="What the photograph shows. Required once there is a cover."
+          />
+
+          <GalleryField<DesignWorkFormValues>
+            name="gallery"
+            label="Gallery"
+            description="Shown after the cover, in this order. Use the arrows to reorder; the order is saved with the record."
+          />
         </section>
 
         <section className="flex flex-col gap-6 border-t border-rule pt-8">

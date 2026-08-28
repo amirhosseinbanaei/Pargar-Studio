@@ -46,6 +46,8 @@ import {
 } from '../schemas/project-form';
 import { RecordForm, RecordFormCancel } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
+import { ImageUploadField } from './ImageUploadField';
+import { GalleryField } from './GalleryField';
 import { FormCheckboxGroup } from './FormCheckboxGroup';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
 
@@ -227,6 +229,40 @@ export function ProjectForm({ project, terms }: ProjectFormProps) {
               required={'required' in field ? field.required : false}
             />
           ))}
+        </section>
+
+        <section className="flex flex-col gap-6 border-t border-rule pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
+            <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
+              Optional. A project with no cover keeps the drawing generated from its slug, on the
+              card and on its page — so leaving this empty is a finished state, not an unfinished
+              one. A description is required in both languages for every image you do add: it is
+              what a reader who cannot see the photograph gets instead, and the Persian one is not
+              filled in from the English, because a Persian screen reader would read out an English
+              sentence.
+            </p>
+          </div>
+
+          <ImageUploadField<ProjectFormValues>
+            name="coverImage"
+            label="Cover image"
+            itemLabel="cover"
+            description="Shown on the project card and as the first plate on its page, in place of the generated drawing."
+          />
+
+          <LocaleFieldPair<ProjectFormValues>
+            label="Cover description"
+            en="coverAltEn"
+            fa="coverAltFa"
+            description="What the photograph shows — read aloud in place of it. Required once there is a cover."
+          />
+
+          <GalleryField<ProjectFormValues>
+            name="gallery"
+            label="Gallery"
+            description="Shown after the cover on the project page, in this order. Use the arrows to reorder; the order is saved with the record."
+          />
         </section>
       </RecordForm>
     </div>

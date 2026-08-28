@@ -75,6 +75,12 @@ const VALID = {
   teamFa: [],
   factsEn: [],
   factsFa: [],
+  // No photograph — the state of every seeded record, and the one the generated-drawing
+  // fallback has to keep working in. `strictObject` requires the keys to be present.
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
+  gallery: [],
 };
 
 const row = (overrides: Partial<DesignWorkRow> = {}): DesignWorkRow =>

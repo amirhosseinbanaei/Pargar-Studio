@@ -14,7 +14,12 @@
  *
  * `emptyRow` is supplied by the caller rather than inferred, because a schema-derived
  * default would need runtime access to the zod shape and this component is deliberately
- * schema-agnostic — it only ever sees the field NAMES, from `columns`.
+ * schema-agnostic — it only ever sees the field NAMES, from `columns` and `imageKey`.
+ *
+ * ─── ONE ROW MAY CARRY AN IMAGE (prompt 10) ────────────────────────────────────────
+ * `imageKey` names a row key holding an uploaded path and renders `ImageUploadField` for it
+ * above that row's text columns. `studio.founders` is the only list that uses it today —
+ * see that prop for why it is set on the English side only.
  *
  * ─── WHY IT LIVES HERE, NOT IN `common/components/form/` ──────────────────────────
  * Same rule as `RepeatableListField`: one module (`dashboard`) is the only consumer so far.
@@ -24,6 +29,7 @@
 import { useFieldArray, useFormContext, type FieldValues, type Path } from 'react-hook-form';
 import { Button, Input, Textarea } from '@/common/components/ds';
 import { FormField, FormItem, FormLabel, FormMessage } from '@/common/components/form';
+import { ImageUploadField } from './ImageUploadField';
 
 export interface RepeatableGroupColumn {
   /** The row object's key — `'k'`, `'title'`, `'year'`. */
@@ -45,6 +51,20 @@ export interface RepeatableGroupFieldProps<TValues extends FieldValues> {
   /** Set on the Persian side of a locale pair — `rtl` text and `fa` shaping/voice. */
   dir?: 'rtl' | 'ltr';
   lang?: string;
+  /**
+   * The row key holding an uploaded image path, if this list has one. Rendering an uploader
+   * for it above the text columns is the whole extension prompt 10 made to this component.
+   *
+   * IT IS SET ON ONE SIDE OF A LOCALE PAIR ONLY. `studio.founders` is stored as two
+   * index-aligned arrays and a founder's PORTRAIT is not per-locale — only the sentence
+   * describing it is. So the English founders editor passes this and the Persian one does
+   * not, and the save copies each path across by index
+   * (`../schemas/studio-form.ts`'s `withPersianFallback`). Rendering an uploader on both
+   * sides would let the two arrays disagree about which photograph a founder has, which is
+   * a bug with no symptom in English.
+   */
+  imageKey?: string;
+  imageLabel?: string;
 }
 
 export function RepeatableGroupField<TValues extends FieldValues>({
@@ -58,6 +78,8 @@ export function RepeatableGroupField<TValues extends FieldValues>({
   required,
   dir,
   lang,
+  imageKey,
+  imageLabel = 'Image',
 }: RepeatableGroupFieldProps<TValues>) {
   const form = useFormContext<TValues>();
   const { fields, append, remove } = useFieldArray({ control: form.control, name: name as never });
@@ -79,6 +101,13 @@ export function RepeatableGroupField<TValues extends FieldValues>({
             )}
             {fields.map((field, index) => (
               <div key={field.id} className="flex flex-col gap-2 border border-rule bg-s-1 p-3">
+                {imageKey && (
+                  <ImageUploadField<TValues>
+                    name={`${name}.${index}.${imageKey}` as Path<TValues>}
+                    label={`${itemLabel} ${index + 1} · ${imageLabel}`}
+                    itemLabel={imageLabel.toLowerCase()}
+                  />
+                )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {columns.map(column => {
                     const path = `${name}.${index}.${column.key}` as Path<TValues>;

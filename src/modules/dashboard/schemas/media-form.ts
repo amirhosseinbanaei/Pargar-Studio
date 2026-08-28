@@ -20,6 +20,7 @@
 import { z } from 'zod';
 import type { MediaCreate, MediaRow } from '@/common/schemas/media';
 import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
+import { imagePathField, requireAltWithImage, toNullableAlt, toNullablePath } from './image';
 
 /**
  * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
@@ -42,32 +43,43 @@ const factFormSchema = z.object({ k: z.string(), v: z.string() });
    The form schema — carries copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const mediaFormSchema = z.object({
-  slug: z
-    .string()
-    .min(1, 'A slug is required.')
-    .regex(MEDIA_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
-  type: z.string().min(1, 'Choose a kind.'),
-  year: yearFieldAsString(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
-  /** `''` = no related project, matching `NO_RELATED_PROJECT`. */
-  projectSlug: z.string(),
+export const mediaFormSchema = z
+  .object({
+    slug: z
+      .string()
+      .min(1, 'A slug is required.')
+      .regex(MEDIA_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
+    type: z.string().min(1, 'Choose a kind.'),
+    year: yearFieldAsString(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
+    /** `''` = no related project, matching `NO_RELATED_PROJECT`. */
+    projectSlug: z.string(),
 
-  titleEn: z.string().min(1, 'An English title is required.'),
-  titleFa: z.string(),
-  outletEn: z.string(),
-  outletFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  authorEn: z.string(),
-  authorFa: z.string(),
-  excerptEn: z.string(),
-  excerptFa: z.string(),
-  contextEn: z.string(),
-  contextFa: z.string(),
+    titleEn: z.string().min(1, 'An English title is required.'),
+    titleFa: z.string(),
+    outletEn: z.string(),
+    outletFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    authorEn: z.string(),
+    authorFa: z.string(),
+    excerptEn: z.string(),
+    excerptFa: z.string(),
+    contextEn: z.string(),
+    contextFa: z.string(),
 
-  factsEn: z.array(factFormSchema),
-  factsFa: z.array(factFormSchema),
-});
+    factsEn: z.array(factFormSchema),
+    factsFa: z.array(factFormSchema),
+
+    /**
+     * A COVER ONLY — no gallery. With none, the card and the detail page keep the drawing
+     * seeded from the RELATED PROJECT rather than from the entry, so a cutting about a
+     * building carries the building's picture (AGENTS.md).
+     */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+  })
+  .superRefine(requireAltWithImage);
 
 export type MediaFormValues = z.infer<typeof mediaFormSchema>;
 
@@ -90,6 +102,9 @@ export const MEDIA_FORM_FIELDS = [
   'contextFa',
   'factsEn',
   'factsFa',
+  'coverImage',
+  'coverAltEn',
+  'coverAltFa',
 ] as const satisfies ReadonlyArray<keyof MediaFormValues>;
 
 export const EMPTY_MEDIA_FORM: MediaFormValues = {
@@ -112,6 +127,9 @@ export const EMPTY_MEDIA_FORM: MediaFormValues = {
   contextFa: '',
   factsEn: [],
   factsFa: [],
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
 };
 
 export function toMediaFormValues(row: MediaRow): MediaFormValues {
@@ -135,6 +153,10 @@ export function toMediaFormValues(row: MediaRow): MediaFormValues {
     contextFa: row.contextFa,
     factsEn: row.factsEn,
     factsFa: row.factsFa,
+    // `?? ''` — nullable columns, and a controlled input handed `null` mounts uncontrolled.
+    coverImage: row.coverImage ?? '',
+    coverAltEn: row.coverAltEn,
+    coverAltFa: row.coverAltFa,
   };
 }
 
@@ -142,28 +164,39 @@ export function toMediaFormValues(row: MediaRow): MediaFormValues {
    The submission schema — carries no copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const mediaSubmissionSchema = z.strictObject({
-  slug: z.string().min(1).regex(MEDIA_SLUG_PATTERN),
-  type: z.string().min(1),
-  year: yearFieldAsNumber(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
-  projectSlug: z.string().transform(value => (value === NO_RELATED_PROJECT ? null : value)),
+export const mediaSubmissionSchema = z
+  .strictObject({
+    slug: z.string().min(1).regex(MEDIA_SLUG_PATTERN),
+    type: z.string().min(1),
+    year: yearFieldAsNumber(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
+    projectSlug: z.string().transform(value => (value === NO_RELATED_PROJECT ? null : value)),
 
-  titleEn: z.string().min(1),
-  titleFa: z.string(),
-  outletEn: z.string(),
-  outletFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  authorEn: z.string(),
-  authorFa: z.string(),
-  excerptEn: z.string(),
-  excerptFa: z.string(),
-  contextEn: z.string(),
-  contextFa: z.string(),
+    titleEn: z.string().min(1),
+    titleFa: z.string(),
+    outletEn: z.string(),
+    outletFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    authorEn: z.string(),
+    authorFa: z.string(),
+    excerptEn: z.string(),
+    excerptFa: z.string(),
+    contextEn: z.string(),
+    contextFa: z.string(),
 
-  factsEn: z.array(factFormSchema),
-  factsFa: z.array(factFormSchema),
-});
+    factsEn: z.array(factFormSchema),
+    factsFa: z.array(factFormSchema),
+
+    /**
+     * A COVER ONLY — no gallery. With none, the card and the detail page keep the drawing
+     * seeded from the RELATED PROJECT rather than from the entry, so a cutting about a
+     * building carries the building's picture (AGENTS.md).
+     */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+  })
+  .superRefine(requireAltWithImage);
 
 export type MediaSubmission = z.output<typeof mediaSubmissionSchema>;
 
@@ -187,6 +220,12 @@ export function withPersianFallback(input: MediaSubmission): Omit<MediaCreate, '
     contextFa: fallbackText(input.contextFa, input.contextEn),
     factsEn: input.factsEn,
     factsFa: fallbackList(input.factsFa, input.factsEn),
+
+    /** ALT TEXT IS NOT FALLEN BACK — see `./image`'s header for why this one translated
+     *  field is the exception. */
+    coverImage: toNullablePath(input.coverImage),
+    coverAltEn: toNullableAlt(input.coverAltEn),
+    coverAltFa: toNullableAlt(input.coverAltFa),
   };
 }
 

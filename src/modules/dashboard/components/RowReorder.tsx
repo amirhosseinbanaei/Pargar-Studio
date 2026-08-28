@@ -44,6 +44,14 @@ export interface RowReorderProps {
   disabledReason?: string;
 }
 
+/**
+ * The arrow buttons' treatment, hoisted and exported so the gallery editor's LOCAL reorder
+ * arrows look identical to these without a second copy of the string. Two copies of a class
+ * list this long is how one control ends up with a focus ring the other lost.
+ */
+export const REORDER_BUTTON_CLASS =
+  'flex size-7 cursor-pointer items-center justify-center border border-rule text-t-lo transition-colors duration-[var(--d-xs)] ease-out-kavan hover:border-rule-md hover:text-t-hi focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-a-1 disabled:cursor-not-allowed disabled:opacity-disabled disabled:hover:border-rule disabled:hover:text-t-lo';
+
 export function RowReorder({
   onMove,
   canMoveUp,
@@ -69,9 +77,6 @@ export function RowReorder({
     });
   };
 
-  const buttonClass =
-    'flex size-7 cursor-pointer items-center justify-center border border-rule text-t-lo transition-colors duration-[var(--d-xs)] ease-out-kavan hover:border-rule-md hover:text-t-hi focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-a-1 disabled:cursor-not-allowed disabled:opacity-disabled disabled:hover:border-rule disabled:hover:text-t-lo';
-
   return (
     <div className="flex items-center gap-1">
       <button
@@ -82,7 +87,7 @@ export function RowReorder({
         // seventy-six identically-named buttons to anyone navigating by control.
         aria-label={`Move ${recordName} up`}
         title={disabledReason ?? 'Move up'}
-        className={buttonClass}
+        className={REORDER_BUTTON_CLASS}
       >
         <span aria-hidden>↑</span>
       </button>
@@ -92,7 +97,7 @@ export function RowReorder({
         disabled={pending || !canMoveDown || Boolean(disabledReason)}
         aria-label={`Move ${recordName} down`}
         title={disabledReason ?? 'Move down'}
-        className={buttonClass}
+        className={REORDER_BUTTON_CLASS}
       >
         <span aria-hidden>↓</span>
       </button>

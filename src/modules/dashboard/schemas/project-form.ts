@@ -51,6 +51,15 @@ import {
   type ProjectCreate,
   type ProjectRow,
 } from '@/common/schemas/project';
+import {
+  galleryField,
+  imagePathField,
+  requireAltWithImage,
+  toGalleryColumns,
+  toGalleryFormItems,
+  toNullableAlt,
+  toNullablePath,
+} from './image';
 
 /* ────────────────────────────────────────────────────────────────────────────────
    The year field
@@ -94,32 +103,49 @@ const yearAsNumber = z
    The form schema — carries copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const projectFormSchema = z.object({
-  slug: z
-    .string()
-    .min(1, 'A slug is required.')
-    .regex(
-      PROJECT_SLUG_PATTERN,
-      'Lowercase words separated by single hyphens — qeytarieh-08-residence.',
-    ),
-  types: z.array(z.string().min(1)).min(1, 'Choose at least one type.'),
-  status: z.string().min(1, 'Choose a status.'),
-  scale: z.string().min(1, 'Choose a scale.'),
-  year: yearAsString,
-  area: z.string(),
+/**
+ * `.superRefine` rather than `.refine`, because the rule raises SEVERAL issues on SEVERAL
+ * fields — an image with neither description named is two errors on two boxes, not one
+ * message at the top of the form. See `./image`.
+ */
+export const projectFormSchema = z
+  .object({
+    slug: z
+      .string()
+      .min(1, 'A slug is required.')
+      .regex(
+        PROJECT_SLUG_PATTERN,
+        'Lowercase words separated by single hyphens — qeytarieh-08-residence.',
+      ),
+    types: z.array(z.string().min(1)).min(1, 'Choose at least one type.'),
+    status: z.string().min(1, 'Choose a status.'),
+    scale: z.string().min(1, 'Choose a scale.'),
+    year: yearAsString,
+    area: z.string(),
 
-  // English title is the only required piece of content — see the header.
-  titleEn: z.string().min(1, 'An English title is required.'),
-  titleFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  descriptionEn: z.string(),
-  descriptionFa: z.string(),
-  locationEn: z.string(),
-  locationFa: z.string(),
-  clientEn: z.string(),
-  clientFa: z.string(),
-});
+    // English title is the only required piece of content — see the header.
+    titleEn: z.string().min(1, 'An English title is required.'),
+    titleFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    descriptionEn: z.string(),
+    descriptionFa: z.string(),
+    locationEn: z.string(),
+    locationFa: z.string(),
+    clientEn: z.string(),
+    clientFa: z.string(),
+
+    /**
+     * THE PHOTOGRAPHS (prompt 10). `''` is "no cover", which is the state of the whole
+     * archive today and stays a valid record — the card and the detail page fall back to the
+     * generated drawing.
+     */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine(requireAltWithImage);
 
 /**
  * Input and output are the SAME type, because nothing in `projectFormSchema` transforms —
@@ -146,6 +172,10 @@ export const PROJECT_FORM_FIELDS = [
   'locationFa',
   'clientEn',
   'clientFa',
+  'coverImage',
+  'coverAltEn',
+  'coverAltFa',
+  'gallery',
 ] as const satisfies ReadonlyArray<keyof ProjectFormValues>;
 
 /**
@@ -178,6 +208,10 @@ export const EMPTY_PROJECT_FORM: ProjectFormValues = {
   locationFa: '',
   clientEn: '',
   clientFa: '',
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
+  gallery: [],
 };
 
 /**
@@ -212,6 +246,12 @@ export function toProjectFormValues(row: ProjectRow): ProjectFormValues {
     locationFa: row.locationFa,
     clientEn: row.clientEn,
     clientFa: row.clientFa,
+    // `?? ''` on every one: the columns are nullable and a controlled input handed `null`
+    // mounts uncontrolled, which is the flip `references/07-forms.md` warns about.
+    coverImage: row.coverImage ?? '',
+    coverAltEn: row.coverAltEn,
+    coverAltFa: row.coverAltFa,
+    gallery: toGalleryFormItems(row.galleryEn, row.galleryFa),
   };
 }
 
@@ -229,25 +269,33 @@ export function toProjectFormValues(row: ProjectRow): ProjectFormValues {
  * is bound onto the field by NAME through `applyFieldErrors`, exactly as the public contact
  * form does. What matters at this boundary is which key failed, not what the sentence says.
  */
-export const projectSubmissionSchema = z.strictObject({
-  slug: z.string().min(1).regex(PROJECT_SLUG_PATTERN),
-  types: z.array(z.string().min(1)).min(1),
-  status: z.string().min(1),
-  scale: z.string().min(1),
-  year: yearAsNumber,
-  area: z.string(),
+export const projectSubmissionSchema = z
+  .strictObject({
+    slug: z.string().min(1).regex(PROJECT_SLUG_PATTERN),
+    types: z.array(z.string().min(1)).min(1),
+    status: z.string().min(1),
+    scale: z.string().min(1),
+    year: yearAsNumber,
+    area: z.string(),
 
-  titleEn: z.string().min(1),
-  titleFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  descriptionEn: z.string(),
-  descriptionFa: z.string(),
-  locationEn: z.string(),
-  locationFa: z.string(),
-  clientEn: z.string(),
-  clientFa: z.string(),
-});
+    titleEn: z.string().min(1),
+    titleFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    descriptionEn: z.string(),
+    descriptionFa: z.string(),
+    locationEn: z.string(),
+    locationFa: z.string(),
+    clientEn: z.string(),
+    clientFa: z.string(),
+
+    /** Same three plus the list. The alt rule below is the same one the form applies. */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine(requireAltWithImage);
 
 export type ProjectSubmission = z.output<typeof projectSubmissionSchema>;
 
@@ -289,6 +337,18 @@ export function withPersianFallback(input: ProjectSubmission): Omit<ProjectCreat
     locationFa: fallback(input.locationFa, input.locationEn),
     clientEn: input.clientEn,
     clientFa: fallback(input.clientFa, input.clientEn),
+
+    /**
+     * ALT TEXT IS NOT FALLEN BACK, and it is the only translated field here that is not.
+     * `./image`'s header carries the argument in full: prose degrades usefully to English,
+     * alt text does not — it is heard rather than read, and an English sentence spoken by a
+     * Persian screen reader is noise that additionally hides the omission from anyone
+     * auditing the page. The schema above requires both instead.
+     */
+    coverImage: toNullablePath(input.coverImage),
+    coverAltEn: toNullableAlt(input.coverAltEn),
+    coverAltFa: toNullableAlt(input.coverAltFa),
+    ...toGalleryColumns(input.gallery),
   };
 }
 

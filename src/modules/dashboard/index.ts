@@ -24,7 +24,8 @@
  *    areas has translated columns, so every one of them needs this.
  *
  * Prompt 9 added a sixth, `TaxonomyEditor`, on the same rule: three subjects need the same
- * term editor, and three copies would be three places to fix one bug.
+ * term editor, and three copies would be three places to fix one bug. Prompt 10 added a
+ * seventh, `ImageUploadField`, on the same rule again — five surfaces upload a picture.
  *
  * `FormCheckboxGroup` is deliberately NOT in that list: it has one consumer, and
  * `references/01-layering-and-boundaries.md` promotes on the second. If prompt 7 finds a
@@ -57,7 +58,16 @@ export {
 export { DeleteRecordDialog, type DeleteRecordDialogProps } from './components/DeleteRecordDialog';
 export { ResultRegion, type ResultRegionProps } from './components/ResultRegion';
 export { LocaleFieldPair, type LocaleFieldPairProps } from './components/LocaleFieldPair';
-export { RowReorder, type RowReorderProps } from './components/RowReorder';
+export { RowReorder, REORDER_BUTTON_CLASS, type RowReorderProps } from './components/RowReorder';
+/**
+ * THE UPLOADER (prompt 10). One control, mounted everywhere a record takes a picture — a
+ * cover on projects, design works and media, every gallery row, and every founder's
+ * portrait. Exported for the same reason `RecordForm` is: five surfaces need it, and five
+ * copies would be five places for the keyboard path or the stored-preview swap to be
+ * dropped from one of them.
+ */
+export { ImageUploadField, type ImageUploadFieldProps } from './components/ImageUploadField';
+export { GalleryField, type GalleryFieldProps } from './components/GalleryField';
 export {
   RepeatableListField,
   type RepeatableListFieldProps,

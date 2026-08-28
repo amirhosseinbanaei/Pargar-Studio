@@ -19,12 +19,26 @@ import { LocaleFieldPair } from './LocaleFieldPair';
 import { RepeatableListField } from './RepeatableListField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 
+/**
+ * `imageAlt` is a column on BOTH sides; the PORTRAIT itself is not.
+ *
+ * A founder's photograph is one fact and their description of it is two — so the uploader is
+ * rendered on the English editor only (`imageKey` below) and the path is copied into the
+ * Persian array by index on save. The alt text is a genuine column here because it is heard
+ * in the reader's own language, and it is the one translated field in this codebase that is
+ * deliberately NOT filled in from English when it is left blank: see
+ * `../schemas/image.ts`'s header.
+ */
 const FOUNDER_COLUMNS = [
   { key: 'name', label: 'Name' },
   { key: 'role', label: 'Role' },
   { key: 'born', label: 'Born' },
   { key: 'bio', label: 'Bio', multiline: true },
+  { key: 'imageAlt', label: 'Portrait description' },
 ] as const;
+
+/** Every key the schema requires, so an appended founder is a complete row. */
+const EMPTY_FOUNDER = { name: '', role: '', born: '', bio: '', image: '', imageAlt: '' };
 
 const STAT_COLUMNS = [
   { key: 'label', label: 'Label' },
@@ -87,14 +101,18 @@ export function StudioForm({ studio }: StudioFormProps) {
               name="foundersEn"
               label="Founders · English"
               columns={FOUNDER_COLUMNS}
-              emptyRow={{ name: '', role: '', born: '', bio: '' }}
+              emptyRow={EMPTY_FOUNDER}
               itemLabel="Founder"
+              // The uploader lives on this side only — see FOUNDER_COLUMNS above.
+              imageKey="image"
+              imageLabel="Portrait"
+              description="A founder with no portrait keeps the generated one, drawn from their English name."
             />
             <RepeatableGroupField<StudioFormValues>
               name="foundersFa"
               label="Founders · Persian"
               columns={FOUNDER_COLUMNS}
-              emptyRow={{ name: '', role: '', born: '', bio: '' }}
+              emptyRow={EMPTY_FOUNDER}
               itemLabel="Founder"
               dir="rtl"
               lang="fa"

@@ -63,6 +63,10 @@ const VALID = {
   contextFa: '',
   factsEn: [],
   factsFa: [],
+  // No photograph — the state of every seeded record. `strictObject` requires the keys.
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
 };
 
 const row = (overrides: Partial<MediaRow> = {}): MediaRow =>

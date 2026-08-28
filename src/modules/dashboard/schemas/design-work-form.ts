@@ -16,6 +16,15 @@
 import { z } from 'zod';
 import type { DesignWorkCreate, DesignWorkRow } from '@/common/schemas/design-work';
 import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
+import {
+  galleryField,
+  imagePathField,
+  requireAltWithImage,
+  toGalleryColumns,
+  toGalleryFormItems,
+  toNullableAlt,
+  toNullablePath,
+} from './image';
 
 /**
  * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
@@ -35,33 +44,42 @@ const factFormSchema = z.object({ k: z.string(), v: z.string() });
    The form schema — carries copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const designWorkFormSchema = z.object({
-  slug: z
-    .string()
-    .min(1, 'A slug is required.')
-    .regex(DESIGN_WORK_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
-  category: z.string().min(1, 'Choose a category.'),
-  status: z.string().min(1, 'Choose a status.'),
-  year: yearFieldAsString(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
+export const designWorkFormSchema = z
+  .object({
+    slug: z
+      .string()
+      .min(1, 'A slug is required.')
+      .regex(DESIGN_WORK_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
+    category: z.string().min(1, 'Choose a category.'),
+    status: z.string().min(1, 'Choose a status.'),
+    year: yearFieldAsString(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
-  titleEn: z.string().min(1, 'An English title is required.'),
-  titleFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  clientEn: z.string(),
-  clientFa: z.string(),
-  scopeEn: z.string(),
-  scopeFa: z.string(),
-  materialsEn: z.string(),
-  materialsFa: z.string(),
-  descriptionEn: z.string(),
-  descriptionFa: z.string(),
+    titleEn: z.string().min(1, 'An English title is required.'),
+    titleFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    clientEn: z.string(),
+    clientFa: z.string(),
+    scopeEn: z.string(),
+    scopeFa: z.string(),
+    materialsEn: z.string(),
+    materialsFa: z.string(),
+    descriptionEn: z.string(),
+    descriptionFa: z.string(),
 
-  teamEn: z.array(z.string()),
-  teamFa: z.array(z.string()),
-  factsEn: z.array(factFormSchema),
-  factsFa: z.array(factFormSchema),
-});
+    teamEn: z.array(z.string()),
+    teamFa: z.array(z.string()),
+    factsEn: z.array(factFormSchema),
+    factsFa: z.array(factFormSchema),
+
+    /** THE PHOTOGRAPHS (prompt 10). `''` is "no cover" and stays a valid record: the card and
+     *  the detail page fall back to the drawing seeded from the slug. */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine(requireAltWithImage);
 
 export type DesignWorkFormValues = z.infer<typeof designWorkFormSchema>;
 
@@ -86,6 +104,10 @@ export const DESIGN_WORK_FORM_FIELDS = [
   'teamFa',
   'factsEn',
   'factsFa',
+  'coverImage',
+  'coverAltEn',
+  'coverAltFa',
+  'gallery',
 ] as const satisfies ReadonlyArray<keyof DesignWorkFormValues>;
 
 export const EMPTY_DESIGN_WORK_FORM: DesignWorkFormValues = {
@@ -111,6 +133,10 @@ export const EMPTY_DESIGN_WORK_FORM: DesignWorkFormValues = {
   teamFa: [],
   factsEn: [],
   factsFa: [],
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
+  gallery: [],
 };
 
 export function toDesignWorkFormValues(row: DesignWorkRow): DesignWorkFormValues {
@@ -137,6 +163,12 @@ export function toDesignWorkFormValues(row: DesignWorkRow): DesignWorkFormValues
     teamFa: row.teamFa,
     factsEn: row.factsEn,
     factsFa: row.factsFa,
+    // `?? ''` — the columns are nullable and a controlled input handed `null` mounts
+    // uncontrolled, which is the flip `references/07-forms.md` warns about.
+    coverImage: row.coverImage ?? '',
+    coverAltEn: row.coverAltEn,
+    coverAltFa: row.coverAltFa,
+    gallery: toGalleryFormItems(row.galleryEn, row.galleryFa),
   };
 }
 
@@ -144,30 +176,39 @@ export function toDesignWorkFormValues(row: DesignWorkRow): DesignWorkFormValues
    The submission schema — carries no copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const designWorkSubmissionSchema = z.strictObject({
-  slug: z.string().min(1).regex(DESIGN_WORK_SLUG_PATTERN),
-  category: z.string().min(1),
-  status: z.string().min(1),
-  year: yearFieldAsNumber(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
+export const designWorkSubmissionSchema = z
+  .strictObject({
+    slug: z.string().min(1).regex(DESIGN_WORK_SLUG_PATTERN),
+    category: z.string().min(1),
+    status: z.string().min(1),
+    year: yearFieldAsNumber(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
-  titleEn: z.string().min(1),
-  titleFa: z.string(),
-  blurbEn: z.string(),
-  blurbFa: z.string(),
-  clientEn: z.string(),
-  clientFa: z.string(),
-  scopeEn: z.string(),
-  scopeFa: z.string(),
-  materialsEn: z.string(),
-  materialsFa: z.string(),
-  descriptionEn: z.string(),
-  descriptionFa: z.string(),
+    titleEn: z.string().min(1),
+    titleFa: z.string(),
+    blurbEn: z.string(),
+    blurbFa: z.string(),
+    clientEn: z.string(),
+    clientFa: z.string(),
+    scopeEn: z.string(),
+    scopeFa: z.string(),
+    materialsEn: z.string(),
+    materialsFa: z.string(),
+    descriptionEn: z.string(),
+    descriptionFa: z.string(),
 
-  teamEn: z.array(z.string()),
-  teamFa: z.array(z.string()),
-  factsEn: z.array(factFormSchema),
-  factsFa: z.array(factFormSchema),
-});
+    teamEn: z.array(z.string()),
+    teamFa: z.array(z.string()),
+    factsEn: z.array(factFormSchema),
+    factsFa: z.array(factFormSchema),
+
+    /** THE PHOTOGRAPHS (prompt 10). `''` is "no cover" and stays a valid record: the card and
+     *  the detail page fall back to the drawing seeded from the slug. */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine(requireAltWithImage);
 
 export type DesignWorkSubmission = z.output<typeof designWorkSubmissionSchema>;
 
@@ -195,6 +236,16 @@ export function withPersianFallback(
     teamFa: fallbackList(input.teamFa, input.teamEn),
     factsEn: input.factsEn,
     factsFa: fallbackList(input.factsFa, input.factsEn),
+
+    /**
+     * ALT TEXT IS NOT FALLEN BACK — the one translated field here that is not. `./image`'s
+     * header carries the argument: prose degrades usefully to English, alt text does not,
+     * because it is heard rather than read. Both are required together instead.
+     */
+    coverImage: toNullablePath(input.coverImage),
+    coverAltEn: toNullableAlt(input.coverAltEn),
+    coverAltFa: toNullableAlt(input.coverAltFa),
+    ...toGalleryColumns(input.gallery),
   };
 }
 
