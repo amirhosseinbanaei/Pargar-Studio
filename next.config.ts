@@ -1,5 +1,15 @@
 // Target path in a real project: <repo-root>/next.config.ts
 import type { NextConfig } from 'next';
+import createNextIntlPlugin from 'next-intl/plugin';
+
+/**
+ * Points next-intl at `src/common/i18n/request.ts` — the non-default location, because
+ * this repository keeps shared infrastructure under `common/` rather than in a top-level
+ * `src/i18n/`. The plugin's whole job is aliasing `next-intl/config` to that file; without
+ * it every next-intl server API throws "Invalid i18n request configuration detected",
+ * naming a file the author never wrote.
+ */
+const withNextIntl = createNextIntlPlugin('./src/common/i18n/request.ts');
 
 /**
  * Remote image hosts, derived from configuration rather than hardcoded.
@@ -109,4 +119,4 @@ const nextConfig: NextConfig = {
   //   and any data-driven href is `Route`-typed at its single construction site.
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

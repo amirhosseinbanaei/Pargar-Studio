@@ -38,6 +38,24 @@ export default defineConfig({
     // Parsing CSS costs seconds on every run and nothing asserts on computed styles.
     css: false,
 
+    server: {
+      deps: {
+        /**
+         * next-intl ships ESM that imports `next/server` and `next/navigation` as BARE
+         * specifiers. Externalized — which is what Vitest does with anything under
+         * `node_modules` by default — those go to Node's own resolver, which cannot read
+         * the `exports` map that maps them and fails with "Cannot find module … Did you
+         * mean to import next/server.js?". Inlining routes the package through Vite's
+         * resolver instead, which does read it.
+         *
+         * This is a TEST-ONLY resolution concern: the Next.js bundler resolves both fine.
+         * It surfaces on any file that reaches `next-intl/middleware` or
+         * `next-intl/navigation` — `src/__tests__/proxy.test.ts` and the i18n suites.
+         */
+        inline: ['next-intl'],
+      },
+    },
+
     // Mock call history resets between tests…
     clearMocks: true,
     // …and spies are un-patched, so a `vi.spyOn` in one file cannot leak into another and

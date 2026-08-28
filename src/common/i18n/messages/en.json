@@ -1,0 +1,175 @@
+{
+  "nav": {
+    "projects": "Projects",
+    "design": "Design",
+    "media": "Media",
+    "studio": "Studio",
+    "contact": "Contact"
+  },
+  "cap": {
+    "projects": "Seventy-six built and drawn",
+    "design": "Objects, marks and details",
+    "media": "Published, awarded, shown",
+    "studio": "Who we are and why",
+    "contact": "Dezashib, Tehran"
+  },
+  "ui": {
+    "selectSection": "Select a section",
+    "escToClose": "Esc to close",
+    "home": "Home",
+    "skip": "Skip to navigation",
+    "open": "Open",
+    "view": "View",
+    "back": "Back",
+    "allProjects": "All projects",
+    "allWorks": "All works",
+    "allMedia": "All entries",
+    "clearAll": "Clear all",
+    "loading": "Loading",
+    "retry": "Try again",
+    "language": "Language",
+    "sections": "Sections",
+    "tehran": "Tehran",
+    "est": "Est.",
+    "projectsCount": "Projects",
+    "projects": "Projects",
+    "works": "Works",
+    "entries": "Entries",
+    "langEn": "English",
+    "langFa": "فارسی",
+    "irst": "IRST",
+    "opened": "section opened",
+    "returned": "Returned to index",
+    "worksCount": "Works",
+    "entriesCount": "Entries"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "notFound": "This page does not exist."
+  },
+  "filter": {
+    "type": "Type",
+    "status": "Status",
+    "scale": "Scale",
+    "year": "Year",
+    "category": "Category",
+    "kind": "Kind",
+    "shown": "Shown",
+    "nothing": "Nothing in this category yet.",
+    "noMatch": "No projects match these filters.",
+    "noKind": "Nothing of this kind."
+  },
+  "type": {
+    "Residential": "Residential",
+    "Villa": "Villa",
+    "Office": "Office",
+    "Hospitality": "Hospitality",
+    "Commercial": "Commercial",
+    "Complex": "Complex",
+    "Interior Design": "Interior Design",
+    "Renovation": "Renovation",
+    "Public": "Public",
+    "Urban Design": "Urban Design",
+    "Industrial": "Industrial"
+  },
+  "status": {
+    "Completed": "Completed",
+    "Under Construction": "Under Construction",
+    "Concept": "Concept"
+  },
+  "scale": {
+    "Small": "Small",
+    "Medium": "Medium",
+    "Large": "Large"
+  },
+  "cat": {
+    "Branding": "Branding",
+    "Detail Design": "Detail Design",
+    "Product": "Product",
+    "Furniture": "Furniture",
+    "Signage": "Signage",
+    "Exhibition": "Exhibition"
+  },
+  "kind": {
+    "Publication": "Publication",
+    "Award": "Award",
+    "Exhibition": "Exhibition",
+    "Lecture": "Lecture"
+  },
+  "spec": {
+    "type": "Type",
+    "status": "Status",
+    "scale": "Scale",
+    "year": "Year",
+    "location": "Location",
+    "area": "Area",
+    "client": "Client",
+    "team": "Team",
+    "scope": "Scope",
+    "materials": "Materials",
+    "outlet": "Outlet",
+    "author": "Author",
+    "project": "Project"
+  },
+  "studio": {
+    "practice": "Practice",
+    "founders": "Founders",
+    "numbers": "In numbers",
+    "history": "History",
+    "awards": "Awards",
+    "people": "People",
+    "previously": "Previously",
+    "name": "The name",
+    "approach": "Approach"
+  },
+  "contact": {
+    "address": "Address",
+    "telephone": "Telephone",
+    "email": "Email",
+    "hours": "Hours",
+    "elsewhere": "Elsewhere",
+    "careers": "Working with us",
+    "press": "Press",
+    "findUs": "Find us"
+  },
+  "form": {
+    "write": "Write to us",
+    "intro": "A message here reaches the studio directly. We answer within a few working days.",
+    "name": "Name",
+    "email": "Email",
+    "subject": "Subject",
+    "message": "Message",
+    "send": "Send message",
+    "sent": "Thank you — your message has reached the studio.",
+    "failed": "The message could not be sent. Please try again.",
+    "tooMany": "Several messages have already come from this connection. Please try again later.",
+    "errName": "Please enter your name.",
+    "errEmail": "Please enter a valid email address.",
+    "errSubject": "Please enter a subject.",
+    "errMessage": "Please write at least a few words.",
+    "errLong": "This is longer than the studio inbox accepts."
+  },
+  "media": {
+    "excerpt": "Excerpt",
+    "note": "Note",
+    "related": "Related project"
+  },
+  "design": {
+    "about": "About",
+    "facts": "Facts"
+  },
+  "brand": {
+    "name": "Kavan Studio",
+    "tagline": "Architecture & Design",
+    "meaning": "kavān — the arc a thing travels through"
+  },
+  "kindName": {
+    "elevation": "Elevation",
+    "massing": "Massing",
+    "court": "Courtyard",
+    "section": "Section",
+    "plan": "Plan",
+    "screen": "Screen",
+    "contour": "Site"
+  }
+}

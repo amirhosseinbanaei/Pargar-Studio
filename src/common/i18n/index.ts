@@ -1,16 +1,19 @@
 // src/common/i18n/index.ts
 /**
- * The i18n foundation: two dictionaries, one accessor, one digit shaper.
+ * The i18n foundation: next-intl, two JSON catalogs, one accessor, one digit shaper.
  *
- * Import `@/common/i18n` and nothing deeper. `getDictionary(locale)` is the whole runtime
- * surface — there is no ambient language state to read, set or subscribe to, because the
- * locale is a URL segment and every render receives it as a parameter.
+ * Import `@/common/i18n` and nothing deeper, except for `./routing` (which `src/proxy.ts`
+ * needs without pulling in any React API) and `./navigation` (whose `Link` and
+ * `usePathname` are React APIs). `getIntl(locale)` is the whole copy surface — there is no
+ * ambient language state to read, set or subscribe to, because the locale is a URL segment
+ * and every render receives it as a parameter.
  *
- * This module is SERVER-SAFE AND CLIENT-SAFE: no `server-only`, no DOM. Client leaves that
- * need copy (the Tehran clock, the shell transition's announcements) take the strings they
- * need as props from a Server Component, or call `getDictionary` themselves — the tables
- * are plain objects and cost a few KB, not a fetch.
+ * This module is SERVER-SAFE AND CLIENT-SAFE: no `server-only`, no DOM, no request scope.
+ * `getIntl` builds a next-intl translator over the catalogs from an explicit locale, so
+ * the two client leaves that need copy — `(site)/error.tsx` and `ContactForm` — can call
+ * it directly instead of receiving an object of functions across the boundary, which is
+ * not serializable.
  */
-export { getDictionary, type Dictionary, type TermGroup } from './translator';
+export { getIntl, type Dictionary, type MessageKey, type TermGroup } from './translator';
 export { faDigits, DIGITS_FA } from './digits';
-export { en, fa, MESSAGES, type MessageKey } from './messages';
+export { MESSAGES, type Messages } from './catalog';

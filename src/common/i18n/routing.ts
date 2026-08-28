@@ -1,6 +1,7 @@
 // src/common/i18n/routing.ts
 /**
- * Locale-prefixed URLs.
+ * THE routing definition — one object, consumed by the proxy, by `./navigation` and by
+ * `./request`, so the prefix strategy, the locale list and the default cannot disagree.
  *
  * THE DECISION THIS FILE ENCODES: the locale is a URL SEGMENT (`/en/...`, `/fa/...`), not
  * a cookie and not a client toggle. Three things follow, and they are the reason the
@@ -18,101 +19,59 @@
  *
  * ROUTE SLUGS STAY ENGLISH IN BOTH LOCALES (`/fa/projects`, not `/fa/پروژه‌ها`). Persian
  * slugs would need a second slug column on every table and a second `generateStaticParams`
- * set keyed by it; the URL is an identifier here, not copy.
+ * set keyed by it; the URL is an identifier here, not copy. That is why no `pathnames` map
+ * is configured below — next-intl's localized-pathname feature is exactly the thing this
+ * decision declines.
+ *
+ * THIS FILE MUST NOT IMPORT `next/navigation`. `src/proxy.ts` imports it to build the
+ * locale middleware, and the proxy runs before route resolution where those APIs do not
+ * exist. `createNavigation` therefore lives in `./navigation`, one import away.
  */
+import { defineRouting } from 'next-intl/routing';
+import { hasLocale } from 'next-intl';
 import { localeValues, type Locale } from '@/common/schemas/locale';
 
-/**
- * The bare `/` redirect target when the request expresses no usable preference.
- *
- * English, matching the current site: `legacy/js/core/i18n.js:97` falls back to `'en'`
- * unless the browser asks for Persian. That function ALSO honours `navigator.language`,
- * so `resolveLocale` below preserves the intent by reading `Accept-Language` — the server
- * equivalent, and the only one available before a document exists.
- */
-export const DEFAULT_LOCALE: Locale = 'en';
+export const routing = defineRouting({
+  locales: localeValues,
 
-/** Type guard for the `[locale]` segment, which arrives as an arbitrary string. */
-export function isLocale(value: string): value is Locale {
-  return (localeValues as readonly string[]).includes(value);
-}
+  /**
+   * English is the fallback, matching `legacy/js/core/i18n.js:97`, which fell back to
+   * `'en'` unless the browser asked for Persian.
+   */
+  defaultLocale: 'en',
 
-/**
- * Build a locale-prefixed path. `localeHref('fa', '/projects')` -> `/fa/projects`, and
- * `localeHref('en', '/')` -> `/en`.
- *
- * Every internal href in the app goes through this. A hand-written `/en/projects` is a
- * link that silently keeps an English page one click away from a Persian reader the first
- * time it is copied into a Persian-rendered component.
- */
-export function localeHref(locale: Locale, path = '/'): string {
-  const rest = path === '/' ? '' : path.startsWith('/') ? path : `/${path}`;
-  return `/${locale}${rest}`;
-}
+  /**
+   * BOTH LOCALES ARE ALWAYS PREFIXED, including the default. Dropping the prefix for
+   * English would change every canonical URL, every entry in `app/sitemap.ts` and both
+   * `generateStaticParams` sets at once — `/en/projects/x` is the URL 152 prerendered
+   * pages, the sitemap and the hreflang set are all written against.
+   */
+  localePrefix: 'always',
 
-/**
- * Swap the locale on a path that already carries one, preserving everything after it.
- * This is what the language switch links to: the same route, the other language.
- */
-export function switchLocale(pathname: string, next: Locale): string {
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length > 0 && isLocale(segments[0])) segments[0] = next;
-  else segments.unshift(next);
-  return `/${segments.join('/')}`;
-}
+  /**
+   * NO LOCALE COOKIE. next-intl writes `NEXT_LOCALE` and prefers it over `Accept-Language`
+   * by default; that is a stored preference, and this app deliberately has none. The
+   * legacy `kavan.lang` key in `localStorage` was dropped in prompt 4 for a reason that
+   * applies identically to a cookie: the language is in the URL, which is a better memory
+   * because it travels with a shared link, while a cookie is per-browser and invisible to
+   * whoever the link is sent to. It would also make the bare-`/` redirect depend on
+   * something the reader cannot see or change.
+   */
+  localeCookie: false,
+});
 
 /**
- * Pick a locale from an `Accept-Language` header.
- *
- * Ported intent, not ported code: `legacy/js/core/i18n.js:97` tested
- * `/^fa|^pe/.test(navigator.language)`. The same two prefixes are tested here — `pe` is
- * the obsolete-but-still-emitted tag for Persian — against each language range in
- * quality order.
- *
- * `null` rather than `DEFAULT_LOCALE` on no match, so a caller can tell "asked for
- * something we do not have" apart from "asked for English".
+ * The bare `/` redirect target when the request expresses no usable preference. Sourced
+ * from `routing` rather than declared beside it, so there is one default locale in the
+ * repository and not two.
  */
-export function resolveLocale(acceptLanguage: string | null): Locale | null {
-  if (!acceptLanguage) return null;
-
-  const ranges = acceptLanguage
-    .split(',')
-    .map(part => {
-      const [tag, ...params] = part.trim().split(';');
-      const q = params.find(p => p.trim().startsWith('q='));
-      // A range with no `q` is q=1. A malformed one sorts last rather than throwing.
-      const weight = q ? Number.parseFloat(q.trim().slice(2)) : 1;
-      return { tag: tag.trim().toLowerCase(), weight: Number.isFinite(weight) ? weight : 0 };
-    })
-    .filter(range => range.tag.length > 0 && range.weight > 0)
-    .sort((a, b) => b.weight - a.weight);
-
-  for (const { tag } of ranges) {
-    if (/^fa\b|^fa-|^pe\b|^pe-/.test(tag)) return 'fa';
-    if (/^en\b|^en-/.test(tag)) return 'en';
-  }
-  return null;
-}
+export const DEFAULT_LOCALE: Locale = routing.defaultLocale;
 
 /**
- * The `alternates` block every public route's metadata carries: this page's canonical URL,
- * plus one `hreflang` entry per locale pointing at its counterpart.
- *
- * WHY IT IS A HELPER AND NOT TWO LINES PER ROUTE. The two halves have to agree — the
- * canonical for `/fa/design/x` must be the Persian URL while `languages.en` points at the
- * English one — and hand-writing them per route is how a page ends up declaring the other
- * language's URL as its own canonical, which asks a search engine to drop one of the two
- * documents this whole locale scheme exists to publish separately.
- *
- * `path` is locale-less (`/design/kavan-identity`), the same shape `localeHref` takes,
- * because route slugs are English in both locales.
+ * Type guard for the `[locale]` segment, which arrives as an arbitrary string. A thin
+ * wrapper over next-intl's `hasLocale` so the check reads against `routing.locales` — the
+ * same list the middleware negotiates against.
  */
-export function localeAlternates(
-  locale: Locale,
-  path = '/',
-): { canonical: string; languages: Record<string, string> } {
-  return {
-    canonical: localeHref(locale, path),
-    languages: Object.fromEntries(localeValues.map(other => [other, localeHref(other, path)])),
-  };
+export function isLocale(value: unknown): value is Locale {
+  return hasLocale(routing.locales, value);
 }
