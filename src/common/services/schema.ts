@@ -22,6 +22,13 @@
  * status per record — as `legacy/data/works.fa.js` redundantly does for design works —
  * would give 76 places for one word to drift.
  *
+ * STILL TRUE AFTER PROMPT 9, with one addition. A content row's taxonomy column is still a
+ * single canonical English string and is still never per-locale. What prompt 9 added is
+ * `taxonomy_terms` at the foot of this file: ONE row per option, carrying the per-locale
+ * LABEL for that option. So the translation moved from the message catalog to a table an
+ * editor can change — it did not move onto the 76 content rows, and the count of places one
+ * word can drift is still one.
+ *
  * ─── JSON COLUMNS ─────────────────────────────────────────────────────────────────
  * Stored as TEXT holding a JSON string, never `mode: 'json'`. drizzle's json mode
  * `JSON.parse`s and hands back `unknown`-shaped data that the caller must cast; a cast is
@@ -294,3 +301,83 @@ export const contactMessages = sqliteTable('contact_messages', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(NOW),
   readAt: integer('read_at', { mode: 'timestamp' }),
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   taxonomy_terms — every closed axis, for every subject, in ONE table (prompt 9)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The editable replacement for the frozen arrays in `@/common/schemas/enums.ts`.
+ *
+ * Until prompt 9 every taxonomy was an `as const` array in code and the write schemas
+ * enforced it with `z.enum`, so adding a category, retiring one, reordering the options or
+ * changing a Persian label were all code edits and a deploy — from a dashboard that exists
+ * so the studio would not need one. A term is a row now, and the arrays survive only as
+ * this table's seed source (that file's header says so).
+ *
+ * ─── ONE TABLE, NOT ONE PER SUBJECT ───────────────────────────────────────────────
+ * `subject` + `axis` discriminate: project type/status/scale, design category/status, media
+ * type. The axes differ but the SHAPE does not — a value, two labels, a position, a flag —
+ * so three tables would be three migrations, three repositories and three editors for one
+ * change, and the editor component would still have to branch on which one it was reading.
+ *
+ * ─── THE UNIQUE INDEX IS LOAD-BEARING ─────────────────────────────────────────────
+ * (`subject`, `axis`, `value`) is the identity of a term: it is the triple a content row's
+ * stored string resolves against. Without the index two rows can claim one value, and then
+ * the option list renders it twice, the usage count is attributed to whichever was read
+ * first, and deleting one leaves the other — with no error anywhere. A UNIQUE constraint
+ * turns all of that into one loud failure at the moment of the second insert.
+ *
+ * ─── THERE IS DELIBERATELY NO FOREIGN KEY ─────────────────────────────────────────
+ * A content row stores the canonical English STRING, not a term id, for exactly the reason
+ * `media.project_slug` above gives: a term may be hidden, or may be deleted from a database
+ * shell, or may never have existed for a value some older row carries — and a row holding
+ * an unrecognized value must DEGRADE (render its raw value, still be filterable) rather
+ * than disappear or fail a foreign-key check. `enums.ts` has argued that since prompt 2 and
+ * the read schemas type these columns as a plain string to make it true.
+ *
+ * ─── `labelEn` / `labelFa` ARE CONTENT, NOT INTERFACE COPY ────────────────────────
+ * This is the one place the "taxonomy values are NOT translated here" note above is
+ * qualified. The stored VALUE is still one canonical English string per row and is still
+ * not per-locale; what is per-locale is the label an editor may now change, which is why it
+ * is a column pair like every other translated field rather than a key in the message
+ * catalog. The catalog stays as the fallback for a value with no term.
+ */
+export const taxonomyTerms = sqliteTable(
+  'taxonomy_terms',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** `project` | `design` | `media` — which content table's rows carry this value. */
+    subject: text('subject').notNull(),
+    /** `type` | `status` | `scale` | `category` — which column of that table. */
+    axis: text('axis').notNull(),
+    /**
+     * The canonical English string a content row actually stores — `'Interior Design'`,
+     * `'Under Construction'`. IMMUTABLE after creation (AGENTS.md): renaming it would have
+     * to rewrite every content row holding the old string inside the same transaction, and
+     * a partial rename is data corruption behind a green toast. The labels carry any change.
+     */
+    value: text('value').notNull(),
+    labelEn: text('label_en').notNull(),
+    labelFa: text('label_fa').notNull(),
+    /**
+     * The order options appear in, within one (`subject`, `axis`) group. Seeded from the
+     * position in the `enums.ts` array, which is deliberate and not alphabetical, and
+     * renumbered from the index by `moveTaxonomyTerm` for the same reason `moveProject`
+     * does it: a swap is a silent no-op the moment two rows share a value.
+     */
+    sortOrder: integer('sort_order').notNull().default(0),
+    /**
+     * Shown on the public filter rails. `false` retires an option WITHOUT touching the rows
+     * that use it — they stay reachable and rendered, which is what makes this the
+     * non-destructive answer to "can I get rid of this?" and the thing an in-use delete
+     * points at.
+     */
+    visible: integer('visible', { mode: 'boolean' }).notNull().default(true),
+
+    ...timestamps,
+  },
+  table => [
+    uniqueIndex('taxonomy_terms_identity_unique').on(table.subject, table.axis, table.value),
+  ],
+);
