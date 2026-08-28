@@ -19,6 +19,7 @@ const moveDesignWork = vi.fn();
 const getDesignWorkRowById = vi.fn();
 
 const readSession = vi.fn();
+const unknownTermErrors = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
@@ -35,6 +36,15 @@ vi.mock('@/common/services/design-work-service', () => ({
 
 vi.mock('@/common/services/session', () => ({
   readSession: () => readSession(),
+}));
+
+/**
+ * The taxonomy service is mocked like every other service here: this file tests the ACTION's
+ * own logic, and reaching the real one would open a database connection. `unknownTermErrors`
+ * resolving to `{}` is "every value is a term" — the case the write path takes.
+ */
+vi.mock('@/common/services/taxonomy-service', () => ({
+  unknownTermErrors: (...args: unknown[]) => unknownTermErrors(...args),
 }));
 
 const {
@@ -101,6 +111,8 @@ const signedIn = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Every value is a declared term unless a test says otherwise.
+  unknownTermErrors.mockResolvedValue({});
   signedIn();
   createDesignWork.mockResolvedValue(row());
   updateDesignWork.mockResolvedValue(row());
@@ -147,10 +159,25 @@ describe('validation', () => {
     expect(createDesignWork).not.toHaveBeenCalled();
   });
 
-  it('rejects a category outside the taxonomy', async () => {
-    const result = await createDesignWorkAction({ ...VALID, category: 'Cinematography' });
-    expect(result.ok).toBe(false);
+  it('rejects a category with no term, 422, naming the field, and writes nothing', async () => {
+    // A table lookup since prompt 9, not a `z.enum` — see `media-actions.test.ts`.
+    unknownTermErrors.mockResolvedValue({ category: ['“Ceramics” is not a category term.'] });
+
+    const result = await createDesignWorkAction({ ...VALID, category: 'Ceramics' });
+
+    if (result.ok) throw new Error('unreachable');
+    expect(result.status).toBe(422);
+    expect(result.body).toHaveProperty('category');
     expect(createDesignWork).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it('asks about both of this subject’s axes', async () => {
+    await createDesignWorkAction(VALID);
+    expect(unknownTermErrors).toHaveBeenCalledWith('design', [
+      { field: 'category', axis: 'category', values: ['Branding'] },
+      { field: 'status', axis: 'status', values: ['Completed'] },
+    ]);
   });
 });
 

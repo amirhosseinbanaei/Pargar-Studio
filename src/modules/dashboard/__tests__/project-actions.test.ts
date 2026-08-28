@@ -31,6 +31,7 @@ const moveProject = vi.fn();
 const getProjectRowById = vi.fn();
 
 const readSession = vi.fn();
+const unknownTermErrors = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
@@ -47,6 +48,15 @@ vi.mock('@/common/services/project-service', () => ({
 
 vi.mock('@/common/services/session', () => ({
   readSession: () => readSession(),
+}));
+
+/**
+ * The taxonomy service is mocked like every other service here: this file tests the ACTION's
+ * own logic, and reaching the real one would open a database connection. `unknownTermErrors`
+ * resolving to `{}` is "every value is a term" — the case the write path takes.
+ */
+vi.mock('@/common/services/taxonomy-service', () => ({
+  unknownTermErrors: (...args: unknown[]) => unknownTermErrors(...args),
 }));
 
 const { createProjectAction, deleteProjectAction, moveProjectAction, updateProjectAction } =
@@ -105,6 +115,8 @@ const everyWrite = () => [createProject, updateProject, deleteProject, moveProje
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Every value is a declared term unless a test says otherwise.
+  unknownTermErrors.mockResolvedValue({});
   signedIn();
   createProject.mockResolvedValue(row());
   updateProject.mockResolvedValue(row());
@@ -201,11 +213,52 @@ describe('validation', () => {
     expect(createProject).not.toHaveBeenCalled();
   });
 
-  it('rejects a type outside the taxonomy', async () => {
+  it('rejects a type with no term, 422, naming the field, and writes nothing', async () => {
+    /**
+     * THE CHECK THAT REPLACED `z.enum`. Until prompt 9 the submission schema carried
+     * `z.enum(projectTypeValues)` and this test drove that; the taxonomy is editable rows
+     * now, so the check is a table lookup in the service and this drives the lookup.
+     *
+     * The two things worth asserting are unchanged, and both are the reason the check had to
+     * survive the move at all: the answer is a 422 NAMING THE FIELD, so `RecordForm` binds it
+     * to the input that caused it, and NOTHING IS WRITTEN — a rejection returned after the
+     * row landed is still a bad write, and it looks identical from the outside.
+     */
+    unknownTermErrors.mockResolvedValue({ types: ['“Submarine” is not a type term.'] });
+
     const result = await createProjectAction({ ...VALID, types: ['Submarine'] });
 
-    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.status).toBe(422);
+    expect(result.body).toHaveProperty('types');
     expect(createProject).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it('asks about all three project axes, by their column names', async () => {
+    // A wrong axis here is invisible: the lookup would still answer, just about the wrong
+    // set, so a scale would be accepted as a status. The field names are the FORM's, because
+    // they are what a 422 has to name for the binding to land on the right input.
+    await createProjectAction(VALID);
+
+    expect(unknownTermErrors).toHaveBeenCalledWith('project', [
+      { field: 'types', axis: 'type', values: ['Residential'] },
+      { field: 'status', axis: 'status', values: ['Completed'] },
+      { field: 'scale', axis: 'scale', values: ['Medium'] },
+    ]);
+  });
+
+  it('runs the taxonomy check on UPDATE too, not only on create', async () => {
+    // The update path is the one an editor uses on an existing record, so it is the path a
+    // retired term is most likely to reach — and the one where forgetting the check would go
+    // unnoticed longest.
+    unknownTermErrors.mockResolvedValue({ status: ['“Mothballed” is not a status term.'] });
+
+    const result = await updateProjectAction(7, { ...VALID, status: 'Mothballed' });
+
+    if (result.ok) throw new Error('unreachable');
+    expect(result.status).toBe(422);
+    expect(updateProject).not.toHaveBeenCalled();
   });
 
   it('refuses an out-of-range year rather than storing it', async () => {

@@ -22,7 +22,7 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
-import { projectScaleEnum, projectStatusEnum, projectTypeEnum, projectTypeValues } from './enums';
+import { projectTypeValues } from './enums';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    READ
@@ -135,9 +135,16 @@ export const projectCreateSchema = z.strictObject({
     .string()
     .min(1)
     .regex(PROJECT_SLUG_PATTERN, 'lowercase words separated by single hyphens'),
-  types: z.array(projectTypeEnum).min(1),
-  status: projectStatusEnum,
-  scale: projectScaleEnum,
+  /**
+   * A TAXONOMY COLUMN, and no longer a `z.enum` — see `@/common/schemas/enums`'s header.
+   * The closed set moved into `taxonomy_terms` in prompt 9, so a value added five minutes
+   * ago must be accepted here; what rejects an arbitrary string is the runtime check
+   * `unknownTermErrors` in `services/taxonomy-service.ts`, which the write ACTION runs
+   * before it calls a service and reports as a 422 naming this field.
+   */
+  types: z.array(z.string().min(1)).min(1),
+  status: z.string().min(1),
+  scale: z.string().min(1),
   year: z.number().int().min(PROJECT_YEAR_MIN).max(PROJECT_YEAR_MAX),
   area: z.string(),
   sortOrder: z.number().int().default(0),
@@ -176,5 +183,11 @@ export const projectUpdateSchema = projectCreateSchema.partial();
 
 export type ProjectUpdate = z.infer<typeof projectUpdateSchema>;
 
-/** Re-exported so a dashboard option list has one import, not two. */
+/**
+ * Re-exported so a dashboard option list has one import, not two.
+ *
+ * NOT an option list any more — the options come from `taxonomy_terms`. This array is the
+ * seed source and a historical record of the eleven types the archive was built with; see
+ * `@/common/schemas/enums`.
+ */
 export { projectTypeValues };

@@ -15,6 +15,7 @@ import {
   updateMediaEntry,
 } from '@/common/services/media-service';
 import { readSession } from '@/common/services/session';
+import { checkTaxonomy } from '../lib/taxonomy-guard';
 import { mediaSubmissionSchema, withPersianFallback } from '../schemas/media-form';
 
 async function requireSession(): Promise<{ ok: false; status: number } | null> {
@@ -37,6 +38,17 @@ export async function createMediaAction(input: unknown): Promise<ActionResult<{ 
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
+  /*
+   * THE TAXONOMY CHECK, after the parse and before the write. `type` was `z.enum(...)` until
+   * prompt 9 and is a plain string now, because the closed set became editable rows — see
+   * `@/common/schemas/enums`'s header and `project-actions.ts`'s clause 2b. It answers in the
+   * same 422 envelope naming the same field, so nothing downstream changed.
+   */
+  const invalid = await checkTaxonomy('media', [
+    { field: 'type', axis: 'type', values: [parsed.data.type] },
+  ]);
+  if (invalid) return invalid;
+
   const result = await toActionResult(() => createMediaEntry(withPersianFallback(parsed.data)));
   if (result.ok) purgeMedia(result.data.slug);
 
@@ -54,6 +66,17 @@ export async function updateMediaAction(
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
+
+  /*
+   * THE TAXONOMY CHECK, after the parse and before the write. `type` was `z.enum(...)` until
+   * prompt 9 and is a plain string now, because the closed set became editable rows — see
+   * `@/common/schemas/enums`'s header and `project-actions.ts`'s clause 2b. It answers in the
+   * same 422 envelope naming the same field, so nothing downstream changed.
+   */
+  const invalid = await checkTaxonomy('media', [
+    { field: 'type', axis: 'type', values: [parsed.data.type] },
+  ]);
+  if (invalid) return invalid;
 
   const result = await toActionResult(async () => {
     const before = await getMediaRowById(id);

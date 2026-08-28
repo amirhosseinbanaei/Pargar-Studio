@@ -14,14 +14,16 @@
  * before the record can be saved at all.
  */
 import { z } from 'zod';
-import {
-  designCategoryEnum,
-  designCategoryValues,
-  designStatusEnum,
-  designStatusValues,
-} from '@/common/schemas/enums';
 import type { DesignWorkCreate, DesignWorkRow } from '@/common/schemas/design-work';
 import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
+
+/**
+ * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
+ * Non-empty strings on both schemas below; the closed set is enforced at runtime against
+ * `taxonomy_terms` by `unknownTermErrors()` in `services/taxonomy-service.ts`, which the
+ * write actions run before they call a service. See `@/common/schemas/enums`'s header.
+ * Everything else is exactly as strict as it was, `strictObject` included.
+ */
 
 export const DESIGN_WORK_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const DESIGN_WORK_YEAR_MIN = 1900;
@@ -38,8 +40,8 @@ export const designWorkFormSchema = z.object({
     .string()
     .min(1, 'A slug is required.')
     .regex(DESIGN_WORK_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
-  category: designCategoryEnum,
-  status: designStatusEnum,
+  category: z.string().min(1, 'Choose a category.'),
+  status: z.string().min(1, 'Choose a status.'),
   year: yearFieldAsString(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
   titleEn: z.string().min(1, 'An English title is required.'),
@@ -88,8 +90,10 @@ export const DESIGN_WORK_FORM_FIELDS = [
 
 export const EMPTY_DESIGN_WORK_FORM: DesignWorkFormValues = {
   slug: '',
-  category: designCategoryValues[0],
-  status: designStatusValues[0],
+  // Empty, not a hardcoded first value — the options are rows now. `DesignWorkForm` fills
+  // these from the first available term, and `.min(1)` makes a blank one a validation error.
+  category: '',
+  status: '',
   year: String(new Date().getFullYear()),
   titleEn: '',
   titleFa: '',
@@ -112,8 +116,10 @@ export const EMPTY_DESIGN_WORK_FORM: DesignWorkFormValues = {
 export function toDesignWorkFormValues(row: DesignWorkRow): DesignWorkFormValues {
   return {
     slug: row.slug,
-    category: designCategoryEnum.safeParse(row.category).data ?? designCategoryValues[0],
-    status: designStatusEnum.safeParse(row.status).data ?? designStatusValues[0],
+    // Carried through untouched. Substituting a default for a value whose term was retired
+    // would silently rewrite a field the editor never opened — see `toProjectFormValues`.
+    category: row.category,
+    status: row.status,
     year: String(row.year),
     titleEn: row.titleEn,
     titleFa: row.titleFa,
@@ -140,8 +146,8 @@ export function toDesignWorkFormValues(row: DesignWorkRow): DesignWorkFormValues
 
 export const designWorkSubmissionSchema = z.strictObject({
   slug: z.string().min(1).regex(DESIGN_WORK_SLUG_PATTERN),
-  category: designCategoryEnum,
-  status: designStatusEnum,
+  category: z.string().min(1),
+  status: z.string().min(1),
   year: yearFieldAsNumber(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
   titleEn: z.string().min(1),

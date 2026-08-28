@@ -18,6 +18,11 @@
  *     keystroke ago with a localized schema, and that proves nothing here. `strictObject`
  *     means an unexpected key is refused rather than tolerated, which is what stops a
  *     crafted POST from smuggling `sortOrder` or `id` into a mass assignment.
+ *  2b. **CHECK THE TAXONOMY AGAINST THE TABLE.** `types`, `status` and `scale` were
+ *     `z.enum(...)` until prompt 9 and are plain strings now, because the closed set became
+ *     editable rows — a compile-time enum would reject a type the studio added five minutes
+ *     ago. `checkTaxonomy` is that check, and it answers in the same 422 envelope naming the
+ *     same field, so nothing downstream changed. See `@/common/schemas/enums`'s header.
  *  3. **CALL A SERVICE through `toActionResult`.** Never a repository, never a query. And
  *     never a hand-rolled try/catch: `toActionResult` is the one place a server-side throw
  *     becomes a result, so twelve actions cannot end up with twelve guesses at the shape.
@@ -59,6 +64,7 @@ import {
   updateProject,
 } from '@/common/services/project-service';
 import { readSession } from '@/common/services/session';
+import { checkTaxonomy } from '../lib/taxonomy-guard';
 import { projectSubmissionSchema, withPersianFallback } from '../schemas/project-form';
 
 /* ────────────────────────────────────────────────────────────────────────────────
@@ -129,6 +135,17 @@ export async function createProjectAction(input: unknown): Promise<ActionResult<
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
+  /*
+   * THE TAXONOMY CHECK — clause 2b in the header. Not a schema rule any more, because the
+   * closed set is editable rows; same 422 envelope, same field names.
+   */
+  const invalid = await checkTaxonomy('project', [
+    { field: 'types', axis: 'type', values: parsed.data.types },
+    { field: 'status', axis: 'status', values: [parsed.data.status] },
+    { field: 'scale', axis: 'scale', values: [parsed.data.scale] },
+  ]);
+  if (invalid) return invalid;
+
   const result = await toActionResult(() => createProject(withPersianFallback(parsed.data)));
   // Inside `if (result.ok)`: purging on a failed write throws away a valid cache and makes
   // every reader pay for a refetch that changes nothing.
@@ -159,6 +176,17 @@ export async function updateProjectAction(
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
+
+  /*
+   * THE TAXONOMY CHECK — clause 2b in the header. Not a schema rule any more, because the
+   * closed set is editable rows; same 422 envelope, same field names.
+   */
+  const invalid = await checkTaxonomy('project', [
+    { field: 'types', axis: 'type', values: parsed.data.types },
+    { field: 'status', axis: 'status', values: [parsed.data.status] },
+    { field: 'scale', axis: 'scale', values: [parsed.data.scale] },
+  ]);
+  if (invalid) return invalid;
 
   /**
    * READ BEFORE WRITE, and the only reason is the cache tag.

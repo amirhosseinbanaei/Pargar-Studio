@@ -15,6 +15,7 @@ const deleteMediaEntry = vi.fn();
 const moveMediaEntry = vi.fn();
 const getMediaRowById = vi.fn();
 const readSession = vi.fn();
+const unknownTermErrors = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
@@ -30,6 +31,15 @@ vi.mock('@/common/services/media-service', () => ({
 }));
 
 vi.mock('@/common/services/session', () => ({ readSession: () => readSession() }));
+
+/**
+ * The taxonomy service is mocked like every other service here: this file tests the ACTION's
+ * own logic, and reaching the real one would open a database connection. `unknownTermErrors`
+ * resolving to `{}` is "every value is a term" — the case the write path takes.
+ */
+vi.mock('@/common/services/taxonomy-service', () => ({
+  unknownTermErrors: (...args: unknown[]) => unknownTermErrors(...args),
+}));
 
 const { createMediaAction, deleteMediaAction, moveMediaAction, updateMediaAction } =
   await import('../actions/media-actions');
@@ -84,6 +94,8 @@ const row = (overrides: Partial<MediaRow> = {}): MediaRow =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Every value is a declared term unless a test says otherwise.
+  unknownTermErrors.mockResolvedValue({});
   readSession.mockResolvedValue({ status: 'valid', session: { sub: 'admin', iat: 0, exp: 0 } });
   createMediaEntry.mockResolvedValue(row());
   updateMediaEntry.mockResolvedValue(row());
@@ -124,10 +136,29 @@ describe('the related-project field', () => {
 });
 
 describe('validation', () => {
-  it('rejects a type outside the taxonomy', async () => {
+  it('rejects a type with no term, 422, naming the field, and writes nothing', async () => {
+    // The taxonomy stopped being a `z.enum` in prompt 9 — it is a table lookup in the
+    // service now, so this drives that lookup rather than a schema. What is asserted is the
+    // envelope the form binds against and, as with every other rejection here, that the
+    // write never happened: a 422 returned after the row was written is still a bad write.
+    unknownTermErrors.mockResolvedValue({ type: ['“Podcast” is not a type term.'] });
+
     const result = await createMediaAction({ ...VALID, type: 'Podcast' });
-    expect(result.ok).toBe(false);
+
+    if (result.ok) throw new Error('unreachable');
+    expect(result.status).toBe(422);
+    expect(result.body).toHaveProperty('type');
     expect(createMediaEntry).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it('asks about the axis the column actually is', async () => {
+    // `media.type` is the `type` axis of the `media` subject. Asking about the wrong subject
+    // would silently accept a project status on a media entry.
+    await createMediaAction(VALID);
+    expect(unknownTermErrors).toHaveBeenCalledWith('media', [
+      { field: 'type', axis: 'type', values: ['Publication'] },
+    ]);
   });
 
   it('rejects an unknown key', async () => {

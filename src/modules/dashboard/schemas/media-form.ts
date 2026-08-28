@@ -18,9 +18,16 @@
  * `MediaCreate.projectSlug` is `string | null`, matching the nullable column.
  */
 import { z } from 'zod';
-import { mediaTypeEnum, mediaTypeValues } from '@/common/schemas/enums';
 import type { MediaCreate, MediaRow } from '@/common/schemas/media';
 import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
+
+/**
+ * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
+ * Non-empty strings on both schemas below; the closed set is enforced at runtime against
+ * `taxonomy_terms` by `unknownTermErrors()` in `services/taxonomy-service.ts`, which the
+ * write actions run before they call a service. See `@/common/schemas/enums`'s header.
+ * Everything else is exactly as strict as it was, `strictObject` included.
+ */
 
 export const MEDIA_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const MEDIA_YEAR_MIN = 1900;
@@ -40,7 +47,7 @@ export const mediaFormSchema = z.object({
     .string()
     .min(1, 'A slug is required.')
     .regex(MEDIA_SLUG_PATTERN, 'Lowercase words separated by single hyphens.'),
-  type: mediaTypeEnum,
+  type: z.string().min(1, 'Choose a kind.'),
   year: yearFieldAsString(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
   /** `''` = no related project, matching `NO_RELATED_PROJECT`. */
   projectSlug: z.string(),
@@ -87,7 +94,8 @@ export const MEDIA_FORM_FIELDS = [
 
 export const EMPTY_MEDIA_FORM: MediaFormValues = {
   slug: '',
-  type: mediaTypeValues[0],
+  // Empty, not a hardcoded first value — see `EMPTY_DESIGN_WORK_FORM`.
+  type: '',
   year: String(new Date().getFullYear()),
   projectSlug: NO_RELATED_PROJECT,
   titleEn: '',
@@ -109,7 +117,8 @@ export const EMPTY_MEDIA_FORM: MediaFormValues = {
 export function toMediaFormValues(row: MediaRow): MediaFormValues {
   return {
     slug: row.slug,
-    type: mediaTypeEnum.safeParse(row.type).data ?? mediaTypeValues[0],
+    // Carried through untouched — see `toProjectFormValues`.
+    type: row.type,
     year: String(row.year),
     projectSlug: row.projectSlug ?? NO_RELATED_PROJECT,
     titleEn: row.titleEn,
@@ -135,7 +144,7 @@ export function toMediaFormValues(row: MediaRow): MediaFormValues {
 
 export const mediaSubmissionSchema = z.strictObject({
   slug: z.string().min(1).regex(MEDIA_SLUG_PATTERN),
-  type: mediaTypeEnum,
+  type: z.string().min(1),
   year: yearFieldAsNumber(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
   projectSlug: z.string().transform(value => (value === NO_RELATED_PROJECT ? null : value)),
 

@@ -36,10 +36,18 @@ import {
   withPersianFallback,
 } from '../schemas/project-form';
 
+/**
+ * `status` and `scale` are spelled out here rather than inherited from `EMPTY_PROJECT_FORM`,
+ * which leaves them blank since prompt 9: the options are `taxonomy_terms` rows now and there
+ * is no hardcoded first value to seed them from — the create form fills them from the first
+ * available term. Both schemas require a non-empty string, so a valid payload has to name one.
+ */
 const VALID = {
   ...EMPTY_PROJECT_FORM,
   slug: 'qeytarieh-08-residence',
   types: ['Residential'] as const,
+  status: 'Completed',
+  scale: 'Medium',
   titleEn: 'Qeytarieh 08 Residence',
   year: '2021',
 };
@@ -62,9 +70,17 @@ describe('the two schemas agree', () => {
     ['an empty PERSIAN title', { ...VALID, titleFa: '' }],
     ['every Persian field empty', { ...VALID, titleFa: '', blurbFa: '', descriptionFa: '' }],
     ['no types at all', { ...VALID, types: [] }],
+    // Prompt 9: these three are ACCEPTED by both schemas now, and the agreement is still the
+    // thing being asserted. The taxonomy stopped being a `z.enum` when it became editable
+    // rows — see `unknownTermErrors` below, which is where an unknown value is actually
+    // refused. What the schemas still judge identically is that all three are non-empty
+    // strings; what they must never do is disagree about it.
     ['a type outside the taxonomy', { ...VALID, types: ['Submarine'] }],
     ['a status outside the taxonomy', { ...VALID, status: 'Demolished' }],
     ['a scale outside the taxonomy', { ...VALID, scale: 'Enormous' }],
+    ['an empty status', { ...VALID, status: '' }],
+    ['an empty scale', { ...VALID, scale: '' }],
+    ['a type that is an empty string', { ...VALID, types: [''] }],
     [`the year ${PROJECT_YEAR_MIN}`, { ...VALID, year: String(PROJECT_YEAR_MIN) }],
     [`the year ${PROJECT_YEAR_MIN - 1}`, { ...VALID, year: String(PROJECT_YEAR_MIN - 1) }],
     [`the year ${PROJECT_YEAR_MAX}`, { ...VALID, year: String(PROJECT_YEAR_MAX) }],
@@ -82,13 +98,25 @@ describe('the two schemas agree', () => {
     });
   }
 
-  it('accepts every type in the canonical taxonomy, on both sides', () => {
-    // A value the enum lists but a schema rejects would make a whole category of project
-    // uncreatable, and the only symptom would be a 422 on a checkbox the form offered.
+  it('accepts every type the archive was seeded with, on both sides', () => {
+    // A value the seed writes as a term but a schema rejects would make a whole category of
+    // project uncreatable, and the only symptom would be a 422 on a checkbox the form
+    // offered. `projectTypeValues` is no longer the enforcement point — it is what
+    // `scripts/seed-taxonomy.ts` writes into `taxonomy_terms` — so this asserts the schemas
+    // stay out of the way of every term the studio starts with.
     for (const type of projectTypeValues) {
       const { form, submission } = verdicts({ ...VALID, types: [type] });
       expect({ type, form, submission }).toEqual({ type, form: true, submission: true });
     }
+  });
+
+  it('neither schema enforces the taxonomy any more, and that is deliberate', () => {
+    // Pinning the MOVE, not just its consequence. Re-adding a `z.enum` here would make a term
+    // the studio added five minutes ago un-saveable, and this test is what would fail —
+    // rather than a 422 nobody can explain, on a value the form itself offered.
+    const invented = { ...VALID, status: 'Mothballed', scale: 'Enormous', types: ['Submarine'] };
+    expect(projectFormSchema.safeParse(invented).success).toBe(true);
+    expect(projectSubmissionSchema.safeParse(invented).success).toBe(true);
   });
 });
 

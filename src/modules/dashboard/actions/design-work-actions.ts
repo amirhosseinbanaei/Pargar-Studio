@@ -18,6 +18,7 @@ import {
   updateDesignWork,
 } from '@/common/services/design-work-service';
 import { readSession } from '@/common/services/session';
+import { checkTaxonomy } from '../lib/taxonomy-guard';
 import { designWorkSubmissionSchema, withPersianFallback } from '../schemas/design-work-form';
 
 async function requireSession(): Promise<{ ok: false; status: number } | null> {
@@ -42,6 +43,19 @@ export async function createDesignWorkAction(
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
+  /*
+   * THE TAXONOMY CHECK, after the parse and before the write. `category` and `status` were
+   * `z.enum(...)` until prompt 9 and are plain strings now, because the closed set became
+   * editable rows — see `@/common/schemas/enums`'s header and `project-actions.ts`'s clause
+   * 2b. It answers in the same 422 envelope naming the same field, so nothing downstream
+   * changed.
+   */
+  const invalid = await checkTaxonomy('design', [
+    { field: 'category', axis: 'category', values: [parsed.data.category] },
+    { field: 'status', axis: 'status', values: [parsed.data.status] },
+  ]);
+  if (invalid) return invalid;
+
   const result = await toActionResult(() => createDesignWork(withPersianFallback(parsed.data)));
   if (result.ok) purgeDesignWork(result.data.slug);
 
@@ -59,6 +73,19 @@ export async function updateDesignWorkAction(
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
+
+  /*
+   * THE TAXONOMY CHECK, after the parse and before the write. `category` and `status` were
+   * `z.enum(...)` until prompt 9 and are plain strings now, because the closed set became
+   * editable rows — see `@/common/schemas/enums`'s header and `project-actions.ts`'s clause
+   * 2b. It answers in the same 422 envelope naming the same field, so nothing downstream
+   * changed.
+   */
+  const invalid = await checkTaxonomy('design', [
+    { field: 'category', axis: 'category', values: [parsed.data.category] },
+    { field: 'status', axis: 'status', values: [parsed.data.status] },
+  ]);
+  if (invalid) return invalid;
 
   const result = await toActionResult(async () => {
     const before = await getDesignWorkRowById(id);

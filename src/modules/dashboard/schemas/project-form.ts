@@ -27,20 +27,23 @@
  * needs no fallback branch: `pickLocale` stays a two-line function and `/fa/projects/x`
  * never renders blank. Recorded in AGENTS.md.
  *
+ * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
+ * `types`, `status` and `scale` were `z.enum(...)` on both schemas below, which is what made
+ * a category a code edit and a deploy. They are non-empty STRINGS here now, and the closed
+ * set is enforced at runtime against `taxonomy_terms` by `unknownTermErrors()` in
+ * `services/taxonomy-service.ts`, which the actions run before they call a service — see
+ * `@/common/schemas/enums`'s header for why a compile-time enum became the wrong check.
+ *
+ * Everything else about the submission schema is EXACTLY as strict: still `strictObject`, so
+ * an unexpected key is still refused, and `.min(1)` still refuses an empty string, so the
+ * runtime check is never handed a blank to look up.
+ *
  * ─── WHY `sortOrder` IS ABSENT ────────────────────────────────────────────────────
  * Position is not a field anyone types. It is owned by the reorder control on the list
  * screen, and `createProject` places a new record first. A number input for it would let
  * one editor's save silently displace another project.
  */
 import { z } from 'zod';
-import {
-  projectScaleEnum,
-  projectScaleValues,
-  projectStatusEnum,
-  projectStatusValues,
-  projectTypeEnum,
-  projectTypeValues,
-} from '@/common/schemas/enums';
 import {
   PROJECT_SLUG_PATTERN,
   PROJECT_YEAR_MAX,
@@ -99,9 +102,9 @@ export const projectFormSchema = z.object({
       PROJECT_SLUG_PATTERN,
       'Lowercase words separated by single hyphens — qeytarieh-08-residence.',
     ),
-  types: z.array(projectTypeEnum).min(1, 'Choose at least one type.'),
-  status: projectStatusEnum,
-  scale: projectScaleEnum,
+  types: z.array(z.string().min(1)).min(1, 'Choose at least one type.'),
+  status: z.string().min(1, 'Choose a status.'),
+  scale: z.string().min(1, 'Choose a scale.'),
   year: yearAsString,
   area: z.string(),
 
@@ -150,12 +153,19 @@ export const PROJECT_FORM_FIELDS = [
  * `undefined` mounts uncontrolled and flips controlled on the first `reset()`, which React
  * warns about and which leaves selects stuck on their placeholder. It is also what makes
  * `isDirty` mean anything — the flag compares against these.
+ *
+ * The taxonomy fields start EMPTY rather than at a hardcoded first value, because there is
+ * no longer a hardcoded list to take one from — the options are rows now, and which one
+ * should lead is an editorial choice expressed by the term order. `ProjectForm` fills these
+ * from the first available term before it mounts; `''` is what a select renders as its
+ * placeholder, and `.min(1)` above is what makes leaving it there a validation error rather
+ * than a blank column.
  */
 export const EMPTY_PROJECT_FORM: ProjectFormValues = {
   slug: '',
   types: [],
-  status: projectStatusValues[0],
-  scale: projectScaleValues[1],
+  status: '',
+  scale: '',
   year: String(new Date().getFullYear()),
   area: '',
   titleEn: '',
@@ -173,19 +183,23 @@ export const EMPTY_PROJECT_FORM: ProjectFormValues = {
 /**
  * A stored row -> the values the edit form mounts with.
  *
- * `types` is widened from the row's tolerant `string[]` back to the enum. The read schema
- * types it loosely on purpose (`common/schemas/enums.ts`: a row carrying an unlisted value
- * must not throw a `ZodError` that blanks the index page), but this form's checkbox group
- * only renders the known values — so an unknown one is dropped here rather than silently
- * re-submitted through a control that never displayed it.
+ * THE ROW'S TAXONOMY VALUES ARE CARRIED THROUGH UNTOUCHED, and that is a change from prompt
+ * 6, which filtered `types` against the frozen array and substituted a default for an
+ * unrecognized `status` or `scale`. Both were silent rewrites: opening a project and saving
+ * it — without touching a taxonomy field — could change what it said. With terms editable
+ * that is no longer a rare edge case, it is what happens to every record using a term
+ * somebody retired.
+ *
+ * `ProjectForm` merges these values into its option lists (`withCurrentValues`), so a value
+ * with no term is DISPLAYED and preserved rather than dropped through a control that never
+ * rendered it.
  */
 export function toProjectFormValues(row: ProjectRow): ProjectFormValues {
-  const known = new Set<string>(projectTypeValues);
   return {
     slug: row.slug,
-    types: row.types.filter((type): type is (typeof projectTypeValues)[number] => known.has(type)),
-    status: projectStatusEnum.safeParse(row.status).data ?? projectStatusValues[0],
-    scale: projectScaleEnum.safeParse(row.scale).data ?? projectScaleValues[1],
+    types: row.types,
+    status: row.status,
+    scale: row.scale,
     year: String(row.year),
     area: row.area,
     titleEn: row.titleEn,
@@ -217,9 +231,9 @@ export function toProjectFormValues(row: ProjectRow): ProjectFormValues {
  */
 export const projectSubmissionSchema = z.strictObject({
   slug: z.string().min(1).regex(PROJECT_SLUG_PATTERN),
-  types: z.array(projectTypeEnum).min(1),
-  status: projectStatusEnum,
-  scale: projectScaleEnum,
+  types: z.array(z.string().min(1)).min(1),
+  status: z.string().min(1),
+  scale: z.string().min(1),
   year: yearAsNumber,
   area: z.string(),
 

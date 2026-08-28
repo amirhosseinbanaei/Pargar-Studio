@@ -14,7 +14,6 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
-import { designCategoryEnum, designStatusEnum } from './enums';
 import { factSchema, factWriteSchema } from './fact';
 
 /* ── READ ─────────────────────────────────────────────────────────────────────── */
@@ -80,9 +79,16 @@ export const designWorkCreateSchema = z.strictObject({
     .string()
     .min(1)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'lowercase words separated by single hyphens'),
-  category: designCategoryEnum,
+  /**
+   * A TAXONOMY COLUMN, and no longer a `z.enum` — see `@/common/schemas/enums`'s header.
+   * The closed set moved into `taxonomy_terms` in prompt 9, so a value added five minutes
+   * ago must be accepted here; what rejects an arbitrary string is the runtime check
+   * `unknownTermErrors` in `services/taxonomy-service.ts`, which the write ACTION runs
+   * before it calls a service and reports as a 422 naming this field.
+   */
+  category: z.string().min(1),
   year: z.number().int().min(1900).max(2200),
-  status: designStatusEnum,
+  status: z.string().min(1),
   sortOrder: z.number().int().default(0),
 
   titleEn: z.string().min(1),

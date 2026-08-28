@@ -1,29 +1,60 @@
 // src/common/schemas/enums.ts
 /**
- * Every closed taxonomy value in the content model, declared once.
+ * ─── THIS FILE IS NO LONGER THE ENFORCEMENT POINT ─────────────────────────────────
+ * Read this before using anything below.
  *
- * Each is exported as an `as const` ARRAY as well as a schema, because three consumers
- * need the same list: the WRITE schemas (`z.enum(...)`, exact), the dashboard's option
- * lists in prompt 6, and the label maps in the UI. One edit updates all three.
+ * Until prompt 9 these arrays were the taxonomy: the write schemas enforced them with
+ * `z.enum`, so the database could only ever hold a value listed here. That is no longer
+ * true, and the change is deliberate rather than a regression.
  *
- * ─── WHY READ SCHEMAS DO NOT USE THESE ────────────────────────────────────────────
- * Read schemas type these fields as a plain `z.string()`, deliberately. The rule is
- * tolerant leaves, strict shape: a row carrying a value not listed here must not throw a
- * `ZodError` that blanks the whole index page. `tolerantEnum()` is the other option and is
- * wrong here — it substitutes a FALLBACK, so a project whose status the dashboard set to
- * something new would render as "Completed", which is a lie rather than a degradation. The
- * UI's translation dictionary already falls back to the raw value (see
- * `legacy/js/core/i18n.js` `t()`), so an unknown value displays as itself.
+ * **The taxonomy now lives in the `taxonomy_terms` TABLE** (`services/schema.ts`), one row
+ * per option, with per-locale labels, an explicit order and a show-on-site flag — editable
+ * from each subject's own dashboard page. **Enforcement moved with it**, to a RUNTIME check
+ * against that table:
  *
- * Writes are where the taxonomy is enforced: the write schemas below reject anything not
- * in these arrays, so in practice the database only ever holds these values — which is
- * also what makes the DERIVED filter taxonomy in `project-service.ts` correct.
+ *   `unknownTermErrors()` in `services/taxonomy-service.ts`
+ *      ← called by every write action in `modules/dashboard/actions/` before it calls a
+ *        service, returning `{ ok: false, status: 422, body: fieldErrors }` naming the field
+ *
+ * A compile-time enum is the WRONG check once terms are editable: a category the studio
+ * added five minutes ago would be rejected as invalid by code that shipped last week, and
+ * the only fix would be a deploy — from a dashboard that exists so the studio would not need
+ * one. The rest of every write schema is exactly as strict as it was: still `strictObject`,
+ * so an unexpected key is still refused.
+ *
+ * A file that silently stops being enforced is worse than one that says so. This says so.
+ *
+ * ─── WHAT THESE ARRAYS ARE FOR NOW ────────────────────────────────────────────────
+ * Two things, both real:
+ *
+ *  1. **They are the SEED SOURCE.** `scripts/seed-taxonomy.ts` writes one `taxonomy_terms`
+ *     row per entry, IN THE ORDER DECLARED HERE — which is the legacy order, deliberate and
+ *     not alphabetical (`project-service.ts` has said so since prompt 2). The seed is the
+ *     only chance to carry that order across into `sort_order`, so do not tidy these arrays.
+ *  2. **They are the historical record** of the vocabulary the archive was authored with.
+ *     A value below that no term exists for any more is still a value 76 rows may carry.
+ *
+ * The exported TYPES are kept and are derived from the arrays directly. They no longer come
+ * from a `z.enum`, because there is no longer a schema here to infer them from — nothing
+ * parses against these arrays at all.
+ *
+ * ─── WHY READ SCHEMAS NEVER USED THESE, WHICH IS UNCHANGED ────────────────────────
+ * Read schemas type these fields as a plain `z.string()`, deliberately, and prompt 9 makes
+ * that MORE important rather than less. The rule is tolerant leaves, strict shape: a row
+ * carrying a value not declared anywhere must not throw a `ZodError` that blanks the whole
+ * index page. `tolerantEnum()` is the other option and is wrong here — it substitutes a
+ * FALLBACK, so a project whose status was set to something new would render as "Completed",
+ * which is a lie rather than a degradation. An unrecognized value must DEGRADE: it displays
+ * as itself, and `utils/taxonomy.ts` appends it to the filter rail rather than dropping it,
+ * so the records carrying it stay reachable.
  *
  * ─── LABELS ARE NOT HERE ──────────────────────────────────────────────────────────
- * These are wire values. `'Residential'` is a database value; `مسکونی` is copy, and copy
- * lives in the UI layer (prompt 4 ports `legacy/data/i18n.js`'s `type.*` dictionary).
+ * These are wire values. `'Residential'` is a database value; `مسکونی` is a label, and a
+ * label is now a COLUMN on the term (`label_fa`) rather than a key in the message catalog.
+ * The catalog's `type.*` / `status.*` / `scale.*` / `cat.*` / `kind.*` groups are kept as
+ * the fallback for a value that has no term at all — the middle step of the three-step
+ * degradation (term label → catalog → raw value) the rails apply.
  */
-import { z } from 'zod';
 
 /* ── projects (legacy/data/projects.js:9-16) ──────────────────────────────────── */
 
@@ -45,13 +76,9 @@ export const projectStatusValues = ['Completed', 'Under Construction', 'Concept'
 
 export const projectScaleValues = ['Small', 'Medium', 'Large'] as const;
 
-export const projectTypeEnum = z.enum(projectTypeValues);
-export const projectStatusEnum = z.enum(projectStatusValues);
-export const projectScaleEnum = z.enum(projectScaleValues);
-
-export type ProjectType = z.infer<typeof projectTypeEnum>;
-export type ProjectStatus = z.infer<typeof projectStatusEnum>;
-export type ProjectScale = z.infer<typeof projectScaleEnum>;
+export type ProjectType = (typeof projectTypeValues)[number];
+export type ProjectStatus = (typeof projectStatusValues)[number];
+export type ProjectScale = (typeof projectScaleValues)[number];
 
 /* ── design works (legacy/data/works.js:10) ───────────────────────────────────── */
 
@@ -67,16 +94,11 @@ export const designCategoryValues = [
 /** Not the same set as a project's: a chair is `In production`, a building never is. */
 export const designStatusValues = ['Completed', 'In production'] as const;
 
-export const designCategoryEnum = z.enum(designCategoryValues);
-export const designStatusEnum = z.enum(designStatusValues);
-
-export type DesignCategory = z.infer<typeof designCategoryEnum>;
-export type DesignStatus = z.infer<typeof designStatusEnum>;
+export type DesignCategory = (typeof designCategoryValues)[number];
+export type DesignStatus = (typeof designStatusValues)[number];
 
 /* ── media (legacy/data/works.js:273) ─────────────────────────────────────────── */
 
 export const mediaTypeValues = ['Publication', 'Award', 'Lecture', 'Exhibition'] as const;
 
-export const mediaTypeEnum = z.enum(mediaTypeValues);
-
-export type MediaType = z.infer<typeof mediaTypeEnum>;
+export type MediaType = (typeof mediaTypeValues)[number];
