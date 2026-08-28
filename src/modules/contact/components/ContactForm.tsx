@@ -31,8 +31,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormButton, FormInput, FormTextarea } from '@/common/components/form';
 import { applyFieldErrors } from '@/common/hooks/applyFieldErrors';
 import { fieldErrors } from '@/common/errors';
-import { getDictionary, type MessageKey } from '@/common/i18n';
-import type { Locale } from '@/common/schemas/locale';
+import { useTranslations } from 'next-intl';
+import type { MessageKey } from '@/common/i18n';
 import { sendContactMessageAction } from '../actions/contact-message-actions';
 import {
   CONTACT_FORM_FIELDS,
@@ -62,19 +62,23 @@ function isKnownField(field: string): field is (typeof CONTACT_FORM_FIELDS)[numb
   return (CONTACT_FORM_FIELDS as readonly string[]).includes(field);
 }
 
-export interface ContactFormProps {
-  locale: Locale;
-}
-
-export function ContactForm({ locale }: ContactFormProps) {
-  const dictionary = getDictionary(locale);
-  const { t } = dictionary;
+/**
+ * IT TAKES NO PROPS SINCE PROMPT 8, and that is the end of a three-step argument rather
+ * than a simplification. It could never take a `Dictionary` — an object of FUNCTIONS does
+ * not cross the server/client boundary — so prompt 5 gave it a `locale` and had it build
+ * its own. Building one here pulled BOTH catalogs into the browser bundle for the fifteen
+ * `form.*` strings this leaf renders. `NextIntlClientProvider` in the root layout already
+ * carries this document's messages, so reading them from context costs nothing extra and
+ * the locale it would have been told is the locale it now infers.
+ */
+export function ContactForm() {
+  const t = useTranslations();
 
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
   const form = useForm<ContactFormValues>({
-    resolver: zodResolver(createContactFormSchema(dictionary)),
+    resolver: zodResolver(createContactFormSchema(t)),
     // Every field present and non-undefined, so each input is controlled from mount to
     // unmount rather than flipping on the first reset.
     defaultValues: EMPTY_CONTACT_FORM,

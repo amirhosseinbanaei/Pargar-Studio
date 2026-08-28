@@ -14,7 +14,7 @@
  */
 import { connection } from 'next/server';
 import type { Locale } from '@/common/schemas/locale';
-import { getDictionary } from '@/common/i18n';
+import { getIntl } from '@/common/i18n';
 import { formatTehranTime } from '@/common/i18n/tehran-time';
 import { LiveClock } from './LiveClock';
 
@@ -25,7 +25,7 @@ export interface TehranClockProps {
 export async function TehranClock({ locale }: TehranClockProps) {
   await connection();
 
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   const suffix = t('ui.irst');
 
   return (

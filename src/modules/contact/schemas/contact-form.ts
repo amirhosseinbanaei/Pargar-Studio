@@ -10,9 +10,13 @@
  *
  * IT IS A FACTORY, not a constant, because this site is bilingual. A module-level schema
  * would bake one language's messages into the module at import time, and the Persian page
- * would then show "Please enter your name." under a Persian label. The dictionary is
+ * would then show "Please enter your name." under a Persian label. The TRANSLATOR is
  * passed in and the schema is built per render — it costs a few object allocations and it
  * is the only way the messages can be in the reader's language.
+ *
+ * It takes the `t` function alone rather than a whole `Dictionary`, so the caller may hand
+ * it either `getIntl(locale).t` or next-intl's `useTranslations()` — which is what
+ * `ContactForm` does, and what keeps the catalogs out of the client bundle.
  *
  * THE BOUNDS COME FROM `./limits`, which the ACTION's schema reads too. They must not be
  * spelled twice: if they drift, the form accepts something the action rejects and the
@@ -23,6 +27,9 @@ import { z } from 'zod';
 import type { Dictionary } from '@/common/i18n';
 import { CONTACT_LIMITS } from './limits';
 
+/** The one thing the schema needs from a translator: a key in, a sentence out. */
+export type Translate = Dictionary['t'];
+
 /**
  * The honeypot's field name. Plausible enough for a bot to fill, absent from the table.
  *
@@ -32,8 +39,7 @@ import { CONTACT_LIMITS } from './limits';
  */
 export const HONEYPOT_FIELD = 'company';
 
-export function createContactFormSchema(dictionary: Dictionary) {
-  const { t } = dictionary;
+export function createContactFormSchema(t: Translate) {
   return z.object({
     name: z
       .string()

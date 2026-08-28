@@ -12,8 +12,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates } from '@/common/i18n/navigation';
 import { localeValues } from '@/common/schemas/locale';
 import { getDesignWork, listDesignWorks } from '@/common/services/design-work-service';
 import { DesignDetail } from '@/modules/design';
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   // Deduplicated with the page's own call: same cached function, same arguments.
   const work = await getDesignWork(slug, locale);
-  if (!work) return { title: getDictionary(locale).t('nav.design') };
+  if (!work) return { title: getIntl(locale).t('nav.design') };
 
   return {
     title: work.title,
@@ -52,5 +53,5 @@ export default async function DesignDetailPage({ params }: PageProps) {
   const work = await getDesignWork(slug, locale);
   if (!work) notFound();
 
-  return <DesignDetail work={work} dictionary={getDictionary(locale)} />;
+  return <DesignDetail work={work} dictionary={getIntl(locale)} />;
 }

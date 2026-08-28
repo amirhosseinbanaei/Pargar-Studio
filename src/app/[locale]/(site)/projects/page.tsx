@@ -4,8 +4,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates, localeHref } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates, localeHref } from '@/common/i18n/navigation';
 import { getProjectFilters, listProjects } from '@/common/services/project-service';
 import { ProjectsScreen, parseProjectFilters, type RawSearchParams } from '@/modules/projects';
 
@@ -17,7 +18,7 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   // A bare title; the root layout's template supplies the suffix.
   // `alternates` carries the canonical AND the `hreflang` pair, so each language's page
   // points at its counterpart rather than competing with it.
@@ -42,7 +43,7 @@ export default async function ProjectsPage({ params, searchParams }: PageProps) 
       taxonomy={taxonomy}
       filters={parseProjectFilters(rawSearchParams)}
       basePath={localeHref(locale, '/projects')}
-      dictionary={getDictionary(locale)}
+      dictionary={getIntl(locale)}
     />
   );
 }

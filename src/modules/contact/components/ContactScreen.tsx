@@ -34,7 +34,6 @@ import { Lat } from '@/common/components/layout';
 import { draw } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import type { Contact } from '@/common/schemas/contact';
-import type { Locale } from '@/common/schemas/locale';
 import { ContactForm } from './ContactForm';
 
 /** `legacy/js/ui/panel.js:459` and `:508` — kind, seed and ratio, unchanged. */
@@ -43,11 +42,15 @@ const PLAN = { kind: 'court', seed: 'kavan-dezashib-site', ratio: 0.62 } as cons
 
 export interface ContactScreenProps {
   contact: Contact;
-  locale: Locale;
   dictionary: Dictionary;
 }
 
-export function ContactScreen({ contact, locale, dictionary }: ContactScreenProps) {
+/**
+ * `locale` was a third prop until prompt 8. Its only job was reaching `ContactForm`, which
+ * needed it to build a dictionary in the browser; the form reads both from
+ * `NextIntlClientProvider` now, so the screen has nothing left to forward.
+ */
+export function ContactScreen({ contact, dictionary }: ContactScreenProps) {
   const { t, num, list } = dictionary;
 
   return (
@@ -154,7 +157,7 @@ export function ContactScreen({ contact, locale, dictionary }: ContactScreenProp
           <h2 className="sheet__h">{t('form.write')}</h2>
           <p className="cblock__v cblock__v--sm">{t('form.intro')}</p>
           <div className="pt-6">
-            <ContactForm locale={locale} />
+            <ContactForm />
           </div>
         </div>
       </div>

@@ -24,7 +24,7 @@
  */
 import type { MetadataRoute } from 'next';
 import { env } from '@/common/config/env';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import { localeValues } from '@/common/schemas/locale';
 import { listDesignWorks } from '@/common/services/design-work-service';
 import { listMedia } from '@/common/services/media-service';

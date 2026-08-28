@@ -13,12 +13,12 @@
  * is precisely what a `min(10)` in one file and a `min(1)` in the other produced.
  */
 import { describe, expect, it } from 'vitest';
-import { getDictionary } from '@/common/i18n';
+import { getIntl } from '@/common/i18n';
 import { createContactFormSchema } from '../contact-form';
 import { contactSubmissionSchema } from '../contact-submission';
 import { CONTACT_LIMITS } from '../limits';
 
-const formSchema = createContactFormSchema(getDictionary('en'));
+const formSchema = createContactFormSchema(getIntl('en').t);
 
 const VALID = {
   name: 'Roya Kamalvand',
@@ -67,12 +67,12 @@ describe.each(CASES)('$label', ({ input, valid }) => {
 
 describe('the localized schema', () => {
   it('carries the reader’s language, which is why it cannot be the wire schema', () => {
-    const fa = createContactFormSchema(getDictionary('fa'));
+    const fa = createContactFormSchema(getIntl('fa').t);
     const issue = fa.safeParse({ ...VALID, email: 'nope' });
     expect(issue.success).toBe(false);
     if (issue.success) throw new Error('unreachable');
     // Persian copy, not an English zod default. The action's schema must never do this.
-    expect(issue.error.issues[0]?.message).toBe(getDictionary('fa').t('form.errEmail'));
+    expect(issue.error.issues[0]?.message).toBe(getIntl('fa').t('form.errEmail'));
   });
 });
 

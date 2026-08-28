@@ -15,8 +15,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates } from '@/common/i18n/navigation';
 import { getStudio } from '@/common/services/studio-service';
 import { StudioScreen, studioSeeds } from '@/modules/studio';
 
@@ -25,7 +26,7 @@ type PageProps = { params: Promise<{ locale: string }> };
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   return {
     title: t('nav.studio'),
     description: t('cap.studio'),
@@ -43,7 +44,5 @@ export default async function StudioPage({ params }: PageProps) {
   // crash rather than as a database nobody has seeded.
   if (!studio || !english) notFound();
 
-  return (
-    <StudioScreen studio={studio} seeds={studioSeeds(english)} dictionary={getDictionary(locale)} />
-  );
+  return <StudioScreen studio={studio} seeds={studioSeeds(english)} dictionary={getIntl(locale)} />;
 }

@@ -25,7 +25,7 @@ import { BackLink, DetailPlates, SpecRow } from '@/common/components/collection'
 import { Lat } from '@/common/components/layout';
 import { draw, kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import type { Media } from '@/common/schemas/media';
 import type { Project } from '@/common/schemas/project';
 

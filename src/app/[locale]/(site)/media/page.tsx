@@ -9,8 +9,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates, localeHref } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates, localeHref } from '@/common/i18n/navigation';
 import { parseFacet, type RawSearchParams } from '@/common/utils/facets';
 import { listMedia } from '@/common/services/media-service';
 import { listProjects } from '@/common/services/project-service';
@@ -24,7 +25,7 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   return {
     title: t('nav.media'),
     description: t('cap.media'),
@@ -44,7 +45,7 @@ export default async function MediaPage({ params, searchParams }: PageProps) {
       projects={projects}
       type={parseFacet(rawSearchParams, MEDIA_FACET)}
       basePath={localeHref(locale, '/media')}
-      dictionary={getDictionary(locale)}
+      dictionary={getIntl(locale)}
     />
   );
 }

@@ -18,7 +18,7 @@
  */
 import { BackLink, DetailPlates, SpecRow } from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import type { Project } from '@/common/schemas/project';
 
 export interface ProjectDetailProps {

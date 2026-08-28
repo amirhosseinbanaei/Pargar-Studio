@@ -23,7 +23,7 @@
 import Link from 'next/link';
 import { draw } from '@/common/lib/art';
 import { COLUMN_ART_RATIO, NAV } from '@/common/constants/site';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import type { Dictionary } from '@/common/i18n';
 import { GlyphText } from './GlyphText';
 

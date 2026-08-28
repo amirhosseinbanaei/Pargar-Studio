@@ -7,8 +7,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates } from '@/common/i18n/navigation';
 import { getContact } from '@/common/services/contact-service';
 import { ContactScreen } from '@/modules/contact';
 
@@ -17,7 +18,7 @@ type PageProps = { params: Promise<{ locale: string }> };
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   return {
     title: t('nav.contact'),
     description: t('cap.contact'),
@@ -33,5 +34,5 @@ export default async function ContactPage({ params }: PageProps) {
   // `null` only on an unseeded database — the row is pinned to id 1 by a CHECK.
   if (!contact) notFound();
 
-  return <ContactScreen contact={contact} locale={locale} dictionary={getDictionary(locale)} />;
+  return <ContactScreen contact={contact} dictionary={getIntl(locale)} />;
 }

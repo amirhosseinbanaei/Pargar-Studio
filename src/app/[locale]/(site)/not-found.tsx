@@ -13,11 +13,12 @@
  * segment.
  */
 import Link from 'next/link';
-import { getDictionary } from '@/common/i18n';
-import { DEFAULT_LOCALE, localeHref } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { DEFAULT_LOCALE } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 
 export default function NotFound() {
-  const { t } = getDictionary(DEFAULT_LOCALE);
+  const { t } = getIntl(DEFAULT_LOCALE);
 
   return (
     <div className="route route--solo" id="main">

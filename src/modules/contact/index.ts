@@ -14,7 +14,7 @@
  * visible in one file, which is the point of a barrel.
  */
 export { ContactScreen, type ContactScreenProps } from './components/ContactScreen';
-export { ContactForm, type ContactFormProps } from './components/ContactForm';
+export { ContactForm } from './components/ContactForm';
 export { sendContactMessageAction } from './actions/contact-message-actions';
 export {
   createContactFormSchema,

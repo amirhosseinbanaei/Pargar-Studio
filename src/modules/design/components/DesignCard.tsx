@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { draw, kindFor } from '@/common/lib/art';
 import { PLATE_RATIO } from '@/common/constants/site';
 import type { Dictionary } from '@/common/i18n';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import type { DesignWork } from '@/common/schemas/design-work';
 
 export interface DesignCardProps {

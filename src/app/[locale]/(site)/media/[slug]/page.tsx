@@ -12,8 +12,9 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
-import { isLocale, localeAlternates } from '@/common/i18n/routing';
+import { getIntl } from '@/common/i18n';
+import { isLocale } from '@/common/i18n/routing';
+import { localeAlternates } from '@/common/i18n/navigation';
 import { localeValues } from '@/common/schemas/locale';
 import { getMediaEntry, listMedia } from '@/common/services/media-service';
 import { getProject } from '@/common/services/project-service';
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!isLocale(locale)) notFound();
 
   const entry = await getMediaEntry(slug, locale);
-  if (!entry) return { title: getDictionary(locale).t('nav.media') };
+  if (!entry) return { title: getIntl(locale).t('nav.media') };
 
   return {
     title: entry.title,
@@ -52,5 +53,5 @@ export default async function MediaDetailPage({ params }: PageProps) {
   // entry with no project makes no second read at all.
   const project = entry.projectSlug ? await getProject(entry.projectSlug, locale) : null;
 
-  return <MediaDetail entry={entry} project={project} dictionary={getDictionary(locale)} />;
+  return <MediaDetail entry={entry} project={project} dictionary={getIntl(locale)} />;
 }

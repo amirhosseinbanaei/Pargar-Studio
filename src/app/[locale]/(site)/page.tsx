@@ -6,7 +6,7 @@
  * and this file decides which locale they speak.
  */
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
+import { getIntl } from '@/common/i18n';
 import { isLocale } from '@/common/i18n/routing';
 import { NAV } from '@/common/constants/site';
 import { ColumnShell, ShellTransition } from '@/common/components/layout';
@@ -17,7 +17,7 @@ export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
 
-  const dictionary = getDictionary(locale);
+  const dictionary = getIntl(locale);
   const { t, isRTL } = dictionary;
 
   return (
@@ -29,7 +29,6 @@ export default async function HomePage({ params }: PageProps) {
         strings={{
           escToClose: t('ui.escToClose'),
           selectSection: t('ui.selectSection'),
-          close: t('ui.close'),
           opened: t('ui.opened'),
           returned: t('ui.returned'),
           sectionLabels: Object.fromEntries(NAV.map(section => [section.id, t(section.labelKey)])),

@@ -11,17 +11,17 @@
  * layout. A boundary sits INSIDE the subtree it guards, so a failing layout takes its own
  * boundary down with it — those are `global-error.tsx`'s.
  *
- * The locale comes from the pathname because an `error.tsx` receives no params. That is
- * also why the dictionary is read on the client here: it is the only place in the site
- * that cannot be handed its strings by a Server Component.
+ * An `error.tsx` receives no params, so until prompt 8 this file recovered the locale
+ * from the pathname and built its own dictionary. It reads both from context now:
+ * `NextIntlClientProvider` sits in the root layout, ABOVE this boundary, so the locale and
+ * the messages survive whatever threw below it — and the catalogs no longer have to be
+ * imported into the browser bundle to get at four strings.
  */
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ErrorState } from '@/common/components/feedback';
 import { mapError } from '@/common/errors';
 import { devError } from '@/common/observability/dev-log';
-import { getDictionary } from '@/common/i18n';
-import { DEFAULT_LOCALE, isLocale } from '@/common/i18n/routing';
 
 export default function SiteError({
   error,
@@ -30,8 +30,7 @@ export default function SiteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const first = usePathname().split('/')[1];
-  const { t } = getDictionary(isLocale(first) ? first : DEFAULT_LOCALE);
+  const t = useTranslations();
 
   useEffect(() => {
     // Dev-only today; `dev-log.ts` records why there is no production tracker yet.

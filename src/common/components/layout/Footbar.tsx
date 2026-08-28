@@ -14,7 +14,7 @@
  */
 import { Suspense } from 'react';
 import type { Locale } from '@/common/schemas/locale';
-import { getDictionary } from '@/common/i18n';
+import { getIntl } from '@/common/i18n';
 import { BRAND } from '@/common/constants/site';
 import { LanguageSwitch } from './LanguageSwitch';
 import { SectionHint } from './SectionHint';
@@ -32,7 +32,7 @@ export interface FootbarProps {
 }
 
 export function Footbar({ locale, projectCount }: FootbarProps) {
-  const { t, num } = getDictionary(locale);
+  const { t, num } = getIntl(locale);
 
   return (
     <div className="footbar">
