@@ -114,7 +114,6 @@ export function createShell(options: ShellOptions): ShellApi {
   const colsWrapEl = document.getElementById('cols');
   const wipeEl = document.getElementById('wipe');
   const marks = [...document.querySelectorAll<HTMLElement>('.mark')];
-  const closer = document.getElementById('closer');
   const home = document.getElementById('home');
   const hint = document.getElementById('hint');
 
@@ -530,16 +529,17 @@ export function createShell(options: ShellOptions): ShellApi {
     }
   });
 
-  // `#closer` and `#home` live in the MASTHEAD, which is part of the site layout and
-  // therefore outlives this shell across a navigation. Their handlers are named so
-  // `destroy()` can take them off again; the ones bound to `colsWrap` are dropped with the
-  // subtree React unmounts.
-  const onCloserClick = (): void => close();
+  // `#home` lives in the MASTHEAD, which is part of the site layout and therefore
+  // outlives this shell across a navigation. Its handler is named so `destroy()` can take
+  // it off again; the ones bound to `colsWrap` are dropped with the subtree React unmounts.
+  //
+  // `#closer` was bound here too until prompt 8 deleted the close button. Escape still
+  // closes an open section — `onKeydown` below is where that has always lived, so the
+  // behaviour did not go with the button.
   const onHomeClick = (e: Event): void => {
     e.preventDefault();
     close();
   };
-  closer?.addEventListener('click', onCloserClick);
   home?.addEventListener('click', onHomeClick);
 
   const onKeydown = (e: KeyboardEvent): void => {
@@ -581,7 +581,6 @@ export function createShell(options: ShellOptions): ShellApi {
     queued = null;
     colsWrap.removeEventListener('pointerover', onPointerOver);
     colsWrap.removeEventListener('pointerout', onPointerOut);
-    closer?.removeEventListener('click', onCloserClick);
     home?.removeEventListener('click', onHomeClick);
     removeEventListener('keydown', onKeydown);
     removeEventListener('resize', onResize);
@@ -597,8 +596,6 @@ export function createShell(options: ShellOptions): ShellApi {
   async function relang(): Promise<void> {
     setTitles();
     if (hint) hint.textContent = openId ? t('ui.escToClose') : t('ui.selectSection');
-    const closerLabel = closer?.querySelector('span');
-    if (closerLabel) closerLabel.textContent = t('ui.close');
     if (openId) {
       const panel = byId.get(openId)?.querySelector<HTMLElement>('.panel');
       if (panel) {

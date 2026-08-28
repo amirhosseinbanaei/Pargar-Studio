@@ -12,9 +12,17 @@
  * "this section is unavailable", and one boundary cannot say both.
  */
 import { notFound } from 'next/navigation';
-import { getDictionary } from '@/common/i18n';
+import { getIntl } from '@/common/i18n';
 import { isLocale } from '@/common/i18n/routing';
-import { Footbar, Masthead, SiteMotion, SkipLink, Stage } from '@/common/components/layout';
+import {
+  Footbar,
+  Masthead,
+  SectionEscape,
+  SiteMotion,
+  SkipLink,
+  Stage,
+} from '@/common/components/layout';
+import { localeHref } from '@/common/i18n/navigation';
 import { listProjects } from '@/common/services/project-service';
 
 type LayoutProps = {
@@ -26,7 +34,7 @@ export default async function SiteLayout({ children, params }: LayoutProps) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
 
-  const { t } = getDictionary(locale);
+  const { t } = getIntl(locale);
   // A cached read (`cacheLife('max')`, tagged `projects`), so the footer's figure is a
   // fact rather than a literal that goes stale the first time the dashboard saves.
   const projects = await listProjects(locale);
@@ -40,6 +48,14 @@ export default async function SiteLayout({ children, params }: LayoutProps) {
         {children}
         <Footbar locale={locale} projectCount={projects.length} />
       </Stage>
+
+      {/*
+        Renders nothing. It restores the Escape key the deleted `Closer` used to bind —
+        the shell's own handler is only alive on the index, where there is no section to
+        leave. See `SectionEscape` for what was measured. It sits in the LAYOUT so it
+        survives navigation between sections.
+      */}
+      <SectionEscape home={localeHref(locale)} />
 
       {/*
         The announcement channel. It lives in the LAYOUT so it survives navigation: a live

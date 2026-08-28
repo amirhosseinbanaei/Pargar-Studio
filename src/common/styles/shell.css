@@ -301,33 +301,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   Close affordance
-   -------------------------------------------------------------------------- */
-.closer {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  z-index: var(--z-head);
-  display: flex;
-  align-items: center;
-  gap: 0.7em;
-  font-size: var(--fs-xs);
-  letter-spacing: var(--tr-mid);
-  text-transform: uppercase;
-  color: var(--t-lo);
-  transform: translate3d(0, -50%, 0);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity var(--d-md) var(--e-out),
-    color var(--d-sm) var(--e-out);
-}
-.stage.is-open .closer { opacity: 1; pointer-events: auto; }
-.closer:hover { color: var(--t-hi); }
-.closer__x { width: 0.75rem; height: 0.75rem; }
-.closer__x line { stroke: currentColor; stroke-width: 1; }
-
-/* --------------------------------------------------------------------------
    Responsive — below 860px the columns stack into rows.
    -------------------------------------------------------------------------- */
 @media (max-width: 860px) {

@@ -26,30 +26,33 @@
  *    holds references to. An empty list means `setTitles` finds no entry for any column
  *    and leaves every one of them alone, which is exactly the required behaviour.
  *
- * WHAT DOES NOT SURVIVE: the reverse transition. Closing runs `Closer`, whose outgoing
- * view is a section route with no columns to fly back — there is nothing on screen to
- * animate. A half-played reverse is worse than a clean cut, so closing is a clean cut. See
- * AGENTS.md.
+ * WHAT DOES NOT SURVIVE: the reverse transition. Closing is a plain navigation — the
+ * wordmark, the browser's Back button, or the Escape key `SectionEscape` binds — and its
+ * outgoing view is a section route with no columns to fly back, so there is nothing on
+ * screen to animate. A half-played reverse is worse than a clean cut, so closing is a
+ * clean cut. (`Closer` was the button that used to start it; prompt 8 deleted it and the
+ * language switch took its place in the masthead.) See AGENTS.md.
  */
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createShell } from '@/common/lib/motion';
 import { NAV } from '@/common/constants/site';
-import { localeHref } from '@/common/i18n/routing';
+import { localeHref } from '@/common/i18n/navigation';
 import type { Locale } from '@/common/schemas/locale';
 import { useCursor } from './SiteMotion';
 
 /**
  * The handful of strings the transition speaks, passed in from the server rather than
- * looked up here. The dictionary is two full tables; this is six strings.
+ * looked up here. The catalog is two full tables; this is five strings.
+ *
+ * `close` was a sixth until prompt 8: `createShell`'s `relang()` re-labelled the masthead's
+ * X button, and both the button and that line are gone.
  */
 export interface ShellStrings {
   /** `t('ui.escToClose')` — written into `#hint` when a section opens. */
   escToClose: string;
   /** `t('ui.selectSection')` — written back into `#hint` on close. */
   selectSection: string;
-  /** `t('ui.close')`. */
-  close: string;
   /** `t('ui.opened')` — the announcement suffix for the `aria-live` region. */
   opened: string;
   /** `t('ui.returned')`. */
@@ -111,7 +114,6 @@ export function ShellTransition({ locale, isRTL, strings }: ShellTransitionProps
         const copy = stringsRef.current;
         if (key === 'ui.escToClose') return copy.escToClose;
         if (key === 'ui.selectSection') return copy.selectSection;
-        if (key === 'ui.close') return copy.close;
         if (key === 'ui.opened') return copy.opened;
         if (key === 'ui.returned') return copy.returned;
         if (key.startsWith('nav.')) return copy.sectionLabels[key.slice(4)] ?? '';

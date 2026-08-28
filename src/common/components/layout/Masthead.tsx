@@ -1,18 +1,25 @@
 // src/common/components/layout/Masthead.tsx
 /**
- * Wordmark, mark stepper, language switch, closer.
+ * Wordmark, mark stepper, language switch.
  *
- * A Server Component. Two of its four children are `'use client'` leaves and each is a
+ * A Server Component. Two of its three children are `'use client'` leaves and each is a
  * leaf for a specific reason: `MarkStepper` measures a box, `LanguageSwitch` reads the
  * pathname. Nothing else here needs the browser, so nothing else is shipped to it.
  *
  * Ported from `legacy/index.html:82`.
+ *
+ * THE CLOSER IS GONE, AND THE LANGUAGE SWITCH STANDS IN ITS PLACE (prompt 8). The X button
+ * meant "leave this section", which every route already offers three other ways: the
+ * wordmark links home, the browser's Back button does what `router.back()` did, and Escape
+ * still closes an open section — `createShell`'s own `keydown` handler in
+ * `common/lib/motion/shell.ts` binds that, so the behaviour did not live in the button.
+ * Nothing replaces the closer; the switch simply moves into the end of the row, which is
+ * where the reader's eye already went for it.
  */
 import Link from 'next/link';
 import type { Locale } from '@/common/schemas/locale';
-import { getDictionary } from '@/common/i18n';
-import { localeHref } from '@/common/i18n/routing';
-import { Closer } from './Closer';
+import { getIntl } from '@/common/i18n';
+import { localeHref } from '@/common/i18n/navigation';
 import { LanguageSwitch } from './LanguageSwitch';
 import { MarkStepper } from './MarkStepper';
 
@@ -21,7 +28,7 @@ export interface MastheadProps {
 }
 
 export function Masthead({ locale }: MastheadProps) {
-  const { t, isRTL } = getDictionary(locale);
+  const { t, isRTL } = getIntl(locale);
   const brand = t('brand.name');
 
   return (
@@ -46,13 +53,14 @@ export function Masthead({ locale }: MastheadProps) {
 
       <MarkStepper isRTL={isRTL} />
 
-      <LanguageSwitch current={locale} label={t('ui.language')} />
-
       {/*
-        The closer means "leave this section", which is a navigation now rather than a
-        transition played in reverse. See `Closer` for why it is a button and not a link.
+        Last in the row, where the closer used to be. Which physical edge that is comes
+        from the document's `dir`, not from a class — `.masthead` is a flex row, so the
+        switch sits at the right in English and at the left in Persian with no rule of its
+        own. The closer needed a mirrored `[dir="rtl"]` override precisely because it was
+        absolutely positioned against `right: 0`; that rule is gone with it.
       */}
-      <Closer label={t('ui.close')} home={localeHref(locale)} />
+      <LanguageSwitch current={locale} label={t('ui.language')} />
     </header>
   );
 }

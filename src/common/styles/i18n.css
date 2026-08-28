@@ -97,9 +97,6 @@ html.is-fa .lat {
 
 [dir="rtl"] .stage.is-open .col.is-active .col__title { left: auto; right: 0; }
 
-[dir="rtl"] .closer { right: auto; left: 0; }
-[dir="rtl"] .closer__x { transform: scaleX(-1); }
-
 [dir="rtl"] .panel__rail { padding-right: 0; padding-inline-start: 0;
   padding-inline-end: var(--sp-5); }
 [dir="rtl"] .panel__rail::after { right: auto; left: 0; }
@@ -145,17 +142,28 @@ html.is-fa .lat {
 .lang__b[aria-pressed="true"] { color: var(--a-1); }
 .lang__sep { opacity: 0.4; }
 
-/* The switch lives in the footer on wide screens and the masthead on narrow
-   ones, where the footer has no room for it. */
-.masthead .lang { display: none; }
+/* NOT PORTED — rewritten in prompt 8, when the closer was deleted and the
+   masthead's switch took its slot.
+
+   `margin-inline-start: auto` in a flex row, not `position: absolute` against a
+   physical edge. `.marks` is the masthead's only other child and is itself out
+   of flow, so the switch is simply pushed to the END of the row — which `dir`
+   then mirrors on its own. That is the whole reason the closer needed
+   `[dir="rtl"] .closer { right: auto; left: 0 }` and this needs no RTL rule at
+   all: a logical margin has no wrong corner.
+
+   VISIBILITY IS THE CLOSER'S, INHERITED. The footer carries the switch on wide
+   screens, so the masthead's copy appears there only in an open section —
+   exactly when and where the X button used to. Below 860px the footer has no
+   room for it and the masthead's is the only one, at every stage state; the old
+   `.stage.is-open` hide is gone with the closer that displaced it. */
+.masthead .lang {
+  display: none;
+  margin-inline-start: auto;
+}
+.stage.is-open .masthead .lang { display: inline-flex; }
+
 @media (max-width: 860px) {
   .footbar .lang { display: none; }
-  .masthead .lang {
-    display: inline-flex;
-    position: absolute;
-    top: 50%;
-    inset-inline-end: 5.5rem;
-    transform: translateY(-50%);
-  }
-  .stage.is-open .masthead .lang { display: none; }
+  .masthead .lang { display: inline-flex; }
 }

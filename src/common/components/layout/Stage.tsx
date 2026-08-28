@@ -4,7 +4,8 @@
  * The `#stage` element, and the one bit of chrome state that depends on WHERE you are.
  *
  * `shell.css` expresses "a section is open" as `.stage.is-open`: the wordmark's glyph
- * rotates, the closer appears, the columns collapse. On the static site a script added
+ * rotates, the columns collapse, and — since prompt 8 replaced the close button with the
+ * language switch — the masthead's switch appears. On the static site a script added
  * that class. With real routes the answer is simply "is this a section route or the
  * index", which is the pathname — so this component reads it and nothing else.
  *
