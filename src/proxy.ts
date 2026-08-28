@@ -22,9 +22,22 @@
  * it to `/en/dashboard`, a route that does not exist.
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { DEFAULT_LOCALE, isLocale, resolveLocale } from '@/common/i18n/routing';
+import createMiddleware from 'next-intl/middleware';
+import { routing } from '@/common/i18n/routing';
 import { SESSION_COOKIE } from '@/common/config/session-cookie';
 import { isAuthRoute, isPrivateRoute, SIGN_IN_PATH } from '@/common/config/private-routes';
+
+/**
+ * LEG 2, built once at module scope rather than per request: `createMiddleware` compiles
+ * the routing config, and doing that on every request would pay for it on every
+ * navigation, RSC payload and `<Link>` prefetch.
+ *
+ * It is COMPOSED INSIDE `proxy` below, never exported as the file's own default. next-intl
+ * ships a middleware that is meant to BE the whole file, and taking that shape here would
+ * lose leg 1 entirely — and its matcher would then see `/dashboard`, which is exactly the
+ * request that must never be locale-prefixed.
+ */
+const routeLocale = createMiddleware(routing);
 
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -32,7 +45,7 @@ export default function proxy(request: NextRequest) {
   // The dashboard, including its login page — `isPrivateRoute` matches the whole prefix.
   if (isPrivateRoute(pathname)) return gateDashboard(request, pathname);
 
-  return routeLocale(request, pathname);
+  return routeLocale(request);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════ *
@@ -99,7 +112,7 @@ function gateDashboard(request: NextRequest, pathname: string) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════ *
- *  LEG 2 — locale routing (prompt 4, unchanged)                                       *
+ *  LEG 2 — locale routing (next-intl since prompt 8)                                  *
  * ══════════════════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -112,38 +125,23 @@ function gateDashboard(request: NextRequest, pathname: string) {
  *
  * (The dashboard DOES have its own root layout, at `app/(dashboard)/layout.tsx`. That is
  * not a contradiction — it is a second, deliberately monolingual document tree, which is
- * why it is gated above and never reaches this function.)
+ * why it is gated above and never reaches `routeLocale`.)
+ *
+ * WHAT PROMPT 8 REPLACED, and what it kept:
+ *
+ *  - The hand-rolled `Accept-Language` parser is gone. next-intl negotiates through
+ *    `Negotiator` + `@formatjs/intl-localematcher` against `routing.locales`, which is the
+ *    same list `[locale]` validates and the sitemap enumerates. `legacy/js/core/i18n.js:97`
+ *    chose the starting language from `navigator.language`; `Accept-Language` is the
+ *    server-side form of the same signal, and that intent is unchanged.
+ *  - The redirect is still a 307. `NextResponse.redirect` defaults to 307 and next-intl
+ *    passes no status, so the mapping stays non-permanent: it depends on a request header,
+ *    and a 308 would pin a reader to whichever language they resolved to on their very
+ *    first visit, in their browser's redirect cache where they cannot see it.
+ *  - No stored preference, still. `localeCookie: false` in `@/common/i18n/routing` turns
+ *    off next-intl's `NEXT_LOCALE` cookie, which would otherwise outrank `Accept-Language`
+ *    and reintroduce exactly the `kavan.lang` memory prompt 4 deliberately dropped.
  */
-function routeLocale(request: NextRequest, pathname: string) {
-  const first = pathname.split('/')[1];
-
-  // Already prefixed. Fall straight through — this runs on EVERY request, navigation, RSC
-  // payload and `<Link>` prefetch alike, so the common case must cost one string split.
-  if (isLocale(first)) return NextResponse.next();
-
-  /**
-   * `legacy/js/core/i18n.js:97` chose the starting language from `navigator.language`,
-   * falling back to English. `Accept-Language` is the server-side form of the same signal
-   * and the only one available before a document exists, so the intent survives the move
-   * even though the mechanism cannot.
-   *
-   * A stored preference has no successor: the language is in the URL now, so a reader who
-   * chose Persian is holding a Persian link. That is a better memory than `localStorage`,
-   * which was per-browser and invisible to anyone they sent the link to.
-   */
-  const locale = resolveLocale(request.headers.get('accept-language')) ?? DEFAULT_LOCALE;
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/${locale}${pathname === '/' ? '' : pathname}`;
-
-  /**
-   * A 307, not a 308. The chosen locale depends on a request header, so this mapping is
-   * not permanent and must not be cached by intermediaries or burned into a browser's
-   * redirect cache — a reader whose browser is set to Persian would otherwise be pinned to
-   * whichever language they happened to resolve to on their very first visit.
-   */
-  return NextResponse.redirect(url, 307);
-}
 
 export const config = {
   /**
