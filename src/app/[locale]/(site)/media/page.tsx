@@ -13,7 +13,7 @@ import { getIntl } from '@/common/i18n';
 import { isLocale } from '@/common/i18n/routing';
 import { localeAlternates, localeHref } from '@/common/i18n/navigation';
 import { parseFacet, type RawSearchParams } from '@/common/utils/facets';
-import { listMedia } from '@/common/services/media-service';
+import { getMediaFilters, listMedia } from '@/common/services/media-service';
 import { listProjects } from '@/common/services/project-service';
 import { MediaScreen, MEDIA_FACET } from '@/modules/media';
 
@@ -37,12 +37,17 @@ export default async function MediaPage({ params, searchParams }: PageProps) {
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   if (!isLocale(locale)) notFound();
 
-  const [entries, projects] = await Promise.all([listMedia(locale), listProjects(locale)]);
+  const [entries, projects, filters] = await Promise.all([
+    listMedia(locale),
+    listProjects(locale),
+    getMediaFilters(locale),
+  ]);
 
   return (
     <MediaScreen
       entries={entries}
       projects={projects}
+      kinds={filters.types}
       type={parseFacet(rawSearchParams, MEDIA_FACET)}
       basePath={localeHref(locale, '/media')}
       dictionary={getIntl(locale)}

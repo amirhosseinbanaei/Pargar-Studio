@@ -8,7 +8,10 @@ import { cacheLife, cacheTag } from 'next/cache';
 import { toLocaleMedia, type Media } from '@/common/schemas/media';
 import type { MediaCreate, MediaRow, MediaUpdate } from '@/common/schemas/media';
 import type { Locale } from '@/common/schemas/locale';
+import type { TermOption } from '@/common/schemas/taxonomy';
+import { optionsForAxis } from '@/common/utils/taxonomy';
 import * as mediaRepo from './media-repository';
+import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, mediaTag, projectTag } from './cache-tags';
 
 export async function listMedia(locale: Locale): Promise<Media[]> {
@@ -43,6 +46,35 @@ export async function listMediaForProject(projectSlug: string, locale: Locale): 
 
   const rows = await mediaRepo.byProjectSlug(projectSlug);
   return rows.map(row => toLocaleMedia(row, locale));
+}
+
+/**
+ * The kind rail's option list, from `taxonomy_terms`.
+ *
+ * One axis, the `type` column (`legacy/js/ui/panel.js:279`). Same composition and the same
+ * two tags as `getProjectFilters` — see that function's header. Counts stay on the screen,
+ * which already holds every entry.
+ *
+ * Note the naming mismatch, which is deliberate and load-bearing: the COLUMN and the axis
+ * are `type`, the rail's heading is "Kind", and the message catalog's fallback group is
+ * `kind.*`. Renaming any of them would be a repo-wide edit for no gain — AGENTS.md records
+ * that catalog keys are never renamed — so `schemas/taxonomy.ts`'s `AXIS_TERM_GROUP` maps
+ * between them in one place.
+ */
+export async function getMediaFilters(locale: Locale): Promise<{ types: TermOption[] }> {
+  'use cache';
+  cacheLife('max');
+  cacheTag(CACHE_TAGS.media, CACHE_TAGS.taxonomy);
+
+  const [rows, terms] = await Promise.all([mediaRepo.list(), getPublicTerms('media')]);
+
+  return {
+    types: optionsForAxis(
+      terms.filter(term => term.axis === 'type'),
+      rows.map(row => row.type),
+      locale,
+    ),
+  };
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════════ *

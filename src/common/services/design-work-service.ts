@@ -12,7 +12,10 @@ import type {
   DesignWorkUpdate,
 } from '@/common/schemas/design-work';
 import type { Locale } from '@/common/schemas/locale';
+import type { TermOption } from '@/common/schemas/taxonomy';
+import { optionsForAxis } from '@/common/utils/taxonomy';
 import * as designWorkRepo from './design-work-repository';
+import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, designWorkTag } from './cache-tags';
 
 export async function listDesignWorks(locale: Locale): Promise<DesignWork[]> {
@@ -31,6 +34,35 @@ export async function getDesignWork(slug: string, locale: Locale): Promise<Desig
 
   const row = await designWorkRepo.bySlug(slug);
   return row ? toLocaleDesignWork(row, locale) : null;
+}
+
+/**
+ * The category rail's option list, from `taxonomy_terms`.
+ *
+ * The design index filters on ONE axis (`legacy/js/ui/panel.js:215`), and until prompt 9 its
+ * options were derived from the rows alone — so a category could not be reordered, retired
+ * or relabelled without a deploy. Same composition and the same two tags as
+ * `getProjectFilters`; that function's header carries the full reasoning, including why
+ * nesting a cached read does not lift its tag onto this entry.
+ *
+ * The COUNTS are not here: the screen already has every row in memory for the grid it is
+ * about to render, so counting there costs nothing and counting here would mean returning a
+ * second parallel structure for the screen to zip back together.
+ */
+export async function getDesignWorkFilters(locale: Locale): Promise<{ categories: TermOption[] }> {
+  'use cache';
+  cacheLife('max');
+  cacheTag(CACHE_TAGS.designWorks, CACHE_TAGS.taxonomy);
+
+  const [rows, terms] = await Promise.all([designWorkRepo.list(), getPublicTerms('design')]);
+
+  return {
+    categories: optionsForAxis(
+      terms.filter(term => term.axis === 'category'),
+      rows.map(row => row.category),
+      locale,
+    ),
+  };
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════════ *

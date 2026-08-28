@@ -35,7 +35,10 @@ export default async function ProjectsPage({ params, searchParams }: PageProps) 
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   if (!isLocale(locale)) notFound();
 
-  const [projects, taxonomy] = await Promise.all([listProjects(locale), getProjectFilters()]);
+  // `getProjectFilters` takes the locale now: the rail's option labels come from
+  // `taxonomy_terms`, which carries a column pair, so the service collapses them here rather
+  // than serializing both languages into the payload.
+  const [projects, taxonomy] = await Promise.all([listProjects(locale), getProjectFilters(locale)]);
 
   return (
     <ProjectsScreen

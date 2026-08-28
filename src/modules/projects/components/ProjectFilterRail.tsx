@@ -22,6 +22,7 @@
 import Link from 'next/link';
 import type { Dictionary } from '@/common/i18n';
 import type { Project } from '@/common/schemas/project';
+import type { TermOption } from '@/common/schemas/taxonomy';
 import {
   FILTER_KEYS,
   hasAnyFilter,
@@ -31,11 +32,18 @@ import {
   type ProjectFilters,
 } from '../lib/filters';
 
-/** The option values per axis, derived from the rows that exist by `getProjectFilters()`. */
+/**
+ * The options per axis, from `getProjectFilters()`.
+ *
+ * Three of them are TERMS — rows in `taxonomy_terms`, carrying a label already resolved to
+ * this locale, ordered by the position an editor chose, and filtered to the ones some
+ * project actually uses. `years` is not and never was: a year has no label and no order to
+ * choose, so it stays a list of strings derived from the rows and is shaped, not looked up.
+ */
 export interface FilterTaxonomy {
-  types: string[];
-  statuses: string[];
-  scales: string[];
+  types: TermOption[];
+  statuses: TermOption[];
+  scales: TermOption[];
   years: string[];
 }
 
@@ -56,6 +64,21 @@ const OPTIONS_BY_KEY: Record<FilterKey, keyof FilterTaxonomy> = {
   scale: 'scales',
   year: 'years',
 };
+
+/**
+ * One axis's options as a uniform list, whichever shape the taxonomy stores it in.
+ *
+ * `years` is a `string[]` and the other three are `TermOption[]`, because a year has no
+ * label to carry. Normalizing here rather than widening the taxonomy type keeps the service
+ * honest about which axes are terms and which one is derived, and confines the difference to
+ * these four lines instead of a ternary inside the render.
+ */
+function optionsFor(taxonomy: FilterTaxonomy, key: FilterKey): TermOption[] {
+  const options = taxonomy[OPTIONS_BY_KEY[key]];
+  return options.map(option =>
+    typeof option === 'string' ? { value: option, label: null } : option,
+  );
+}
 
 export function ProjectFilterRail({
   taxonomy,
@@ -82,22 +105,38 @@ export function ProjectFilterRail({
           </summary>
           <div className="fgroup__body">
             <ul className="fgroup__list">
-              {taxonomy[OPTIONS_BY_KEY[key]].map(value => {
-                const selected = filters[key] === value;
+              {optionsFor(taxonomy, key).map(option => {
+                const selected = filters[key] === option.value;
                 return (
-                  <li key={value}>
+                  <li key={option.value}>
                     <Link
                       className="fopt magnet"
-                      href={toggleFilterHref(basePath, filters, key, value)}
+                      href={toggleFilterHref(basePath, filters, key, option.value)}
                       aria-current={selected ? 'true' : undefined}
                       // Filtering swaps content inside the current view; jumping to the
                       // top would lose the reader's place in a 76-card grid.
                       scroll={false}
                     >
-                      {/* Years are values, not vocabulary — they are shaped, not looked up. */}
-                      <span>{key === 'year' ? num(value) : term(key, value)}</span>
+                      {/*
+                        THE THREE-STEP DEGRADATION, in the one place it is visible.
+
+                        A known term carries its own label, in this locale, from the table —
+                        so changing a Persian label in the dashboard changes this rail and
+                        nothing else. `label` is `null` for a value some project carries that
+                        no term declares, and that falls through to the message catalog's
+                        `type.*` / `status.*` / `scale.*` group, which itself degrades to the
+                        raw value. Never blank, never the literal key.
+
+                        Years take neither path: they are values, not vocabulary, so they are
+                        digit-shaped rather than looked up.
+                      */}
+                      <span>
+                        {key === 'year'
+                          ? num(option.value)
+                          : (option.label ?? term(key, option.value))}
+                      </span>
                       <span className="fopt__n">
-                        {num(optionCount(projects, filters, key, value))}
+                        {num(optionCount(projects, filters, key, option.value))}
                       </span>
                     </Link>
                   </li>

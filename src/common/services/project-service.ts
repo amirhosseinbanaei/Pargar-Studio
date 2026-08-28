@@ -2,9 +2,9 @@
 /**
  * RING 3 — what a page calls to read projects.
  *
- * Imports its repository and nothing else. It never touches `db`, never builds a query,
- * and never parses a row: skipping ring 2 is exactly how an unvalidated row reaches a
- * component.
+ * Imports its repository and — since prompt 9 — `taxonomy-service`, for the filter rail's
+ * option list. It never touches `db`, never builds a query, and never parses a row:
+ * skipping ring 2 is exactly how an unvalidated row reaches a component.
  *
  * ─── CACHING ──────────────────────────────────────────────────────────────────────
  * Every read here is a Cache Components function: `'use cache'` + `cacheLife` + `cacheTag`.
@@ -27,7 +27,6 @@
  */
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
-import { projectStatusValues, projectScaleValues, projectTypeValues } from '@/common/schemas/enums';
 import {
   toLocaleProject,
   type Project,
@@ -36,7 +35,10 @@ import {
   type ProjectUpdate,
 } from '@/common/schemas/project';
 import type { Locale } from '@/common/schemas/locale';
+import type { TermOption } from '@/common/schemas/taxonomy';
+import { optionsForAxis } from '@/common/utils/taxonomy';
 import * as projectRepo from './project-repository';
+import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, projectTag } from './cache-tags';
 
 /** The whole archive, in `sort_order` (seeded reverse-chronological). */
@@ -67,62 +69,70 @@ export async function getProject(slug: string, locale: Locale): Promise<Project 
 }
 
 /**
- * The filter taxonomy for the projects index — DERIVED from the rows that exist, not
- * hardcoded.
+ * The filter taxonomy for the projects index — the OPTION LIST from `taxonomy_terms`, the
+ * counts and the years from the rows.
  *
- * This is what `legacy/data/projects.js:424` already did for `type`
- * (`TYPES.filter(t => PROJECTS.some(p => p.type.includes(t)))`) and this extends the same
- * rule to the other three axes. A hardcoded list goes stale in both directions: it offers
- * a filter that matches nothing the first time a category empties, and it silently hides a
- * project the first time the dashboard introduces a type nobody listed.
+ * ─── IT USED TO BE DERIVED FROM THE ROWS ALONE ────────────────────────────────────
+ * Until prompt 9 the options were `enums.ts`'s frozen arrays intersected with the values
+ * some row happened to use. That is why there was no way to add a category, hide a retired
+ * one, reorder the options or change a Persian label without a code edit and a deploy. The
+ * canon is a table now; both halves of the old rule survive and live in `optionsForAxis`:
  *
- * Ordering is the canonical one from `@/common/schemas/enums` — the legacy arrays are in a
- * deliberate order, not alphabetical — with any value not in that list appended rather
- * than dropped, so an unknown value is visible instead of invisible.
+ *  - **Presence still gates.** A term nothing uses is not offered, because an option beside
+ *    a zero is a filter that matches nothing — the failure AGENTS.md's prompt-2 decision
+ *    named. `visible` is a VETO over that set, not a way to force an empty option on.
+ *  - **An unknown value is APPENDED, not dropped.** A project whose status has no term still
+ *    appears in the rail carrying its raw value, so the records holding it stay reachable.
  *
- * Labels are NOT here. `'Type'` and `'Residential'` are copy; the UI dictionary ported in
- * prompt 4 translates them.
+ * ─── BOTH TAGS, AND WHY BOTH ARE SPELLED OUT HERE ─────────────────────────────────
+ * This entry is a composition of two tables, so it is purged by two tags. `getPublicTerms`
+ * is itself a cached function and carries `taxonomy-terms` on its OWN entry; nesting does
+ * not lift that tag onto this one, so a term write would refresh the inner read and leave
+ * this rail exactly as stale as before. Every taxonomy write action therefore purges the
+ * pair — see `cache-tags.ts`'s `taxonomySubjectTag`.
+ *
+ * ─── `year` IS NOT A TERM ─────────────────────────────────────────────────────────
+ * It stays derived from the rows, and that is not an omission. A year has no label to
+ * translate and no order to choose: it is sorted newest-first below, which is the only order
+ * it can sensibly have, and there is nothing an editor could usefully edit about `2019`.
+ *
+ * Labels: a known term's label comes from the table, in this locale. `null` marks a value
+ * with no term, which the rail degrades through the message catalog to the raw value — the
+ * same three-step the i18n layer documents for `term()`.
  */
-export async function getProjectFilters(): Promise<{
-  types: string[];
-  statuses: string[];
-  scales: string[];
+export async function getProjectFilters(locale: Locale): Promise<{
+  types: TermOption[];
+  statuses: TermOption[];
+  scales: TermOption[];
   years: string[];
 }> {
   'use cache';
   cacheLife('max');
-  cacheTag(CACHE_TAGS.projects);
+  cacheTag(CACHE_TAGS.projects, CACHE_TAGS.taxonomy);
 
-  const rows = await projectRepo.list();
+  const [rows, terms] = await Promise.all([projectRepo.list(), getPublicTerms('project')]);
+  const onAxis = (axis: string) => terms.filter(term => term.axis === axis);
 
   return {
-    types: order(
-      projectTypeValues,
+    types: optionsForAxis(
+      onAxis('type'),
       rows.flatMap(row => row.types),
+      locale,
     ),
-    statuses: order(
-      projectStatusValues,
+    statuses: optionsForAxis(
+      onAxis('status'),
       rows.map(row => row.status),
+      locale,
     ),
-    scales: order(
-      projectScaleValues,
+    scales: optionsForAxis(
+      onAxis('scale'),
       rows.map(row => row.scale),
+      locale,
     ),
     // Newest first, as strings: these are filter option VALUES compared against a query
     // parameter, and `String(year)` is what the URL carries.
     years: [...new Set(rows.map(row => row.year))].sort((a, b) => b - a).map(String),
   };
-}
-
-/**
- * Distinct values actually present, in canonical order, with unknowns appended.
- * Module-private: it is a detail of the taxonomy above, not part of the service surface.
- */
-function order(canonical: readonly string[], present: readonly string[]): string[] {
-  const seen = new Set(present);
-  const known = canonical.filter(value => seen.has(value));
-  const unknown = [...seen].filter(value => !canonical.includes(value)).sort();
-  return [...known, ...unknown];
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════════ *

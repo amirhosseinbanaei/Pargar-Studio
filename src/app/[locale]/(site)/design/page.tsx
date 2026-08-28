@@ -8,7 +8,7 @@ import { getIntl } from '@/common/i18n';
 import { isLocale } from '@/common/i18n/routing';
 import { localeAlternates, localeHref } from '@/common/i18n/navigation';
 import { parseFacet, type RawSearchParams } from '@/common/utils/facets';
-import { listDesignWorks } from '@/common/services/design-work-service';
+import { getDesignWorkFilters, listDesignWorks } from '@/common/services/design-work-service';
 import { DesignScreen, DESIGN_FACET } from '@/modules/design';
 
 type PageProps = {
@@ -33,11 +33,15 @@ export default async function DesignPage({ params, searchParams }: PageProps) {
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   if (!isLocale(locale)) notFound();
 
-  const works = await listDesignWorks(locale);
+  const [works, filters] = await Promise.all([
+    listDesignWorks(locale),
+    getDesignWorkFilters(locale),
+  ]);
 
   return (
     <DesignScreen
       works={works}
+      categories={filters.categories}
       category={parseFacet(rawSearchParams, DESIGN_FACET)}
       basePath={localeHref(locale, '/design')}
       dictionary={getIntl(locale)}

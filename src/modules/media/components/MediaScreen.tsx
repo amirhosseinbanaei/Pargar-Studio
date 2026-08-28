@@ -15,6 +15,7 @@ import { CardReveal, FacetRail, type FacetOption } from '@/common/components/col
 import type { Dictionary } from '@/common/i18n';
 import type { Media } from '@/common/schemas/media';
 import type { Project } from '@/common/schemas/project';
+import type { TermOption } from '@/common/schemas/taxonomy';
 import { MediaCard } from './MediaCard';
 
 const GRID_ID = 'media-grid';
@@ -26,23 +27,32 @@ export interface MediaScreenProps {
   entries: readonly Media[];
   /** The whole archive, for the card seeds. Missing slugs simply draw from their own. */
   projects: readonly Project[];
+  /** The kind options, from `taxonomy_terms` via `getMediaFilters()`. */
+  kinds: readonly TermOption[];
   /** The selected kind, or undefined for all fourteen. */
   type: string | undefined;
   basePath: string;
   dictionary: Dictionary;
 }
 
-export function MediaScreen({ entries, projects, type, basePath, dictionary }: MediaScreenProps) {
+export function MediaScreen({
+  entries,
+  projects,
+  kinds,
+  type,
+  basePath,
+  dictionary,
+}: MediaScreenProps) {
   const { t, num, term } = dictionary;
 
   const typesBySlug = new Map(projects.map(project => [project.slug, project.types]));
 
-  // Derived from the rows that exist — see `DesignScreen` for why this is not a constant.
-  const kinds = [...new Set(entries.map(entry => entry.type))];
-  const options: FacetOption[] = kinds.map(value => ({
-    value,
-    label: term('kind', value),
-    count: entries.filter(entry => entry.type === value).length,
+  // Options from the terms table, counts from these rows — see `DesignScreen` for the full
+  // reasoning. The catalog group is `kind` while the column and the axis are both `type`.
+  const options: FacetOption[] = kinds.map(option => ({
+    value: option.value,
+    label: option.label ?? term('kind', option.value),
+    count: entries.filter(entry => entry.type === option.value).length,
   }));
 
   const shown = type ? entries.filter(entry => entry.type === type) : entries;
