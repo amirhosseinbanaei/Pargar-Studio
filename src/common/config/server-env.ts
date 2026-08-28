@@ -21,6 +21,7 @@
  * Requires zod v4.
  */
 import 'server-only';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 const serverEnvSchema = z.object({
@@ -61,6 +62,30 @@ const serverEnvSchema = z.object({
    * CONSUMED BY: prompt 6 (the session module).
    */
   SESSION_SECRET: z.string().min(32),
+  /**
+   * ABSOLUTE path to the directory uploaded images are written to and served from.
+   *
+   * NO DEFAULT, and that is the rule this file's header states rather than a preference. A
+   * default — `./uploads`, `/tmp/uploads`, anything — turns a missing value into writes that
+   * land somewhere nobody looks: the dashboard reports a saved image, the file is on an
+   * ephemeral layer inside the container, and the picture disappears at the next deploy with
+   * no error at any point. A missing value must stop the boot with the key named instead.
+   *
+   * It is REQUIRED TO BE ABSOLUTE for the same reason. A relative path resolves against the
+   * process working directory, which is the repo root under `npm run dev`, `/app` in the
+   * container, and whatever the orchestrator chose for a one-off migration container — three
+   * different directories for one configured value.
+   *
+   * `/data/uploads` in the container, mounted from the named volume in `compose.yaml`. A
+   * gitignored absolute path locally (`<repo>/uploads`, which `.gitignore` covers).
+   *
+   * CONSUMED BY: prompt 10 (`common/services/upload-store.ts`, and through it the two route
+   * handlers at `/api/uploads` and `/api/media/[...path]`).
+   */
+  UPLOAD_DIR: z
+    .string()
+    .min(1)
+    .refine(value => isAbsolute(value), 'must be an absolute path'),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -72,6 +97,7 @@ const parsed = serverEnvSchema.safeParse({
   TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   SESSION_SECRET: process.env.SESSION_SECRET,
+  UPLOAD_DIR: process.env.UPLOAD_DIR,
 });
 
 if (!parsed.success) {
