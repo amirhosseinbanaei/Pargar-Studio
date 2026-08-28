@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
+import { imagePath, imagePathWrite, toLocaleImage } from './image';
 import { factSchema, factWriteSchema } from './fact';
 
 /* ── READ ─────────────────────────────────────────────────────────────────────── */
@@ -51,6 +52,18 @@ export const mediaRowSchema = z.object({
   factsEn: jsonArray(factSchema),
   factsFa: jsonArray(factSchema),
 
+  /**
+   * A COVER ONLY (prompt 10), and usually absent.
+   *
+   * With no cover of its own the card and the detail page keep the drawing seeded from the
+   * RELATED PROJECT rather than from the entry, so a press cutting about a building carries
+   * the building's picture — the rule `legacy/js/ui/panel.js:263` established and AGENTS.md
+   * records. Uploading a cover here overrides that for this entry and nothing else.
+   */
+  coverImage: imagePath,
+  coverAltEn: looseString,
+  coverAltFa: looseString,
+
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -74,6 +87,7 @@ export function toLocaleMedia(row: MediaRow, locale: Locale) {
     excerpt: pickLocale(locale, row.excerptEn, row.excerptFa),
     context: pickLocale(locale, row.contextEn, row.contextFa),
     facts: pickLocale(locale, row.factsEn, row.factsFa),
+    cover: toLocaleImage(locale, row.coverImage, row.coverAltEn, row.coverAltFa),
   };
 }
 
@@ -118,6 +132,11 @@ export const mediaCreateSchema = z.strictObject({
   contextFa: z.string(),
   factsEn: z.array(factWriteSchema),
   factsFa: z.array(factWriteSchema),
+
+  /** See `projectCreateSchema`. No gallery: a media entry carries one image at most. */
+  coverImage: imagePathWrite,
+  coverAltEn: z.string().nullable(),
+  coverAltFa: z.string().nullable(),
 });
 
 export type MediaCreate = z.infer<typeof mediaCreateSchema>;

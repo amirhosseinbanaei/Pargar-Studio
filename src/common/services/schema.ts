@@ -35,6 +35,22 @@
  * an unverifiable claim. These columns are parsed by the zod schemas in
  * `@/common/schemas/` instead, which is a claim the runtime enforces.
  *
+ * ─── IMAGE COLUMNS (prompt 10) ────────────────────────────────────────────────────
+ * A record that takes a picture carries a nullable TEXT `cover_image` holding the path
+ * `/api/media` serves it from, plus a per-locale `cover_alt_en` / `cover_alt_fa` pair. The
+ * path column is nullable and NULL is the correct value for every row that exists today:
+ * 76 projects genuinely have no photograph, and a record with no image keeps the drawing
+ * `common/lib/art/` generates from its slug.
+ *
+ * ALT TEXT IS A COLUMN PAIR because it is CONTENT — it is a sentence a reader hears in
+ * their own language, so it translates like every other translated field and not like a
+ * taxonomy value. It is nullable in the DATABASE and required by the WRITE schemas whenever
+ * an image is present; the constraint is cross-field ("required if"), which SQLite cannot
+ * express as a column type and which belongs with the other write rules regardless.
+ *
+ * A GALLERY is a per-locale pair of JSON columns, per the rule immediately below. See
+ * `projects.gallery_en`.
+ *
  * ─── TIMESTAMPS ───────────────────────────────────────────────────────────────────
  * Stored as INTEGER unix-epoch seconds (`mode: 'timestamp'`), which sorts correctly as a
  * number and needs no string-format agreement between writer and reader.
@@ -87,6 +103,31 @@ export const projects = sqliteTable(
     clientEn: text('client_en').notNull(),
     clientFa: text('client_fa').notNull(),
 
+    /**
+     * The cover photograph's stored path, or NULL for a project with no photograph — which
+     * is every row in the archive today. NULL is not a gap to fill: the card and the detail
+     * page fall back to the drawing generated from the slug, which is what those pages have
+     * always shown.
+     */
+    coverImage: text('cover_image'),
+    /** Required whenever `cover_image` is set — enforced by the write schemas, not here. */
+    coverAltEn: text('cover_alt_en'),
+    coverAltFa: text('cover_alt_fa'),
+    /**
+     * The ordered gallery: a JSON string array of `{ path, alt }`, per locale.
+     *
+     * TEXT holding JSON, never `mode: 'json'` — the rule at the top of this file. The
+     * ORDER is the array's order and is what the dashboard's arrow controls change.
+     *
+     * The two columns are INDEX-ALIGNED, the same convention `studio.founders` already
+     * uses: item `i` is the same photograph in both, and only its `alt` differs. That
+     * alignment is not left to an editor's care — the dashboard edits ONE list holding both
+     * alt texts and splits it into these two columns on save, so the paths and the order
+     * have exactly one author and cannot desync.
+     */
+    galleryEn: text('gallery_en'),
+    galleryFa: text('gallery_fa'),
+
     ...timestamps,
   },
   table => [uniqueIndex('projects_slug_unique').on(table.slug)],
@@ -124,6 +165,13 @@ export const designWorks = sqliteTable(
     /** JSON array of `{ k, v }` — translated in full (legacy/data/works.fa.js:28). */
     factsEn: text('facts_en').notNull(),
     factsFa: text('facts_fa').notNull(),
+
+    /** Same four columns as `projects`, same reasons — see there. */
+    coverImage: text('cover_image'),
+    coverAltEn: text('cover_alt_en'),
+    coverAltFa: text('cover_alt_fa'),
+    galleryEn: text('gallery_en'),
+    galleryFa: text('gallery_fa'),
 
     ...timestamps,
   },
@@ -178,6 +226,16 @@ export const media = sqliteTable(
     factsEn: text('facts_en').notNull(),
     factsFa: text('facts_fa').notNull(),
 
+    /**
+     * A COVER ONLY, and no gallery. A media entry is a press cutting or an award notice —
+     * one image at most, and often none: with no cover of its own the card and the detail
+     * page keep the drawing seeded from the RELATED PROJECT rather than from the entry, so
+     * a cutting about a building carries the building's picture (AGENTS.md).
+     */
+    coverImage: text('cover_image'),
+    coverAltEn: text('cover_alt_en'),
+    coverAltFa: text('cover_alt_fa'),
+
     ...timestamps,
   },
   table => [uniqueIndex('media_slug_unique').on(table.slug)],
@@ -199,7 +257,21 @@ export const studio = sqliteTable(
 
     manifestoEn: text('manifesto_en').notNull(),
     manifestoFa: text('manifesto_fa').notNull(),
-    /** JSON `{ name, role, born, bio }[]`. */
+    /**
+     * JSON `{ name, role, born, bio, image, imageAlt }[]`.
+     *
+     * A PORTRAIT LIVES INSIDE THE EXISTING STRUCTURE rather than in new columns, because a
+     * founder is already a row of this array and a parallel `founder_portraits` column
+     * would have to stay index-aligned with it by hand. `image` is the stored path (`''`
+     * for a founder with no photograph, who keeps the generated portrait); `imageAlt` is
+     * the per-locale sentence, which is per-locale for free because these two columns
+     * already are.
+     *
+     * The IMAGE has one author: the dashboard offers the uploader on the English side only
+     * and the save copies each `image` across to the Persian array by index. So the two
+     * arrays can differ in their `imageAlt` — which is the point — and never in which
+     * photograph a founder has.
+     */
     foundersEn: text('founders_en').notNull(),
     foundersFa: text('founders_fa').notNull(),
     /** JSON `{ label, value }[]`. */

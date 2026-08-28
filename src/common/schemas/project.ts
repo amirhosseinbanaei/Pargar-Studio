@@ -22,6 +22,14 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
+import {
+  galleryColumn,
+  galleryItemWriteSchema,
+  imagePath,
+  imagePathWrite,
+  toLocaleGallery,
+  toLocaleImage,
+} from './image';
 import { projectTypeValues } from './enums';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -61,6 +69,20 @@ export const projectRowSchema = z.object({
   clientEn: looseString,
   clientFa: looseString,
 
+  /**
+   * THE PHOTOGRAPHS (prompt 10), and every one of them is optional.
+   *
+   * `null` / `[]` is the state of the entire seeded archive and is not a gap: a project
+   * with no cover keeps the drawing `kindFor(slug, types)` generates, on the card and on
+   * the detail page alike. See `@/common/schemas/image` for why a path with no alt text in
+   * the rendered locale counts as "no image" rather than as an undescribed one.
+   */
+  coverImage: imagePath,
+  coverAltEn: looseString,
+  coverAltFa: looseString,
+  galleryEn: galleryColumn,
+  galleryFa: galleryColumn,
+
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -94,6 +116,13 @@ export function toLocaleProject(row: ProjectRow, locale: Locale) {
     description: pickLocale(locale, row.descriptionEn, row.descriptionFa),
     location: pickLocale(locale, row.locationEn, row.locationFa),
     client: pickLocale(locale, row.clientEn, row.clientFa),
+    /**
+     * `{ path, alt } | null` rather than a path and a string, so "is there a picture here"
+     * is one check a component cannot half-do — and so the alt text is already in the
+     * rendered locale by the time any component sees it.
+     */
+    cover: toLocaleImage(locale, row.coverImage, row.coverAltEn, row.coverAltFa),
+    gallery: toLocaleGallery(locale, row.galleryEn, row.galleryFa),
   };
 }
 
@@ -170,6 +199,21 @@ export const projectCreateSchema = z.strictObject({
   locationFa: z.string(),
   clientEn: z.string(),
   clientFa: z.string(),
+
+  /**
+   * NULLABLE, and the alt pair is nullable beside it, because "no photograph" is a normal
+   * and permanent state for a record in this archive.
+   *
+   * The rule that alt text is REQUIRED WHENEVER AN IMAGE IS SET is cross-field, so it lives
+   * on the dashboard's form and submission schemas (`modules/dashboard/schemas/image.ts`'s
+   * `requireAltWithImage`) rather than here — this schema describes what a column may hold,
+   * and by the time a payload reaches it the rule has already been enforced.
+   */
+  coverImage: imagePathWrite,
+  coverAltEn: z.string().nullable(),
+  coverAltFa: z.string().nullable(),
+  galleryEn: z.array(galleryItemWriteSchema),
+  galleryFa: z.array(galleryItemWriteSchema),
 });
 
 export type ProjectCreate = z.infer<typeof projectCreateSchema>;

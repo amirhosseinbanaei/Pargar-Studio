@@ -16,6 +16,7 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
+import { embeddedImageAlt, embeddedImagePath, imagePathWrite } from './image';
 
 /** The id every read and write pins to. Exported so the repository never spells it twice. */
 export const STUDIO_ID = 1;
@@ -27,6 +28,25 @@ export const founderSchema = z.object({
   role: looseString,
   born: looseString,
   bio: looseString,
+  /**
+   * THE PORTRAIT (prompt 10), inside the founder rather than in a parallel column.
+   *
+   * `null` for a founder with no photograph — which is both of them today — and the studio
+   * page then renders the generated `portrait()` seeded from the ENGLISH name, exactly as
+   * it did before. That English-name seeding is the reason `modules/studio/lib/seeds.ts`
+   * exists, and the uploaded path is carried alongside those seeds for the same reason: the
+   * English record is the authority on which picture a founder has, and the localized one
+   * is the authority on what it says.
+   */
+  /**
+   * `embedded*` rather than the plain leaves, and that is load-bearing: every founder object
+   * in the database was written before these keys existed, and a schema that rejects an
+   * ABSENT key makes `jsonArray` degrade the whole array to `[]` — which blanks the founders
+   * section of the studio page silently. See `./image`.
+   */
+  image: embeddedImagePath,
+  /** Required whenever `image` is set — enforced by the dashboard's schemas. */
+  imageAlt: embeddedImageAlt,
 });
 
 export const statSchema = z.object({
@@ -122,6 +142,8 @@ const founderWriteSchema = z.strictObject({
   role: z.string(),
   born: z.string(),
   bio: z.string(),
+  image: imagePathWrite,
+  imageAlt: z.string().nullable(),
 });
 
 const statWriteSchema = z.strictObject({ label: z.string().min(1), value: z.string() });

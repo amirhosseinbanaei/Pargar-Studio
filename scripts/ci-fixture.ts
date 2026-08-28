@@ -42,6 +42,14 @@ async function main() {
     locationFa: '',
     clientEn: '',
     clientFa: '',
+    // No photograph. That is the correct fixture value and not a shortcut: every record
+    // in the real archive is in this state, and it is the state the generated-drawing
+    // fallback has to keep working in — which is exactly what the build renders.
+    coverImage: null,
+    coverAltEn: null,
+    coverAltFa: null,
+    galleryEn: [],
+    galleryFa: [],
   });
 
   await designWorkRepo.create({
@@ -66,6 +74,11 @@ async function main() {
     teamFa: [],
     factsEn: [],
     factsFa: [],
+    coverImage: null,
+    coverAltEn: null,
+    coverAltFa: null,
+    galleryEn: [],
+    galleryFa: [],
   });
 
   await mediaRepo.create({
@@ -88,6 +101,9 @@ async function main() {
     contextFa: '',
     factsEn: [],
     factsFa: [],
+    coverImage: null,
+    coverAltEn: null,
+    coverAltFa: null,
   });
 
   console.log('CI fixture rows written: 1 project, 1 design work, 1 media entry');

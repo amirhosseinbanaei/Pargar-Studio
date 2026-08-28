@@ -14,6 +14,14 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
+import {
+  galleryColumn,
+  galleryItemWriteSchema,
+  imagePath,
+  imagePathWrite,
+  toLocaleGallery,
+  toLocaleImage,
+} from './image';
 import { factSchema, factWriteSchema } from './fact';
 
 /* ── READ ─────────────────────────────────────────────────────────────────────── */
@@ -43,6 +51,17 @@ export const designWorkRowSchema = z.object({
   factsEn: jsonArray(factSchema),
   factsFa: jsonArray(factSchema),
 
+  /**
+   * THE PHOTOGRAPHS (prompt 10). Optional throughout: a design work with no product shot
+   * keeps the drawing seeded from its slug and steered by its category, exactly as it did
+   * before there was any way to upload one. See `@/common/schemas/image`.
+   */
+  coverImage: imagePath,
+  coverAltEn: looseString,
+  coverAltFa: looseString,
+  galleryEn: galleryColumn,
+  galleryFa: galleryColumn,
+
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -67,6 +86,8 @@ export function toLocaleDesignWork(row: DesignWorkRow, locale: Locale) {
     description: pickLocale(locale, row.descriptionEn, row.descriptionFa),
     team: pickLocale(locale, row.teamEn, row.teamFa),
     facts: pickLocale(locale, row.factsEn, row.factsFa),
+    cover: toLocaleImage(locale, row.coverImage, row.coverAltEn, row.coverAltFa),
+    gallery: toLocaleGallery(locale, row.galleryEn, row.galleryFa),
   };
 }
 
@@ -107,6 +128,14 @@ export const designWorkCreateSchema = z.strictObject({
   teamFa: z.array(z.string().min(1)),
   factsEn: z.array(factWriteSchema),
   factsFa: z.array(factWriteSchema),
+
+  /** See `projectCreateSchema` — same columns, same nullability, same cross-field rule
+   *  living on the dashboard's schemas rather than here. */
+  coverImage: imagePathWrite,
+  coverAltEn: z.string().nullable(),
+  coverAltFa: z.string().nullable(),
+  galleryEn: z.array(galleryItemWriteSchema),
+  galleryFa: z.array(galleryItemWriteSchema),
 });
 
 export type DesignWorkCreate = z.infer<typeof designWorkCreateSchema>;

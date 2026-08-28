@@ -49,6 +49,10 @@ beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'http://localhost:3000');
   vi.stubEnv('ADMIN_PASSWORD', 'test-password');
   vi.stubEnv('SESSION_SECRET', 'test-session-secret-at-least-32-characters-long');
+  // Required and absolute, with no default (`common/config/server-env.ts`) — and the schema
+  // validates at import time, so this suite cannot import a repository without it. Nothing
+  // here writes a file; the key simply has to satisfy the boot.
+  vi.stubEnv('UPLOAD_DIR', join(dir, 'uploads'));
 
   // Inherits the stubbed environment above, same as the deleted `seeded-database.ts` did —
   // that is what stops a developer's local `kavan.db` from becoming the database under test.
@@ -90,6 +94,14 @@ describe('projectRepository.bySlug', () => {
       locationFa: '',
       clientEn: '',
       clientFa: '',
+      // The gallery columns are the other JSON pair on this table (prompt 10), encoded by
+      // the same `toRow` and decoded by the same `jsonArray` leaf, so they are asserted
+      // here rather than in a second near-identical test.
+      coverImage: '2026/08/0123456789abcdef0123456789abcdef.jpg',
+      coverAltEn: 'The courtyard from the street',
+      coverAltFa: 'حیاط از خیابان',
+      galleryEn: [{ path: '2026/08/11111111111111111111111111111111.png', alt: 'The stair' }],
+      galleryFa: [{ path: '2026/08/11111111111111111111111111111111.png', alt: 'پلکان' }],
     });
 
     const project = await repo.bySlug('darrous-court-residence');
@@ -99,5 +111,15 @@ describe('projectRepository.bySlug', () => {
     for (const type of project?.types ?? []) {
       expect(typeof type).toBe('string');
     }
+
+    // The gallery columns make the same round trip: an array in, a JSON string in the
+    // column, a real array of objects back out. Nothing downstream calls `JSON.parse`, and
+    // a `toRow` that forgot one of these would write `[object Object]` and decode to `[]`
+    // — silently, because `jsonArray` degrades rather than throwing.
+    expect(project?.galleryEn).toEqual([
+      { path: '2026/08/11111111111111111111111111111111.png', alt: 'The stair' },
+    ]);
+    expect(project?.galleryFa[0]?.alt).toBe('پلکان');
+    expect(project?.coverImage).toBe('2026/08/0123456789abcdef0123456789abcdef.jpg');
   });
 });

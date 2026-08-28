@@ -15,7 +15,7 @@
  * asserting something nobody checked.
  *
  * It is also where the JSON columns stop being strings: `types` leaves this file as
- * `string[]`.
+ * `string[]`, and the two gallery columns as arrays of `{ path, alt }`.
  *
  * ─── WRITES ───────────────────────────────────────────────────────────────────────
  * `create` / `update` / `remove` exist and are unused until prompt 6 wires the dashboard
@@ -38,15 +38,26 @@ import {
 type ProjectInsert = typeof projects.$inferInsert;
 
 /**
- * Encode the one JSON column on the way IN. Mirrors `jsonArray` on the way out; the pair
- * is what keeps `JSON.parse`/`JSON.stringify` out of every call site.
+ * The JSON columns. `types` since prompt 2, the two gallery columns since prompt 10 —
+ * adding one to the schema means adding it here in the same commit, or the array reaches
+ * drizzle as an object and is written as `'[object Object]'`.
+ */
+const JSON_FIELDS = ['types', 'galleryEn', 'galleryFa'] as const;
+
+/**
+ * Encode the JSON columns on the way IN. The exact inverse of the `jsonArray` leaves in
+ * `@/common/schemas/project`; the pair is what keeps `JSON.parse`/`JSON.stringify` out of
+ * every call site.
+ *
+ * An ABSENT key stays absent. A PATCH `set()` handed `undefined` would otherwise have
+ * drizzle write the string `'undefined'` into a column the caller never meant to touch.
  */
 function toRow<T extends ProjectCreate | ProjectUpdate>(input: T) {
-  const { types, ...rest } = input;
-  return {
-    ...rest,
-    ...(types === undefined ? {} : { types: JSON.stringify(types) }),
-  };
+  const out: Record<string, unknown> = { ...input };
+  for (const field of JSON_FIELDS) {
+    if (input[field] !== undefined) out[field] = JSON.stringify(input[field]);
+  }
+  return out;
 }
 
 export async function list(): Promise<ProjectRow[]> {

@@ -2,8 +2,8 @@
 /**
  * RING 2 — the `design_works` table. The only place a design-work row is validated.
  *
- * Four JSON columns rather than one (`team` and `facts`, each per locale), so the
- * encode/decode pair matters more here: `toRow` below is the exact inverse of the
+ * Six JSON columns rather than one (`team`, `facts` and — since prompt 10 — `gallery`, each
+ * per locale), so the encode/decode pair matters more here: `toRow` below is the exact inverse of the
  * `jsonArray` leaves in `@/common/schemas/design-work`, and they must be edited together.
  * See `./project-repository` for the reasoning this file follows.
  */
@@ -20,7 +20,12 @@ import {
 
 type DesignWorkInsert = typeof designWorks.$inferInsert;
 
-const JSON_FIELDS = ['teamEn', 'teamFa', 'factsEn', 'factsFa'] as const;
+/**
+ * Six since prompt 10: the two gallery columns join `team` and `facts`. Adding a JSON
+ * column to the schema means adding it here in the same commit — the array would otherwise
+ * reach drizzle as an object and be written as `'[object Object]'`.
+ */
+const JSON_FIELDS = ['teamEn', 'teamFa', 'factsEn', 'factsFa', 'galleryEn', 'galleryFa'] as const;
 
 /**
  * JSON-encode the list columns, leaving an absent key absent — an `undefined` in a PATCH
