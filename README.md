@@ -11,12 +11,19 @@ repository's git history, deleted once its content and behaviour had fully moved
 database and `src/`) and has since grown a write side: nothing here is edited by hand-typed
 data anymore. What was true about the original site and still is:
 
-- **Every image is drawn at runtime.** There are no photographs and no image files —
-  `src/common/lib/art/` holds eight procedural SVG generators (elevation, massing,
-  courtyard, section, plan, jali screen, site contour, portrait), seeded from a record's
-  slug so a drawing is unique, reproducible, and identical on every render. This layer is
-  pure (no `document`, `window`, `Date`, or `Math.random`) and runs on the server —
-  `'use client'` must never be added under `src/common/lib/art/`.
+- **Every image is drawn at runtime unless someone uploaded one.** `src/common/lib/art/`
+  holds eight procedural SVG generators (elevation, massing, courtyard, section, plan, jali
+  screen, site contour, portrait), seeded from a record's slug so a drawing is unique,
+  reproducible, and identical on every render. This layer is pure (no `document`, `window`,
+  `Date`, or `Math.random`) and runs on the server — `'use client'` must never be added
+  under `src/common/lib/art/`.
+
+  The dashboard grew photograph uploads, and **the drawings are the fallback, not a
+  placeholder that got replaced**: a record with no photograph renders its generated art
+  exactly as it always did, on the card and on its page, so a grid of 76 projects with two
+  photographs among them still looks finished. Uploaded files live on local disk under
+  `UPLOAD_DIR` and are served by the app itself at `/api/media/<path>` — see Deploying.
+
 - **Persian is a first-class locale, not a translated string table.** `/en/...` and
   `/fa/...` are independently cached, independently crawlable routes; bilingual content is
   a pair of columns on one database row (`title_en` / `title_fa`), never a translations
@@ -50,8 +57,11 @@ npm run dev                  # http://localhost:3000
 ```
 
 `.env.local` needs, at minimum, a `TURSO_DATABASE_URL` (a local `file:./kavan.db` works for
-development), an `ADMIN_PASSWORD` for the dashboard, and a `SESSION_SECRET` (32+ characters
-— generate one with `openssl rand -base64 32`). See `.env.example` for the full contract.
+development), an `ADMIN_PASSWORD` for the dashboard, a `SESSION_SECRET` (32+ characters —
+generate one with `openssl rand -base64 32`), and an **`UPLOAD_DIR`**: an ABSOLUTE path to a
+directory for uploaded images, with no default (`<repo>/uploads` locally, which `.gitignore`
+covers — write the path out in full, dotenv does not expand `$PWD`). See `.env.example` for
+the full contract.
 
 ### The database
 
@@ -82,8 +92,21 @@ types and should run first on a clean checkout, or after touching routing.
 ## Deploying
 
 The app builds to a standalone Node server (`output: 'standalone'`) and ships as a
-multi-stage Docker image (`Dockerfile`, `.dockerignore`) with no volume — the only stateful
-dependency is the Turso database, reached over the network.
+multi-stage Docker image (`Dockerfile`, `.dockerignore`).
+
+**There are two stateful things now, not one.** The database is Turso, reached over the
+network. Uploaded images are FILES, on local disk under `UPLOAD_DIR`, served by the app —
+which is why `compose.yaml` mounts a named `uploads` volume at `/data/uploads`.
+
+> **Deploy without that volume and every uploaded photograph is destroyed.** A container's
+> writable layer is discarded when the container is replaced, which is what a redeploy does.
+> The database keeps its paths, the pages fall back to their generated drawings, and nothing
+> anywhere reports an error. Do not remove the volume as tidying.
+
+The mount point is created in the `Dockerfile` owned by the non-root `appuser` the container
+runs as, because Docker seeds a new named volume from the image's directory — ownership
+included. Leaving that to Docker's default gives a root-owned volume and the FIRST upload
+fails, in production only, with nothing useful in `docker logs`.
 
 1. **Back up first.** The database is the one copy of the studio's content:
    ```bash
@@ -104,6 +127,7 @@ dependency is the Turso database, reached over the network.
    ```
 4. **Start the container**, supplying the server-only variables at runtime (never baked into
    the image — see `compose.yaml`):
+
    ```bash
    docker run -p 3000:3000 \
      -e TURSO_DATABASE_URL=... \
@@ -112,8 +136,31 @@ dependency is the Turso database, reached over the network.
      -e SESSION_SECRET=... \
      kavan-studio
    ```
+
    Or `docker compose up` — see `compose.yaml`, which wires the same four variables from
-   `.env.local`.
+   `.env.local` and sets `UPLOAD_DIR` to the volume's mount point itself.
+
+   Running with `docker run` instead of compose means mounting the volume by hand:
+   `-v kavan_uploads:/data/uploads -e UPLOAD_DIR=/data/uploads`.
+
+5. **Back up the images too.** The database backup in step 1 does not contain them — they
+   are files. `docker run --rm -v kavan_uploads:/data -v "$PWD:/backup" alpine tar czf
+/backup/uploads-$(date +%F).tar.gz -C /data .`
+
+### Reclaiming orphaned images
+
+An image is written the moment it is uploaded, before the record referencing it is saved, so
+an editor who uploads a picture and then closes the tab leaves a file nothing points at.
+This is deliberate — see AGENTS.md for why a two-phase commit between a filesystem and a
+database was not built for a studio's photographs — and the cost is that `UPLOAD_DIR` grows
+slowly and forever unless it is swept.
+
+The sweep is a set difference: every path on disk (`listAllStoredPaths()` in
+`src/common/services/upload-store.ts`) minus every path any record references
+(`projects.cover_image` and `gallery_en`, the same two on `design_works`, `media.cover_image`,
+and `studio.founders[].image`). Run it manually a couple of times a year, or on a schedule;
+**take a backup first**, and never delete a file younger than a day — one being uploaded
+right now is legitimately unreferenced.
 
 A dashboard write purges exactly the public cache tags that record touches
 (`src/common/services/cache-tags.ts`), so a saved change is live at its public URL

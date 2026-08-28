@@ -82,6 +82,11 @@ All four pass, or the change is not done.
   render. A Server Component puts the shell and its artwork in the HTML, so the preloader is
   now a flourish over a finished page, and a long one costs the very thing it used to buy.
   Restoring the original feel is one edit to that block.
+- **~~The site ships zero image files.~~ QUALIFIED IN PROMPT 10 — the dashboard uploads
+  photographs now; the generated art is the FALLBACK.** Every record that has no photograph
+  — which is all 76 projects, 9 design works and 14 media entries today — renders exactly the
+  drawing it always did, on the card and on its page. What changed is that a record CAN have
+  one. See "Image uploads (prompt 10)" below.
 - **The art layer is PURE — confirmed, not assumed.** _(The assumption with the most leverage
   in the migration.)_ `rng`, `palette` and `draw` touch no `document`, `window`, `Date` or
   `Math.random`; the only matches for "window" in the legacy source are the word in prose
@@ -1681,6 +1686,345 @@ of those regexes — only a new value assigned to a project can move it — and
 (confirmed still passing). If a type ever needs to map to a drawing deliberately, the place to
 do it is `kindFor`, not the term.
 
+## Image uploads (prompt 10)
+
+The site shipped zero image files. Every plate on every card and every detail page was an
+SVG generated at request time by `draw()`, seeded by the record's slug — which is why
+`next.config.ts`'s `mediaRemotePatterns()` returned an empty array and said outright that
+this was correct "until the day the dashboard grows an upload field". This is that day. A
+practice's archive of 76 built projects with no photographs was the gap.
+
+```
+  src/common/config/server-env.ts            UPLOAD_DIR — absolute, required, NO default
+  src/common/constants/uploads.ts            the limits + the accepted formats, both sides read them
+  src/common/lib/images/sniff.ts             what a file IS, from its own bytes. PURE.
+  src/common/services/upload-store.ts        the only module that touches UPLOAD_DIR
+  src/app/api/uploads/route.ts               POST — authenticates itself, validates in four steps
+  src/app/api/media/[...path]/route.ts       GET — resolves, then prefix-checks the RESULT
+  src/common/schemas/image.ts                the shared read/write/locale contracts
+  src/modules/dashboard/schemas/image.ts     the form shape + the alt-text rule
+  src/modules/dashboard/components/ImageUploadField.tsx   THE uploader, mounted five places
+  src/modules/dashboard/components/GalleryField.tsx       one list -> two index-aligned columns
+  src/common/components/collection/CardPlate.tsx          photograph, or the drawing
+  drizzle/0002_*.sql                         thirteen ADD COLUMNs, every one nullable
+```
+
+### Storage is local disk on a mounted volume, and `UPLOAD_DIR` has no default
+
+Not object storage, not bytes in the database. Files are written under `UPLOAD_DIR` and
+served by this app.
+
+**`UPLOAD_DIR` is required, must be ABSOLUTE, and carries no default** — the rule
+`server-env.ts`'s header already stated, applied. A default (`./uploads`, `/tmp/uploads`,
+anything) turns a missing value into writes that land somewhere nobody looks: the dashboard
+reports a saved image, the file sits on an ephemeral container layer, and it is gone at the
+next deploy with no error at any point. A missing value must stop the boot with the key
+named. It must be absolute for the same reason — a relative path resolves against the
+process working directory, which is the repo root under `npm run dev`, `/app` in the
+container, and something else again in a one-off migration container.
+
+**A stored path is generated, never received**: `YYYY/MM/<16 random bytes as hex>.<sniffed
+extension>`. The date partition keeps one directory legible; the random id means two people
+uploading `photo.jpg` cannot collide; and the client's filename never touches the filesystem
+at all, because a caller-controlled path component is a path traversal and sanitizing one
+correctly for every encoding is a problem nobody needs to have. The extension comes from the
+BYTE SNIFF, so a file claiming `.jpg` that is really a PNG is stored and served as a PNG.
+The original filename is not stored anywhere: nothing renders it, the alt text is what
+describes the image, and `IMG_4471 (client's copy).jpg` is a liability once echoed into a
+page or a log.
+
+### The proxy does not gate `api`, so each route handler authenticates itself
+
+`src/proxy.ts`'s matcher excludes `api` deliberately (a 307 is a valid answer to a document
+request and a corrupt one to a data request). **Nothing stands in front of either handler**,
+so each one answers the question the interception layer cannot:
+
+| Route                      | Auth                                                                               | Why                                                                                                                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/uploads`        | `readSession()` as its FIRST statement, 401 **before it reads a byte of the body** | It writes files to a disk. `project-actions.ts` makes this argument for Server Actions; it applies here with more force. An anonymous caller must not be able to make this process allocate, parse or store anything |
+| `GET /api/media/[...path]` | **None, deliberately**                                                             | It serves the photograph on a public project page; gating it would 401 every card on `/en/projects` for every visitor. Its authorization is over the FILE NAMESPACE instead, and that is total                       |
+
+**`/api/uploads` validates in four steps, each refusing before the next costs anything:**
+
+1. **The session.** Above.
+2. **The byte size, WHILE STREAMING** — the body is pulled chunk by chunk against a running
+   total and abandoned the moment it passes the cap. Buffering first and checking after is
+   how a 2 GB body becomes a memory exhaustion; the 413 would be correct and would arrive
+   after the damage. `Content-Length` is checked first as a courtesy, never as the
+   enforcement — it is a claim.
+3. **The real type, by sniffing the leading bytes.** `Content-Type` is caller-supplied and
+   proves nothing: `mv notes.txt photo.jpg` is the whole attack and a browser labels the
+   result `image/jpeg` from the extension alone.
+4. **The declared pixel dimensions, against a cap.** A heavily-compressed image declaring
+   60000 × 60000 is a few hundred kilobytes on the wire that asks `next/image` for ~14 GB of
+   bitmap. The dimensions are read from the file's own header before anything is stored.
+
+**The body is RAW BYTES, not multipart**, and that is forced by two things: `request.formData()`
+buffers the whole body before yielding a field, so step 2 could not be a streaming check at
+all; and the uploader posts with `XMLHttpRequest`, whose `upload.onprogress` is the only real
+progress signal a browser exposes (`references/07-forms.md` §6 — a Server Action and `fetch`
+have none, and the alternative to a real percentage is an indeterminate state, never a fake
+bar).
+
+**It answers in the `ActionResult` envelope** with the HTTP status matching, so the uploader
+branches on `result.status` and a 422 carries a `fieldErrors` body keyed `image` — bound onto
+the control exactly as `RecordForm` binds a Server Action's. Never a branch on message text.
+
+**SVG is deliberately not an accepted format.** An SVG is a document, not a bitmap: it can
+carry `<script>`, and served from this app's own origin — which is what `/api/media` does — it
+executes with the session cookie in scope. The site already generates every SVG it needs from
+pure code.
+
+### The path-traversal defence: resolve FIRST, then check the prefix of the RESULT
+
+`resolveStoredPath` in `upload-store.ts`, and the ORDER is the whole thing. It is
+emphatically **not** a scan of the incoming path for `..`:
+
+- A route handler receives its segments **already percent-decoded**, so `%2e%2e`,
+  `%252e%252e`, `..%2f` and `..` are four different strings and one directory. A check that
+  runs after a decoder can always be fed another encoding.
+- `path.resolve` normalizes `..` for real, so `a/../../etc/passwd` becomes `/etc/passwd` and
+  the prefix comparison simply fails. There is no list of tricks to keep up with, because the
+  comparison is on the ANSWER rather than on the question.
+- **`realpath` is the second half** and covers what resolution cannot: a symlink inside
+  `UPLOAD_DIR` resolves lexically to a path that IS under the root, and only asking the
+  filesystem where it really goes catches it. The root is realpath'd too.
+- The trailing separator on the prefix is not cosmetic — without it `/data/uploads-evil`
+  passes a `startsWith('/data/uploads')` test.
+- **An extension allowlist is the second lock**: even a path resolving inside the root is
+  served only if it ends in one of the five stored extensions, so a stray `.env`, `.sql`
+  backup or `.part` file in the volume is not readable by anyone who guesses its name.
+- **Every refusal is one 404** — escaped, missing, wrong extension, a directory. Telling a
+  prober which of their attempts resolved to a real file outside the root is telling them the
+  traversal worked.
+
+`__tests__/upload-store.test.ts` covers all of it against real files, symlink included.
+
+**The cache header is `immutable`, one year, and that is safe because the path is.** A stored
+path carries 16 random bytes and is generated per upload, so replacing a picture produces a
+NEW path and the bytes at a given URL can never change. That is also why the uploader
+replaces a path rather than overwriting a file.
+
+### The columns, and the one rule that is neither a column type nor a field type
+
+| Table          | Columns                                                                      |
+| -------------- | ---------------------------------------------------------------------------- |
+| `projects`     | `cover_image`, `cover_alt_en`, `cover_alt_fa`, `gallery_en`, `gallery_fa`    |
+| `design_works` | the same five                                                                |
+| `media`        | `cover_image`, `cover_alt_en`, `cover_alt_fa` — **a cover only, no gallery** |
+| `studio`       | `image` + `imageAlt` **inside the existing founders JSON**, not new columns  |
+
+Every one is NULLABLE and every existing row got NULL, which is the correct value: those
+records genuinely have no photograph. A gallery is a TEXT column holding a JSON string parsed
+by a zod schema — never `mode: 'json'`, per `schema.ts:25`.
+
+**ALT TEXT IS PER-LOCALE AND REQUIRED WHENEVER THERE IS AN IMAGE.** It is content — a
+sentence a reader HEARS — so it takes an `_en`/`_fa` pair like every other translated field
+and sits beside the uploader in `LocaleFieldPair`. The rule is cross-field ("required if"),
+which SQLite cannot express, so it lives as a `superRefine` on BOTH the form schema (the
+editor is told before they submit, on the field itself) and the submission schema (a
+hand-written POST is refused). An uploader that can save a picture with no alt text is an
+accessibility regression on a site that until now had no images to get wrong.
+
+**And Persian alt text is the ONE translated field that does NOT fall back to English.** This
+is a deliberate exception to the decision recorded for prompts 6 and 7, and it is written
+down here because the next person to touch `withPersianFallback` will otherwise "fix" it:
+
+- Falling back is right for PROSE. A Persian page showing an untranslated English paragraph
+  is imperfect but readable, and blocking publication on translation was the worse trade.
+- Falling back is wrong for ALT TEXT. It is heard, not read: a Persian screen reader
+  pronounces an English sentence with Persian phonetics and produces noise. There is no
+  partial credit, and the copied sentence additionally HIDES the omission from anyone
+  auditing the page, because the column is populated.
+
+Not auto-filled from the filename either — a filename describes a camera's numbering scheme.
+
+### A record with no image keeps its generated drawing
+
+`CardPlate` owns that choice for all three grids and `DetailPlates` owns it per slot. `null`
+is the NORMAL case, not a gap: 76 projects, 9 design works and 14 media entries have no
+photograph and most never will. **An empty image column must never render an empty box** — a
+grid where a third of the cards are grey rectangles reads as broken, and the generated art
+exists precisely so a page with no photography still looks finished. Verified: 76 cards, one
+photograph, 75 drawings, zero empty frames.
+
+Per-SLOT rather than all-or-nothing on a detail page: a record with a cover and no gallery
+shows its photograph beside two drawings. **The seed arithmetic is untouched** — `drawingSet`
+is still called with the bare seed and the kinds still taken in order, so slot 0's drawing is
+still `kindFor(seed, types)` for every record without a cover. Computing drawings only for
+the slots that need them would have made slot 2's kind depend on how many photographs a
+record happens to have.
+
+**A media entry with no cover of its own still seeds from the PROJECT**, so a press cutting
+carries the building's picture — the rule `legacy/js/ui/panel.js:263` established, unchanged.
+
+**A photograph with no alt text for the rendered locale counts as NO image** and falls back to
+the drawing. The write schemas make that state unreachable through the application, so
+reaching it needs a row edited elsewhere — and the honest answer is the drawing rather than a
+published image no screen reader can describe.
+
+### `fill`, not intrinsic dimensions — and what that buys
+
+`.card__frame` is a fixed 4:3 box with `overflow: hidden`, and the SVGs inside it are drawn
+`preserveAspectRatio="xMidYMid slice"` — they COVER the frame and are cropped. `next/image`'s
+`fill` plus `object-fit: cover` is the identical behaviour for a bitmap, so swapping a
+drawing for a photograph moves nothing on the page. Intrinsic `width`/`height` would either
+letterbox or distort inside that frame.
+
+Three consequences worth stating:
+
+- **`content-visibility: auto` and `contain-intrinsic-size` still do their job.** A `fill`
+  image is absolutely positioned and contributes nothing to layout, so it cannot force one;
+  the frame's size comes from its own `aspect-ratio` either way. `ProjectCard.tsx:13`'s claim
+  — 76 cards costing about what the dozen on screen cost — is intact.
+- **The reveal animation still plays, and cannot break.** `clip-path: inset(0 0 100% 0)` is on
+  `.card__frame`, the PARENT, so whatever is inside is clipped by the same rule and wiped open
+  by the same `.is-in` class `CardReveal` adds. The `@media (scripting: none)` unclip covers a
+  photograph for free. AGENTS.md:529's warning is why the frame element was left untouched and
+  only its child differs.
+- **The endpoint reports intrinsic dimensions and nothing persists them.** No render needs
+  them, so a stored pair would be a second copy of a fact the file already carries and nothing
+  reads. The uploader shows them beside the preview.
+
+`sizes` is DERIVED from the real column widths, not guessed: `.grid` is
+`repeat(auto-fill, minmax(15rem, 1fr))`, dropping to `minmax(9rem, 1fr)` below 860px, and
+`auto-fill` means a column can never reach twice its minimum — hence
+`(max-width: 860px) 18rem, 30rem`. The detail plates and the founders' `.duo` are derived the
+same way, each from its own rule.
+
+The `img` rules live in `common/styles/route.css`, not `panel.css`: that file is a
+byte-identical port and additions go beside it.
+
+### The uploader is a `form/` tier field, and the keyboard path is the real control
+
+`ImageUploadField`, exported from `@/modules/dashboard`, mounted five places — a cover on
+projects, design works and media, every gallery row, and every founder's portrait.
+
+- **Its value is owned by react-hook-form**, as a plain string (`''` = none). Required, not
+  stylistic: `FormButton` gates on `isValid`, so an uploader holding its path in `useState`
+  beside the form would leave the button disabled on a valid record with no error to point at.
+  `references/07-forms.md` §6's rule — keep `File` out of form values, store the returned key —
+  is what makes it work.
+- **The picker is a real `<input type="file">`, `sr-only` and therefore FOCUSABLE**, never
+  `display: none`, with a real `<label htmlFor>` styled as the button and wearing the focus
+  ring through `peer-focus-visible:`. That input is the whole reason the control is usable
+  without a pointer: a drop zone is a pointer-only affordance — there is no keyboard gesture
+  for "drag" — so the drop handling is an ENHANCEMENT layered over a control that already
+  worked. Same reasoning `RowReorder` records for shipping arrows instead of drag.
+- **The preview shows what is STORED**, not only the local file: the object URL during the
+  request, then `/api/media/<stored path>` fetched back the moment it lands. A preview that
+  only ever showed the local file looks identical whether the bytes reached the disk, a full
+  disk, or a volume that is not mounted — and the failure would surface weeks later as a
+  broken image on the public site.
+- **Failures render through `ResultRegion`** in the one normalized shape, branching on status.
+
+**`GalleryField` edits ONE list and splits it into the two index-aligned columns on save.** It
+deliberately does not mirror the storage: with two independent editors (the shape `StudioForm`
+uses for the founders, which predates this) an editor could add a photograph to one language
+and not the other, or reorder one and not the other, and item `i` would stop being the same
+picture in both — with no symptom in the language most people check. One list makes the
+alignment structural. Its reorder arrows are LOCAL (`useFieldArray`'s `move`), not
+`RowReorder`: a gallery's order is a field of the record being edited, so it is written by the
+same save and reordering-then-cancelling changes nothing.
+
+**A founder's portrait has one author.** `RepeatableGroupField` gained an `imageKey` prop, set
+on the ENGLISH founders editor only; the save copies each path into the Persian array by
+index. The alt text is a genuine column on both sides, because that is the half that is
+per-locale.
+
+### A bug this prompt found and fixed — the `studio.awards` failure, again
+
+Adding `image` and `imageAlt` to `founderSchema` made **every founder fail to parse and the
+founders section of `/en/studio` and `/fa/studio` disappear**, with no error, no empty state
+and all four gate commands green.
+
+The cause: `looseString` and `imagePath` accept `null` but not an ABSENT key, because
+`.nullable()` is deliberately not `.nullish()` (`helpers.ts`). Every founder object in the
+database was written before these keys existed, so on a stored row they are missing — and
+`jsonArray` degrades an item-schema failure to `[]` ON PURPOSE, so one bad row cannot blank a
+page.
+
+This is the identical shape of the `studio.awards` bug prompt 5 found, and it is exactly what
+that section's closing warning means: **the tolerance that keeps one bad row from blanking a
+page is also what hides a schema that never matched.** It was caught in a browser, not by the
+gate. The fix is `embeddedImagePath` / `embeddedImageAlt` in `common/schemas/image.ts`, which
+normalize `undefined` before validation; `common/schemas/__tests__/image.test.ts` pins it.
+
+**Any key added to a stored JSON object needs the same treatment or the same bug.**
+
+### `NEXT_PUBLIC_MEDIA_URL` stays unset, and `mediaRemotePatterns()` still returns `[]`
+
+Both still correct, but for a NEW reason — the old one has expired and `next.config.ts` now
+says so. The old reason was "the site ships zero image files". The reason now: uploaded images
+are served by THIS APP at `/api/media/<path>`, so they are same-origin URLs, and the image
+optimizer needs no `remotePatterns` entry for its own origin — that list gates fetching from
+ELSEWHERE, which is the open-image-proxy it exists to prevent. Verified: `next/image`
+optimizes `/_next/image?url=%2Fapi%2Fmedia%2F…` with an empty allowlist.
+
+**What would change it:** moving storage to another origin (object storage, a CDN, a separate
+media host). Then `NEXT_PUBLIC_MEDIA_URL` is set to that origin and the function derives the
+allowlist from it. It stays rather than being deleted as unreachable code — it fails closed
+today and is correct the day it is needed.
+
+### A second bug this prompt found: the standalone trace swallowed the whole project
+
+`stat` and `createReadStream` in `upload-store.ts` are called with a path Turbopack's static
+analysis cannot see through — it is resolved at runtime from `UPLOAD_DIR`, an absolute path
+outside the project and unknowable at build time. Faced with that, the tracer gives up and
+includes THE ENTIRE PROJECT in `output: 'standalone'`.
+
+Measured, not assumed: the standalone output carried **292 source files, `src/` and `public/`
+included**, which the container image in `Dockerfile` then ships. That is precisely what
+standalone tracing exists to avoid. A `/* turbopackIgnore: true */` comment on each of the two
+calls takes it back to 21.
+
+This is an opt-out rather than a suppression, and the distinction matters because this file
+bans suppressions: there is genuinely nothing for the tracer to find. Those files are not
+build inputs, are not in the repository, and live on a volume that does not exist until the
+container runs. **The build printed a clear warning about it and the four-command gate still
+passed** — worth remembering that `npm run build` succeeding is not the same as reading what
+it said.
+
+### The volume, and what a redeploy without it costs
+
+`compose.yaml` gains a named `uploads` volume mounted at `/data/uploads`, and sets
+`UPLOAD_DIR` under `environment:` (which outranks `env_file:`, so a developer's machine-local
+path in `.env.local` cannot leak into the container).
+
+> **Without that volume, `docker compose down && up` destroys every uploaded file.** A
+> container's writable layer is discarded when the container is replaced, which is what every
+> redeploy does. The database keeps pointing at paths that no longer exist, the public pages
+> fall back to their generated drawings, and nothing anywhere reports an error. Do not remove
+> it as tidying.
+
+**The mount point is created in the `Dockerfile`, owned by `appuser`, and that line is
+load-bearing** — Docker seeds a NEW named volume from the image's directory, ownership
+included. Verified both ways rather than assumed: with the `mkdir`/`chown`, a fresh volume
+arrives owned by uid 1001 and the write succeeds; without it the volume is root-owned and the
+same write fails `Permission denied`. That failure would appear in production only, on the
+first upload, with nothing useful in `docker logs` (a production Next server logs no
+per-request access log). A file written by one container was also confirmed readable by a
+later one after the first was removed.
+
+### The three open decisions, resolved
+
+- **The endpoint stores the ORIGINAL only, no derivatives.** Taken as recommended. Next's
+  optimizer already caches its own variants (`minimumCacheTTL`), and a second stored copy is a
+  second thing to invalidate when a picture is replaced — with the added trap that a stored
+  path is immutable, so a stale derivative would never be overwritten, only orphaned.
+- **Orphans are reclaimed by a documented SWEEP, not a transactional upload.** Taken as
+  recommended. A file is written when it is uploaded, before the record referencing it is
+  saved, so closing the tab leaves a file nothing points at. The alternative is a two-phase
+  commit between a filesystem and a database that cannot share a transaction — a real
+  distributed-systems problem to solve for a studio's photograph. `listAllStoredPaths()` is the
+  read half; the README carries the procedure (set difference against the six referencing
+  columns, back up first, never delete a file younger than a day — one being uploaded right
+  now is legitimately unreferenced). **An unbounded directory on a volume is an outage six
+  months out**, which is why the sweep is documented rather than left implied.
+- **A gallery's images carry their OWN alt text, not the record's.** Taken as recommended. A
+  gallery of eight photographs described by one sentence is one sentence read eight times,
+  which is worse than useless — it actively misdescribes seven of them.
+
 ## Deviations from the architecture playbook
 
 Each is deliberate. Re-enable conditions are stated so the next agent does not "fix" them.
@@ -1743,4 +2087,11 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
   you just broke. A narrow, single-rule, one-line disable naming the false positive is the
   only sanctioned escape hatch.
 - No new dependency for something `common/` or the design system already does; check
-  first, and say what you checked.
+  first, and say what you checked. Prompt 10 added image uploads with none: the byte sniff,
+  the dimension read, the drop zone and the progress bar are all platform APIs.
+- **Never add a key to a stored JSON object without making the read schema tolerate its
+  ABSENCE.** Every row already in the database predates it, `jsonArray` degrades an
+  item-schema failure to `[]` on purpose, and the result is a section of a page silently
+  disappearing with all four gate commands green. It has now happened twice — `studio.awards`
+  in prompt 5, `studio.founders` in prompt 10. Use `embeddedImagePath` /`embeddedImageAlt` in
+  `common/schemas/image.ts` as the pattern.
