@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kavan Studio dashboard control pass — prompts 8–11</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --s-0:#0c0b0a; --s-1:#121010; --s-2:#171513; --s-3:#1e1a17; --s-4:#262119;
+  --t-hi:#f4efe7; --t-md:#a9a29a; --t-lo:#6f6862; --t-xlo:#45403c;
+  --a-1:#e3cfa3; --a-2:#a8743f; --a-glow:rgba(227,207,163,.14);
+  --rule:rgba(244,239,231,.09); --rule-md:rgba(244,239,231,.16); --rule-hi:rgba(244,239,231,.34);
+  --f-sans:"Futura","Avenir Next","Avenir","Century Gothic","URW Gothic",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,monospace;
+}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--s-0);color:var(--t-md);font-family:var(--f-sans);
+  font-size:15px;line-height:1.65;padding:clamp(1rem,4vw,3.5rem) clamp(1rem,4vw,2rem) 6rem}
+.wrap{max-width:62rem;margin:0 auto}
+header.top{border-bottom:1px solid var(--rule);padding-bottom:1.75rem;margin-bottom:2rem}
+.eyebrow{font-size:.6875rem;letter-spacing:.24em;text-transform:uppercase;color:var(--a-1);margin:0 0 .75rem}
+h1{font-size:clamp(1.5rem,1.2rem+1.4vw,2.25rem);line-height:1.15;color:var(--t-hi);
+  margin:0 0 .85rem;font-weight:500;letter-spacing:.01em}
+.lede{margin:0;max-width:52rem;color:var(--t-md)}
+.lede + .lede{margin-top:.7rem}
+.strip{display:flex;flex-wrap:wrap;gap:.4rem;margin:1.75rem 0 .6rem}
+.seg{flex:1 1 4rem;min-width:2.5rem;height:.4rem;background:var(--s-3);
+  border:1px solid var(--rule);border-radius:2px;transition:background .25s,border-color .25s}
+.seg.is-done{background:var(--a-1);border-color:var(--a-1)}
+.strip-note{font-size:.75rem;letter-spacing:.06em;color:var(--t-lo);margin:0 0 2.5rem}
+.strip-note b{color:var(--a-1);font-weight:500}
+.card{border:1px solid var(--rule);border-radius:4px;background:var(--s-1);margin:0 0 1.25rem;overflow:hidden}
+.card.is-sent{opacity:.62}
+.card.is-sent .card-head{background:var(--s-0)}
+.card-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem .85rem;
+  padding:1.1rem 1.25rem;border-bottom:1px solid var(--rule);background:var(--s-2)}
+.chip{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.1em;color:var(--s-0);
+  background:var(--a-1);border-radius:2px;padding:.2rem .5rem;flex:none}
+.card-title{font-size:1rem;color:var(--t-hi);margin:0;font-weight:500;flex:1 1 16rem;line-height:1.35}
+.badge{font-size:.6875rem;letter-spacing:.1em;text-transform:uppercase;color:var(--a-1);
+  border:1px solid var(--rule-md);border-radius:2px;padding:.2rem .5rem;flex:none;white-space:nowrap}
+.card-meta{padding:.85rem 1.25rem;border-bottom:1px solid var(--rule);display:flex;
+  flex-wrap:wrap;gap:.5rem 1.5rem;align-items:center}
+.branch{font-family:var(--f-mono);font-size:.75rem;color:var(--t-lo)}
+.branch b{color:var(--t-md);font-weight:400}
+.summary{padding:1rem 1.25rem;margin:0;color:var(--t-md);font-size:.9375rem;border-bottom:1px solid var(--rule)}
+.actions{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;padding:.9rem 1.25rem}
+button.copy{font:inherit;font-size:.8125rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--s-0);background:var(--a-1);border:1px solid var(--a-1);border-radius:2px;
+  padding:.5rem 1.1rem;cursor:pointer;transition:background .18s,color .18s}
+button.copy:hover{background:var(--a-2);border-color:var(--a-2);color:var(--t-hi)}
+button.copy:focus-visible{outline:2px solid var(--a-1);outline-offset:2px}
+button.copy.is-ok{background:transparent;color:var(--a-1)}
+label.sent{display:inline-flex;align-items:center;gap:.5rem;font-size:.8125rem;
+  letter-spacing:.06em;color:var(--t-lo);cursor:pointer;user-select:none}
+label.sent input{accent-color:var(--a-1);width:1rem;height:1rem;cursor:pointer}
+button.toggle{font:inherit;font-size:.8125rem;letter-spacing:.06em;color:var(--t-lo);
+  background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;
+  text-underline-offset:3px;margin-inline-start:auto}
+button.toggle:hover{color:var(--a-1)}
+pre{margin:0;padding:1.25rem;background:var(--s-0);border-top:1px solid var(--rule);
+  font-family:var(--f-mono);font-size:.8125rem;line-height:1.6;color:var(--t-md);
+  white-space:pre-wrap;word-wrap:break-word;overflow-x:auto;max-height:30rem;overflow-y:auto}
+pre[hidden]{display:none}
+footer.bot{border-top:1px solid var(--rule);margin-top:2.5rem;padding-top:1.5rem;
+  font-size:.8125rem;color:var(--t-lo)}
+footer.bot p{margin:0 0 .6rem;max-width:52rem}
+footer.bot b{color:var(--t-md);font-weight:500}
+@media (max-width:32rem){
+  .card-head{padding:.9rem 1rem}.card-meta,.summary,.actions{padding-inline:1rem}
+  pre{padding:1rem;font-size:.75rem}
+  button.toggle{margin-inline-start:0;flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Prompts 8&ndash;11</p>
+  <h1>Kavan Studio &mdash; the dashboard control pass</h1>
+  <p class="lede">Four prompts that run <b>after prompt 7</b>, once the migration is finished and the dashboard edits every table. They close the six gaps the tool still has: internationalization done by hand instead of by a library, taxonomies frozen in code so no category can be added or hidden, no uploader and no upload API anywhere in the app, reordering by clicking arrows, an X-icon close button where the language switch should be, and a Persian font stack that names Vazirmatn without ever loading it.</p>
+  <p class="lede">Run them in order. Each names the prompts it depends on and how to check the dependency is actually merged. Each ends with the four-command gate, an AGENTS.md update and a commit pass. Prompts 9, 10 and 11 each reverse a decision AGENTS.md records, and each one says so rather than leaving the codebase arguing with itself.</p>
+</header>
+
+<div class="strip">
+    <i class="seg" data-seg="8"></i>
+    <i class="seg" data-seg="9"></i>
+    <i class="seg" data-seg="10"></i>
+    <i class="seg" data-seg="11"></i>
+</div>
+<p class="strip-note" id="strip-note">0 of 4 sent</p>
+
+  <article class="card" data-card="8">
+    <div class="card-head">
+      <span class="chip">Prompt 8</span>
+      <h2 class="card-title">next-intl, the Vazirmatn webfont, and the language switch in the masthead</h2>
+      <span class="badge">Opus 5 &middot; high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-8-next-intl-and-persian-type</b></span>
+    </div>
+    <p class="summary">Replace the hand-rolled i18n layer with next-intl on JSON catalogs, compose its middleware inside the existing proxy behind the dashboard gate, load Vazirmatn through next/font for the Persian document only, and delete the X-icon closer so the language switch takes its place.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="8">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="8"> Sent</label>
+      <button type="button" class="toggle" data-toggle="8">Show prompt text</button>
+    </div>
+    <pre data-prompt="8" hidden>Work on a new branch: prompt-8-next-intl-and-persian-type. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md in full. It records every decision this repository has already made, including two that this prompt deliberately reverses — read those sections carefully rather than skimming them, because reversing a recorded decision without recording the reversal is how the next agent "fixes" your work back.
+
+Read the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/, starting from README.md, then 10-routing-and-app-shell.md and 01-layering-and-boundaries.md.
+
+Then read, in this order:
+- src/common/i18n/ in full — index.ts, messages.ts, translator.ts, routing.ts, digits.ts, and both files under __tests__/
+- src/proxy.ts — both legs and the matcher at the bottom
+- src/app/[locale]/layout.tsx
+- src/common/components/layout/Masthead.tsx, Closer.tsx, LanguageSwitch.tsx and index.ts
+- src/app/globals.css — the @theme block and the :root block, specifically --font-sans and --f-sans
+- src/common/styles/i18n.css, lines 35 to 55
+- src/common/lib/motion/shell.ts, lines 110 to 130 and 525 to 570
+
+Then read the current next-intl documentation for the version npm actually installs. Do NOT write next-intl code from memory. The App Router API changed shape at v4 (defineRouting, createNavigation, getRequestConfig) and Next.js 16 renamed middleware.ts to proxy.ts; a v3-shaped setup on v4 fails at build with an error naming a file you did not write.
+
+2. CONTEXT
+
+Prompts 1 through 7 took this repository from a static site to a Next.js 16.3 App Router application with a libSQL database and an authenticated dashboard. Confirm that src/common/i18n/translator.ts and src/app/[locale]/layout.tsx both exist and that legacy/ is gone; if legacy/ is still present, prompt 7 has not been merged and this prompt is not ready to run.
+
+Internationalization is hand-rolled today. src/common/i18n/messages.ts is a 411-line TypeScript object: `en` is the source of keys and `fa` is typed as a total record over them, so a missing Persian string is a compile error. src/common/i18n/translator.ts exports `getDictionary(locale)`, returning `{ locale, isRTL, t, num, term, list }`, and twenty-one files import it — every public page and layout under src/app/[locale]/, Masthead.tsx, Footbar.tsx, TehranClock.tsx and ContactForm.tsx. src/common/i18n/routing.ts owns `localeHref`, `switchLocale`, `resolveLocale` and `localeAlternates`, and src/proxy.ts's second leg does the locale redirect by hand off `Accept-Language`.
+
+That was a deliberate decision and translator.ts's header explains it. It is being reversed on purpose: next-intl owns plural rules, per-locale number and date formatting, ICU message arguments and rich text, and it keeps the routing, the redirect and the alternate links in one place — all of which the hand-rolled version either lacks or would have to grow one special case at a time.
+
+Persian type is the second problem. src/common/styles/i18n.css:36 already names "Vazirmatn" first in the Persian font stack, and no webfont is loaded anywhere in the app — so Persian renders in Vazirmatn only for a reader who happens to have it installed locally, and falls through to Tahoma for everyone else.
+
+3. GOAL
+
+When this is done: every interface string on the public site is served by next-intl from JSON message catalogs; the locale redirect and the hreflang alternates come from next-intl's routing rather than from hand-written helpers; Persian renders in Vazirmatn loaded from Google Fonts through next/font; and the masthead's X-icon close button is gone with the language switch standing in its place.
+
+4. SCOPE
+
+In scope:
+- Install next-intl at its latest version and wire it for the App Router on Next.js 16.3
+- Convert src/common/i18n/messages.ts into per-locale JSON catalogs
+- Replace `getDictionary` at all twenty-one call sites
+- Move locale routing and the locale redirect into next-intl, composed inside the existing src/proxy.ts so the dashboard gate still runs first
+- Preserve the behaviour of `num()`, `term()` and `list()`
+- Load Vazirmatn through next/font/google for the Persian document only
+- Delete the Closer and put LanguageSwitch in its masthead slot
+
+Out of scope, do not start any of it in this pass:
+- The dashboard's interface language. AGENTS.md records that it is monolingual English on purpose — every label maps onto a database column name. Do not localize it and do not wrap it in a provider.
+- Any change to how CONTENT is translated. Per-locale column pairs on one row stay exactly as they are.
+- Persian route slugs. routing.ts:19 records why the slug is an identifier and not copy.
+- Editable categories, image uploads and drag-and-drop reordering. Those are prompts 9, 10 and 11.
+- Any redesign or restyling beyond the masthead change in 5.7.
+
+5. SPECIFICS
+
+5.1 Install, and check the version you actually got.
+`npm i next-intl@latest`, then record the exact installed version in AGENTS.md. Read the setup for THAT version from node_modules/next-intl or the current documentation. If the installed version does not support Next.js 16.3, stop and say so rather than pinning an older Next.
+
+5.2 The message catalogs.
+src/common/i18n/messages/en.json and src/common/i18n/messages/fa.json, with the keys preserved EXACTLY as messages.ts declares them — `nav.projects`, `cap.projects`, `ui.close`, `type.Residential`, `status.Completed`, and the rest. Do not rename a key, do not regroup one, do not "tidy" the naming. messages.ts:5 states that the ported stylesheets and the projects module name these keys directly, and translator.ts:68 builds a lookup key as `${group}.${value}` from a DATABASE column, so the `&lt;group&gt;.&lt;value&gt;` shape is load-bearing rather than cosmetic.
+
+Two properties the current file has that a plain pair of JSON files does not, and both must survive:
+
+- A missing Persian string is a TYPE error, not a silent runtime fallback. Reproduce that with next-intl's message type augmentation — declare the global `IntlMessages` type from en.json — so a key present in en.json and absent from fa.json fails `npm run typecheck`.
+- `term()` degrades fa to en to the raw value. Its argument comes from a database column, so the dashboard can introduce a project type nobody has translated. next-intl throws or renders the key for a missing message, which would put the literal string `type.Warehouse` on a public page. Keep a `term()` equivalent that catches the miss and hands back the raw value. messages.ts:56 and translator.ts:56 both state why blanking the field or throwing is the wrong degradation.
+
+5.3 Numbers.
+`num()` shapes Latin digits to the extended Arabic-Indic set U+06F0 to U+06F9 at render time, through `faDigits` in src/common/i18n/digits.ts. That function is deliberately a string transform: several call sites hand it an already-formatted string such as `'1,240 m²'`, and digits.ts:28 says so.
+
+next-intl's formatter produces the same Persian digits for a real number and also gets the grouping separators right. Use it where the value genuinely is a number. Keep `faDigits` for the string case. Do not replace one with the other wholesale, and state in AGENTS.md which path each kind of call site takes.
+
+src/common/i18n/__tests__/translator.test.ts and routing.test.ts must keep passing, or be rewritten with the reason stated in the commit body. Do not delete a test because its subject moved.
+
+5.4 Routing.
+Replace src/common/i18n/routing.ts's hand-rolled helpers with next-intl's routing:
+
+- `localeHref` and `switchLocale` become next-intl's `Link` and `getPathname` from `createNavigation`.
+- `resolveLocale` — the Accept-Language parser at routing.ts:75 — becomes next-intl's own negotiation, configured with `defaultLocale: 'en'` to match `DEFAULT_LOCALE` and a prefix strategy that keeps `/en/...` explicit in the URL. Both locales are currently always prefixed and every canonical URL, the sitemap and generateStaticParams depend on that.
+- `localeAlternates` at routing.ts:110 may keep its name and its callers, but must source its paths from next-intl so the canonical and the hreflang set cannot disagree. routing.ts:100 explains what a disagreement costs: a page declaring the other language's URL as its own canonical asks a search engine to drop one of the two documents this whole scheme exists to publish separately. Every public route's generateMetadata calls this helper and src/app/sitemap.ts enumerates every URL through it.
+
+The bare-`/` redirect stays a 307, not a 308, for the reason proxy.ts:139 gives: the chosen locale depends on a request header, so a permanent redirect pins a reader to whichever locale they resolved to on their first ever visit.
+
+5.5 The proxy.
+src/proxy.ts runs the dashboard gate first and locale routing second, and that order is load-bearing. proxy.ts:19 states why: /dashboard is deliberately outside the [locale] segment, and a locale middleware would redirect it to /en/dashboard, a route that does not exist.
+
+Compose next-intl's middleware INSIDE the existing `proxy` function, after the `isPrivateRoute` early return. Do not replace the file with next-intl's exported middleware, and do not merge next-intl's matcher into the existing one in a way that lets it see /dashboard.
+
+Keep the `x-current-path` request header the dashboard leg sets at proxy.ts:97, and keep the exact spelling `NextResponse.next({ request: { headers } })`. proxy.ts:9 documents what the other spelling costs: on a Server Action POST it overwrites the response content-type and every Server Action in the app then fails client-side with no server error and no stack.
+
+After the change, verify explicitly that /dashboard and /dashboard/login are never locale-prefixed and that a dashboard Server Action still succeeds.
+
+5.6 The Vazirmatn webfont.
+Load it with next/font/google — `import { Vazirmatn } from 'next/font/google'` — with the arabic and latin subsets, `display: 'swap'`, and exposed as a CSS variable rather than a class. Set that variable on the &lt;html&gt; element in src/app/[locale]/layout.tsx:99, and reference it from the Persian stack in src/common/styles/i18n.css:36. Do not inline the family name in a component and do not add a hex or a family literal outside the token layer.
+
+Keep the rest of the existing fallback stack behind it. A font request that fails must land on IRANSansX or Tahoma, not on a browser serif default.
+
+Load it for the Persian document only. An English page must not download an Arabic-subset font it never renders a glyph from.
+
+Two comments become false the moment this lands and must be corrected in the same commit: src/app/globals.css:64 claims "Zero webfont bytes: no next/font, no CDN font CSS, so there is no FOIT and no CLS", and the matching note at src/app/globals.css:177 says the same thing about the `--f-sans` stack. Replace them with what is now true — one webfont, Persian only, `display: swap`, English unchanged and still request-free.
+
+5.7 The masthead: the closer goes, the language switch takes its place.
+Delete src/common/components/layout/Closer.tsx and its export from src/common/components/layout/index.ts, and move `LanguageSwitch` into the slot the closer occupied at src/common/components/layout/Masthead.tsx:55 — the end of the masthead row. The switch is moved, not duplicated, and nothing else replaces the closer.
+
+The deletion leaves three loose ends and all three must be handled in this prompt:
+
+- src/common/styles/shell.css:306 to 328 styles `.closer` and `.closer__x`, and src/common/styles/i18n.css:89 to 90 mirrors both for RTL. Remove those rules. Do not leave dead selectors behind.
+- src/common/lib/motion/shell.ts:117 reads `document.getElementById('closer')` and :533 binds `onCloserClick`, with a matching removal in `destroy()`. Both are optional-chained so nothing throws, but they become dead code — remove them and the teardown together.
+- Closer.tsx:45 binds Escape at the ROUTE level, which works whether or not the shell transition is running. shell.ts:546 already closes on Escape when a section is open, so the behaviour survives for a visitor with the shell mounted. Verify that in the browser on a section route. If it does not hold, keep the key handler in a small non-visual client component instead of dropping the behaviour.
+
+`ui.close` and `ui.escToClose` may become unused message keys. Grep before removing either from both catalogs — the ported CSS and the shell module both name dictionary keys directly, and messages.ts:5 warns that renaming a key is a repo-wide edit.
+
+Check the switch's placement in both directions. It must sit at the same visual end of the masthead on /en and on /fa; the layout is mirrored by `dir`, not by a class, so a hardcoded `right` would put it in the wrong corner in Persian.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- "Remove the close button with the X icon and put the language switcher instead of it" means the closer is deleted outright and the language switch moves into its position. The switch already exists in the masthead; it is relocated, not added a second time.
+- The dashboard stays monolingual English and next-intl is wired for the public site only.
+- next-intl's routing replaces the hand-rolled helpers. src/common/i18n/routing.ts may keep a thin wrapper where a helper has many callers, but not a second implementation of the same decision.
+- Both locales stay prefixed in the URL. Dropping the prefix for English would change every canonical URL, the sitemap and generateStaticParams at once.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether src/common/i18n/messages.ts is deleted or kept as a re-export shim over the JSON. Recommended: delete it. Two sources for one dictionary is precisely the drift cache-tags.ts:6 exists to prevent one concern over.
+- Whether Persian numerals come from `faDigits` or from next-intl's formatter. Recommended: keep `faDigits` as the string-safe path and use the formatter only where the value is a real number, because several call sites shape an already-formatted string and the formatter cannot.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- app/ is routing and composition only. Modules are consumed through their index.ts barrel; no cross-module imports; anything shared is promoted to common/.
+- common/ imports from no module, ever. It is the bottom of the graph.
+- Every write Server Action returns a discriminated ActionResult, re-validates its input and re-authorizes from the session. Branch on status, code or a named field key — never on message text.
+- Cache tags are purged with `updateTag` using the exact strings src/common/services/cache-tags.ts declares. No single-argument `revalidateTag` anywhere.
+- Dashboard routes are never cached.
+- No colour, radius, duration or z-index literal outside the token layer in src/app/globals.css. No `any`.
+- No `typescript.ignoreBuildErrors`, no `eslint.ignoreDuringBuilds`, no `--no-verify`, no file-level or blanket eslint-disable, no `.skip` on a test you just broke.
+- The gate is the four commands. All four pass, or the change is not done.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against the seeded database with `npm run dev`:
+- /en and /fa both render every page with no untranslated key and no raw message id visible anywhere
+- Deleting a key from fa.json fails `npm run typecheck` — check this deliberately, then put it back
+- A project whose `status` column holds a value with no dictionary entry renders that raw value on the card and in the rail, not `status.Whatever` and not a blank
+- The bare `/` redirects with a 307, and the target honours an `Accept-Language: fa` header
+- /dashboard and /dashboard/login are never locale-prefixed, and saving a project from the dashboard still succeeds — this is the Server Action check for the proxy change
+- Persian pages render in Vazirmatn with the network throttled, and the English pages request no font file at all
+- The masthead has no X button; the language switch sits at its position, and at the same visual end on /en and /fa
+- Escape still leaves an open section
+- `grep -rn "getDictionary" src/` returns nothing, or only the shim you deliberately kept
+- `grep -rn "closer" src/` returns nothing
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the installed next-intl version, the reversal of the hand-rolled i18n decision with its reason, where message catalogs now live and the rule that keys are never renamed, the number-formatting split, how the proxy composes two middlewares in a fixed order, the webfont and what it costs, and the removal of the Closer with the three loose ends it had.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-8-next-intl-and-persian-type. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="9">
+    <div class="card-head">
+      <span class="chip">Prompt 9</span>
+      <h2 class="card-title">Editable categories: a taxonomy table, and a term editor on every list page</h2>
+      <span class="badge">Opus 5 &middot; high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-9-editable-taxonomies</b></span>
+    </div>
+    <p class="summary">One taxonomy_terms table for every closed axis on every subject &mdash; per-locale labels, explicit order, a show-on-site flag &mdash; seeded from the frozen enums, edited above the list on each subject&rsquo;s own dashboard page, and enforced at write time against the table instead of a compile-time z.enum.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="9">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="9"> Sent</label>
+      <button type="button" class="toggle" data-toggle="9">Show prompt text</button>
+    </div>
+    <pre data-prompt="9" hidden>Work on a new branch: prompt-9-editable-taxonomies. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md in full, then the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ — README.md first, then 03-server-data-layer.md, 04-actions-and-mutations.md and 05-contracts-and-schemas.md.
+
+Then read, in this order:
+- src/common/schemas/enums.ts in full, including its header — it states where the taxonomy is enforced today and why read schemas deliberately do not use it
+- src/common/services/schema.ts — the header's four conventions, and the "TAXONOMY VALUES ARE NOT TRANSLATED HERE" block at line 18
+- src/common/services/project-service.ts — `getProjectFilters` at line 86 and the module-private `order` helper at line 117, then the dashboard half below the divider at line 147
+- src/common/services/cache-tags.ts in full
+- src/common/utils/facets.ts and src/common/components/collection/FacetRail.tsx
+- src/modules/projects/components/ProjectFilterRail.tsx and src/modules/projects/lib/filters.ts
+- src/modules/dashboard/ in full, especially actions/project-actions.ts, components/RecordForm.tsx, components/RecordTable.tsx, components/ProjectListScreen.tsx, components/LocaleFieldPair.tsx and lib/areas.ts
+- src/modules/dashboard/index.ts — the barrel is the module's entire public API
+- scripts/seed.ts and drizzle/ — how a migration and a seed are produced here
+- eslint.config.mjs, the MODULES array at line 62 and the note above it
+
+2. CONTEXT
+
+Prompts 1 through 8 built the app, the dashboard and the next-intl i18n layer. Confirm src/common/services/schema.ts and src/modules/dashboard/actions/project-actions.ts exist and that next-intl message catalogs are in place under src/common/i18n/; if they are not, prompt 8 has not been merged and this prompt is not ready to run.
+
+Every taxonomy in this app is a frozen array in code. src/common/schemas/enums.ts declares eleven project types, three statuses, three scales, six design categories, two design statuses and four media types as `as const` arrays, and the WRITE schemas enforce them with `z.enum`. The public filter rails then show only the values rows actually use: `getProjectFilters()` at src/common/services/project-service.ts:86 derives its options from every row and orders them against the canonical arrays, appending anything unrecognized rather than dropping it. Design and media filter on one axis each through src/common/utils/facets.ts and FacetRail. The Persian labels are interface copy in the message catalogs, keyed `type.*`, `status.*`, `scale.*`, `cat.*` and `kind.*`.
+
+The consequence is the problem this prompt fixes: there is no way to add a category, no way to hide one that is retired or empty, no way to change the order options appear in, and no way to change a Persian label — every one of those is a code edit and a deploy, from a dashboard that was built so the studio would not need one.
+
+3. GOAL
+
+When this is done there is one `taxonomy_terms` table holding every closed axis for every subject, with per-locale labels, an explicit order and a show-on-site flag; a term editor sits above the list on each subject's own dashboard page; the public filter rails are driven by that table; and the write path validates against it instead of against a compile-time enum.
+
+4. SCOPE
+
+In scope:
+- The `taxonomy_terms` table, its migration and its seed
+- A taxonomy repository and service under src/common/services/, with the cached public half and the uncached dashboard half
+- The term editor component, mounted on /dashboard/projects, /dashboard/design and /dashboard/media
+- Taxonomy Server Actions
+- Rewiring `getProjectFilters` and the design and media facet sources
+- Moving write-time taxonomy validation from `z.enum` to a runtime check against the table
+
+Out of scope, do not start any of it in this pass:
+- Image uploads and drag-and-drop reordering. Those are prompts 10 and 11. Term reordering here uses the existing arrow control.
+- Any change to the shape of the content tables beyond what a taxonomy needs
+- A general-purpose settings area. The editor belongs on each subject's page, not on a page of its own.
+- Localizing the dashboard interface. It stays English.
+- Any redesign of the public rails
+
+5. SPECIFICS
+
+5.1 The table.
+`taxonomy_terms` in src/common/services/schema.ts, following the conventions that file's header states: per-locale column pairs, no `mode: 'json'`, integer unix-epoch timestamps.
+
+Columns: `id`; `subject` — 'project' | 'design' | 'media'; `axis` — 'type' | 'status' | 'scale' | 'category'; `value`, the canonical English string a content row stores; `labelEn` and `labelFa`; `sortOrder`; `visible`; and the shared timestamps. A unique index on the triple (`subject`, `axis`, `value`) — that triple is the identity, and without the index two rows can claim one value and the option list renders it twice with no error anywhere.
+
+There is deliberately NO foreign key from a content row to a term, for the same reason src/common/services/schema.ts:138 gives for `media.project_slug`: a term may be renamed or hidden while rows still carry its value, and a row carrying an unknown value must DEGRADE, not disappear.
+
+5.2 The migration and the seed.
+Generate the migration with `npm run db:generate`; never hand-edit a file under drizzle/. Then seed `taxonomy_terms` from the arrays in src/common/schemas/enums.ts IN THEIR DECLARED ORDER, with `labelEn` the value itself and `labelFa` taken from the matching `type.*`, `status.*`, `scale.*`, `cat.*` or `kind.*` entry in the Persian message catalog.
+
+That declared order is not alphabetical and is deliberate — project-service.ts:80 says so — and the seed is the only chance to carry it across into `sortOrder`. Every seeded term starts `visible`.
+
+Extend scripts/seed.ts, keeping it idempotent for this table the way it already is for the rest, so `npm run db:seed` twice does not duplicate the taxonomy.
+
+5.3 The service ring.
+A `taxonomy-repository.ts` and `taxonomy-service.ts` pair under src/common/services/, shaped like project-repository.ts and project-service.ts: a cached public read at the top — 'use cache', `cacheLife('max')`, `cacheTag` — and an uncached bilingual half below a divider for the dashboard, for the two reasons project-service.ts:129 states. An editor shown the value they just replaced cannot tell a stale cache from a failed save.
+
+Add `taxonomy: 'taxonomy-terms'` to `CACHE_TAGS` in src/common/services/cache-tags.ts and use that constant on both sides. Never a tag literal — cache-tags.ts:6 explains that a tag set under one string and purged under another is a silent no-op that leaves the public site stale until the next deploy.
+
+A term write purges `taxonomy-terms` AND the collection tag of the subject it belongs to — `projects`, `design-works` or `media`. Missing the second is a filter rail that updates while the grid below it does not.
+
+5.4 What the public rails read.
+`getProjectFilters()` at project-service.ts:86 currently derives its options from the rows. Change it to read the terms table: `visible` only, ordered by `sortOrder`, for subject 'project'.
+
+Keep the "unknown value appended rather than dropped" behaviour the `order` helper at project-service.ts:117 provides today, now for values that appear on rows but have no term. A value that vanishes from every rail is a set of records nobody can filter to, and enums.ts:9 already argues that an unrecognized value must stay visible rather than be substituted or blanked.
+
+`year` is NOT a taxonomy term and stays derived from the rows. It has no label to translate and no order to choose; project-service.ts:111 already sorts it newest-first.
+
+Design and media rails go through src/common/utils/facets.ts and FacetRail — feed their option lists from the same service, for subjects 'design' and 'media'.
+
+Labels: the rail renders `labelEn` or `labelFa` from the table for a known term, and falls back to the message-catalog `term()` lookup and then to the raw value for one that is not in the table. That is the same three-step degradation the i18n layer already documents.
+
+5.5 The write path.
+The `z.enum(...)` arrays in src/common/schemas/enums.ts are what stop a crafted POST writing an arbitrary status — project-actions.ts:20 explains that a Server Action is a public HTTP endpoint and the parse is the only thing standing in front of the database. Once terms are editable, a compile-time enum is the wrong check: a term added five minutes ago would be rejected as invalid.
+
+Move the taxonomy check in the WRITE path to a runtime check against the terms table, performed in the service — which can read the database — and returned as a 422 naming the offending field, in the same `{ ok: false, status: 422, body: fieldErrors }` envelope every other validation failure uses. The rest of the write schema stays exactly as strict: `strictObject`, so an unexpected key is still refused.
+
+Do NOT delete src/common/schemas/enums.ts. Keep the arrays as the seed source and keep the exported types, and rewrite the file header to say plainly that they are no longer the enforcement point and where the enforcement moved to. A file that silently stops being enforced is worse than one that says so.
+
+5.6 The editor, on each subject's own page.
+Above the record list on /dashboard/projects, /dashboard/design and /dashboard/media — not on a separate settings page. Putting it there is what makes the relationship between a term and the records using it visible, and it is what was asked for.
+
+Build ONE component under src/modules/dashboard/components/ and use it three times with a different subject, exported from src/modules/dashboard/index.ts. Four copies of this would be four places to fix the same bug; src/modules/dashboard/index.ts:11 already lists which pieces exist to be reused rather than copied, and this joins them.
+
+It renders each axis for its subject as a group, and per term: the English label, the Persian label in its own `dir` and `lang` the way LocaleFieldPair does, the wire value, a visible toggle, edit, delete, and up/down reorder using the existing RowReorder control. It can add a term to any axis.
+
+It is collapsed by default, as a `&lt;details&gt;` — the same pattern FacetRail.tsx:64 uses — so it does not push the record list off the fold on a page whose job is the list.
+
+Per term, it shows HOW MANY records currently use that value. A count is the only thing that makes "can I delete this?" answerable without leaving the page.
+
+Deleting a term that is in use must not silently orphan rows. Refuse it with a 409 naming the count, and have the editor say so and point at the visible toggle, which is the non-destructive way to take an option off the site.
+
+5.7 The actions.
+src/modules/dashboard/actions/taxonomy-actions.ts, following project-actions.ts clause for clause and in the same order: `'use server'`; `readSession()` FIRST and `{ ok: false, status: 401 }` before any parse, so an anonymous caller learns nothing about the shape the endpoint accepts; re-validate against an exact `strictObject` write schema and return 422 with `fieldErrors`; call a service through `toActionResult` and never a repository; purge the exact tags with `updateTag` only on success; return a discriminated ActionResult and never throw.
+
+Nothing that is not an action is exported from that file — project-actions.ts:64 explains that every export from a `'use server'` file becomes a public POST endpoint with a stable id baked into the client bundle.
+
+5.8 One coupling this must not break.
+`kindFor(seed, types)` at src/common/lib/art/draw.ts:943 chooses a project's generated drawing by matching type substrings — `/urban|complex|industrial/`, `/villa/`, `/interior|renovation/` and so on — lowercased and joined. A new or renamed type simply falls through to the default weighting, so nothing throws, but a project's drawing CHANGES when its types change. src/modules/projects/components/__tests__/drawing-identity.test.ts asserts that a card and its detail page draw the same picture; confirm it still passes, and record the coupling in AGENTS.md so the next person to rename a type is not surprised by the archive redrawing itself.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- EVERY closed axis becomes editable — project types, statuses and scales; design categories and statuses; media types — not only the axes literally named "category". Two kinds of dropdown that behave differently for no reason a user can see is worse than one editable set.
+- `year` is derived from the rows and is not a term.
+- One `taxonomy_terms` table serves all three subjects rather than a table per subject. The axes differ but the shape does not, and three tables would be three migrations for one change.
+- The dashboard interface stays English. What the editor edits is a term's Persian LABEL, which is content.
+- Term reordering uses the existing arrow control in this prompt. Prompt 11 replaces every arrow control in the dashboard with drag and drop, including this one.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether a term's `value` can be edited after creation. Recommended: no, make it immutable and let the labels carry any change. A rename has to migrate every content row holding the old string inside the same transaction, and a partial rename is a data corruption behind a green toast.
+- Whether a hidden term still filters for someone holding its URL. Recommended: yes, keep it working. facets.ts:14 already argues that 404-ing a stale link is the wrong answer and that an empty result stating so is the honest one.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Every write Server Action returns a discriminated ActionResult, re-validates its input, re-authorizes from the session, and never accepts an identity as an argument.
+- Branch on status, code, or a named field key — never on message text.
+- Cache tags are purged with `updateTag` inside the action, using the exact strings src/common/services/cache-tags.ts declares. No single-argument `revalidateTag` anywhere.
+- Reads go through db to repository to service. A component never touches a repository and never builds a query.
+- Dashboard routes are never cached; public reads are cached with `cacheLife('max')` precisely because the writes purge their tags.
+- app/ is routing and composition only; the dashboard module is consumed through its index.ts barrel. No cross-module imports; anything shared is promoted to common/. common/ imports from no module.
+- Forms are react-hook-form plus zodResolver through the form/ tier, built on RecordForm. No raw JSON textarea standing in for a structured editor.
+- No colour literal outside the token layer. No `any`. No `ignoreBuildErrors`, no `ignoreDuringBuilds`, no `--no-verify`, no blanket eslint-disable, no `.skip` on a test you just broke.
+- The gate is the four commands. All four pass, or the change is not done.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against a freshly migrated and seeded database with `npm run dev`:
+- `npm run db:seed` run twice leaves exactly one row per seeded term
+- The seeded order matches the arrays in src/common/schemas/enums.ts, not alphabetical order
+- Adding a project type on /dashboard/projects makes it selectable on the project form and, once a project uses it, visible in the rail on /en/projects and /fa/projects immediately — no rebuild, no second save
+- Editing a term's Persian label changes the rail on /fa/projects immediately
+- Hiding a term removes it from the public rail and leaves the records that use it reachable and rendered
+- A project whose `status` is a value with no term still renders, with its raw value shown, and appears in the rail rather than vanishing
+- Deleting a term that is in use is refused with a 409 and a count; deleting an unused one succeeds
+- The same three checks pass on /dashboard/design and /dashboard/media for their own axes
+- A POST to the create-project action with a status that matches no term is rejected 422 with the field named, and writes nothing
+- Every action rejects an unauthenticated call with 401 and writes nothing
+- `npm run test` still passes drawing-identity.test.ts
+- Every `cacheTag` string in src/common/services/ has a matching `updateTag` caller in src/modules/dashboard/actions/
+- `grep -rn "revalidateTag([^,)]*)" src` returns nothing
+
+Report anything you could not verify, and why.
+
+9. THEN
+
+1. Update AGENTS.md: the `taxonomy_terms` table and its unique index, the new cache tag and the two-tag purge rule, the move of taxonomy enforcement from `z.enum` to a runtime check with what enums.ts is now for, where the editor lives and why it is on each subject's page, the in-use delete refusal, the two open decisions as resolved, and the `kindFor` coupling.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-9-editable-taxonomies. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="10">
+    <div class="card-head">
+      <span class="chip">Prompt 10</span>
+      <h2 class="card-title">Image uploads: the storage volume, the upload API, and a picture on every record</h2>
+      <span class="badge">Opus 5 &middot; high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-10-image-uploads</b></span>
+    </div>
+    <p class="summary">An authenticated upload endpoint and a file-serving route over a mounted volume, one reusable uploader wired into RecordForm, image and per-locale alt-text columns on projects, design works, media and founders &mdash; with the generated drawing kept as the fallback for every record that has no photograph.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="10">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="10"> Sent</label>
+      <button type="button" class="toggle" data-toggle="10">Show prompt text</button>
+    </div>
+    <pre data-prompt="10" hidden>Work on a new branch: prompt-10-image-uploads. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md in full, then the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ — README.md first, then 03-server-data-layer.md, 04-actions-and-mutations.md, 06-error-system.md and 07-forms.md.
+
+Then read, in this order:
+- src/common/config/server-env.ts and src/common/config/env.ts in full — both headers state rules this prompt has to obey
+- next.config.ts, specifically `mediaRemotePatterns` at line 23 and the comment above it at line 11
+- src/proxy.ts, specifically the matcher at line 148 and what it excludes
+- src/common/services/schema.ts — the header's conventions, especially the JSON-column rule at line 25
+- src/common/lib/art/ — draw.ts, palette.ts and `kindFor` — and src/common/constants/site.ts for `PLATE_RATIO`
+- src/modules/projects/components/ProjectCard.tsx and ProjectDetail.tsx, and src/common/components/collection/CardReveal.tsx and DetailPlates.tsx
+- src/modules/dashboard/components/RecordForm.tsx, ResultRegion.tsx, LocaleFieldPair.tsx and ProjectForm.tsx
+- src/common/components/form/ in full, and src/common/errors/
+- the compose.yaml, Dockerfile and README deploy section that prompt 7 created
+
+2. CONTEXT
+
+Prompts 1 through 9 built the app, the dashboard, the i18n layer and the editable taxonomy. Confirm src/modules/dashboard/components/RecordForm.tsx exists and that compose.yaml and a Dockerfile are present at the repo root; if they are not, prompt 7 has not been merged and this prompt is not ready to run.
+
+This site ships zero image files. Every plate on every card and every detail page is an SVG generated at request time by `draw()` in src/common/lib/art/draw.ts, seeded by the record's slug, and injected as markup — see ProjectCard.tsx:44. That is why next.config.ts:23's `mediaRemotePatterns()` returns an empty array, and next.config.ts:14 says outright that this is correct "until the day the dashboard grows an upload field". `NEXT_PUBLIC_MEDIA_URL` in src/common/config/env.ts:36 was declared for that day and is unset. There is no src/app/api/ directory in the repository at all.
+
+So there is no way to put a photograph of a building on a project, a product shot on a design work, or a portrait on a founder — and a practice's archive of 76 built projects with no photographs is the gap this prompt closes.
+
+The storage decision is already made and is not open: files live on LOCAL DISK under a mounted volume and are served by the app. Prompt 7's compose.yaml deliberately has no volume because the database is Turso; this prompt adds one.
+
+3. GOAL
+
+When this is done there is an authenticated upload endpoint, a file-serving route, one reusable uploader control, image columns on every record that takes a picture, and public pages that render an uploaded image when there is one and keep the generated drawing when there is not.
+
+4. SCOPE
+
+In scope:
+- `UPLOAD_DIR` in the server environment schema
+- `POST /api/uploads` and `GET /api/media/[...path]` route handlers
+- One uploader component in the dashboard module, integrated with RecordForm
+- Image and per-locale alt-text columns on projects, design works, media and studio founders, with their migration
+- Public rendering, with the generated drawing as the fallback
+- The compose volume and the README deploy note
+
+Out of scope, do not start any of it in this pass:
+- Moving storage to object storage. Local disk on a volume is the decision; do not add an S3 client "for later".
+- Any anonymous or public upload path. There is one administrator and no public write.
+- Drag-and-drop reordering. That is prompt 11 — a gallery's order uses the existing arrow control here.
+- Image editing: cropping, filters, rotation. Out.
+- Replacing the generated art system. It stays and it is the fallback.
+- Any redesign of the public pages beyond showing an image where one exists.
+
+5. SPECIFICS
+
+5.1 Where files live.
+Add `UPLOAD_DIR` to src/common/config/server-env.ts: an absolute path, required, with NO default. That file's header states the rule and the reason — a missing value must stop the boot with the key named, not surface later as writes going somewhere nobody looks. `/data/uploads` in the container; a gitignored directory locally. Add it to .env.example with a comment, and to .gitignore if the local default sits inside the repo.
+
+Files are stored under a generated path — content hash or date partition plus a random id — never under the filename the client sent. A caller-controlled path is a path traversal, and two people uploading `photo.jpg` must not collide.
+
+5.2 The upload endpoint.
+`POST /api/uploads`, a route handler at src/app/api/uploads/route.ts.
+
+src/proxy.ts:151 excludes `api` from the matcher deliberately, so NOTHING gates this route. It must call `readSession()` itself and answer 401 before it reads a byte of the body. project-actions.ts:10 makes this argument for Server Actions; it applies here with more force, because this endpoint writes files to a disk.
+
+Validate, in this order, and reject before doing the next thing:
+- The session.
+- The byte size, checked WHILE streaming rather than after buffering. Buffering first and checking after is how a 2GB body becomes a memory exhaustion.
+- The real type, by sniffing the leading bytes against an allowlist of image formats. The `Content-Type` header is caller-supplied and proves nothing.
+- The decoded pixel dimensions, against a cap.
+
+Answer with the same envelope the actions use — a status and, on 422, a `fieldErrors` body — so the client branches on `result.status` and never on message text, the rule 06-error-system.md §4.3 states and RecordForm.tsx:18 already follows.
+
+Return the stored path plus the image's intrinsic width and height. `next/image` needs the dimensions, and reading them once here beats reading them on every render.
+
+5.3 Serving the files.
+`GET /api/media/[...path]` at src/app/api/media/[...path]/route.ts. It resolves the requested path against `UPLOAD_DIR`, then REJECTS anything that escapes it — resolve the path first and check the prefix of the result; a `..` check against the raw string is not enough, because encodings and symlinks get past it. Stream the file with its content type and a long immutable cache header.
+
+These are same-origin URLs, so `next/image` optimizes them with no `remotePatterns` entry. Leave `NEXT_PUBLIC_MEDIA_URL` unset and leave `mediaRemotePatterns()` in next.config.ts alone — update its comment to say it now applies only if storage ever moves to another origin, rather than deleting a function that fails closed correctly.
+
+5.4 The uploader.
+One client component under src/modules/dashboard/components/, exported from src/modules/dashboard/index.ts, used everywhere a record takes a picture. Requirements, all of them:
+
+- Accepts a file from a picker AND from a drop.
+- Is fully operable from the keyboard. A drop zone whose only affordance is dropping is a control a large number of people cannot use; the file input button is the parallel implementation and it must be focusable and labelled.
+- Shows upload progress, and shows a preview of what is STORED once the upload lands, not only of the local file — the difference is how a silent server-side failure gets noticed.
+- Supports replace and remove.
+- Renders its failures through ResultRegion in the one normalized error shape, and binds a 422's field errors the way RecordForm.tsx:24 describes, so it behaves like every other field in the form.
+- Integrates as a form/ tier field so react-hook-form owns its value and `FormButton`'s `isValid` gate sees it.
+
+5.5 Which records get pictures, and what the columns look like.
+- `projects` — one cover image plus an ordered gallery
+- `design_works` — one cover image plus an ordered gallery
+- `media` — one cover image
+- `studio` — a portrait per founder, inside the existing founders JSON structure
+
+Follow src/common/services/schema.ts's stated conventions exactly: a single image is a nullable text path column; a gallery is a TEXT column holding a JSON string, never `mode: 'json'`, parsed by a zod schema in src/common/schemas/ — schema.ts:25 explains that drizzle's json mode hands back `unknown` that the caller must cast, and a cast is an unverifiable claim.
+
+ALT TEXT IS PER-LOCALE AND REQUIRED. It is content, so it takes an `_en` / `_fa` column pair like every other translated field, and it sits beside the uploader in `LocaleFieldPair`. An uploader that can save a picture with no alt text is an accessibility regression on a site that today has no images to get wrong — do not make it optional and do not auto-fill it from the filename.
+
+Generate the migration with `npm run db:generate`; never hand-edit a file under drizzle/. Existing rows get NULL, which is the correct value: they genuinely have no photograph.
+
+5.6 Rendering.
+A record WITH an image shows the image. A record WITHOUT one keeps its generated drawing. Do not delete the art system, and do not let an empty image column render an empty box — 76 projects have no photograph today and every one of them must keep looking finished. AGENTS.md records that a media card's drawing is seeded from the PROJECT rather than the entry; keep that rule for entries with no image of their own.
+
+Use `next/image` with the stored intrinsic dimensions and a `sizes` value derived from the grid's real column widths, not a guess. Keep the `content-visibility: auto` and `contain-intrinsic-size` behaviour panel.css gives the cards — ProjectCard.tsx:13 explains that it is what makes 76 cards cost roughly what the dozen on screen cost, and an image that forces layout on every offscreen card throws that away.
+
+Check the reveal animation still works. CardReveal rests the frame at `clip-path: inset(0 0 100% 0)` and AGENTS.md:529 warns that a grid without it renders every drawing invisibly — an &lt;img&gt; inside that frame must reveal the same way the SVG does, or the images are there and nobody sees them.
+
+5.7 Deploy.
+compose.yaml gains a named volume mounted at `UPLOAD_DIR`. Document in the README's deploy sequence what happens on a redeploy WITHOUT it, in one sentence, so nobody removes it as tidying: every uploaded file is gone.
+
+The container runs as a non-root user. The volume must be writable by that user or the very first upload fails in production and nowhere else — verify the ownership explicitly rather than assuming the default works.
+
+A file no record references is a leak. Recommended: write straight to the store and remove unreferenced files with a documented manual or scheduled sweep; do not build a two-phase commit for this. Whatever you choose, say it in AGENTS.md — an unbounded directory on a volume is an outage six months out.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- Storage is local disk on a mounted volume, served by the app. Not object storage, not bytes in the database.
+- Uploading is dashboard-only and authenticated. There is no public upload anywhere in this app.
+- The generated art system stays and is the fallback for every record with no image.
+- Alt text is per-locale and required.
+- `NEXT_PUBLIC_MEDIA_URL` stays unset, because files are served same-origin from this app.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- Whether the upload endpoint stores derivatives (a thumbnail, a resized variant) or stores the original and lets `next/image` do the resizing. Recommended: store the original only. Next's optimizer already caches derivatives, and a second copy is a second thing to invalidate when a picture is replaced.
+- How orphaned files are reclaimed. Recommended: a documented sweep, not a transactional upload.
+- Whether a gallery's images carry their own alt text or share the record's. Recommended: their own — a gallery of eight photographs described by one sentence is one sentence read eight times.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Every write Server Action returns a discriminated ActionResult, re-validates its input, re-authorizes from the session, and never accepts an identity as an argument. A route handler that writes does the same, and answers with a status.
+- Branch on status, code, or a named field key — never on message text.
+- Cache tags are purged with `updateTag` inside the action, using the exact strings src/common/services/cache-tags.ts declares. No single-argument `revalidateTag` anywhere.
+- Reads go through db to repository to service. A route handler never touches a repository directly.
+- No secret in src/common/config/env.ts — anything `NEXT_PUBLIC_` is shipped to every browser. `UPLOAD_DIR` belongs in server-env.ts behind `server-only`.
+- app/ is routing and composition only; the dashboard module is consumed through its index.ts barrel. No cross-module imports; anything shared is promoted to common/.
+- Forms are react-hook-form plus zodResolver through the form/ tier, built on RecordForm.
+- No colour literal outside the token layer. No `any`. No `ignoreBuildErrors`, no `ignoreDuringBuilds`, no `--no-verify`, no blanket eslint-disable, no `.skip` on a test you just broke.
+- The gate is the four commands. All four pass, or the change is not done.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against the seeded database with `npm run dev`:
+- Uploading a cover image on /dashboard/projects/&lt;slug&gt; shows it at /en/projects/&lt;slug&gt; and /fa/projects/&lt;slug&gt; immediately
+- A project with no image still renders its generated drawing, on the card and on the detail page, and the grid still looks finished
+- The card reveal animation plays for an uploaded image exactly as it does for a drawing
+- Saving with an image and an empty Persian alt text is refused, with the error bound to that field
+- The uploader is reachable and operable with the keyboard alone, from focus to chosen file to saved
+- `curl -X POST http://localhost:3000/api/uploads` with no session cookie returns 401 and writes no file to `UPLOAD_DIR`
+- `curl` for `/api/media/../../etc/passwd` and its encoded variants returns a 4xx and no file contents
+- A file larger than the cap is rejected without the process memory spiking
+- A `.txt` renamed to `.jpg` is rejected by the byte sniff, not accepted by the header
+- The gallery renders in its stored order, and reordering it in the dashboard changes the public order
+- `docker compose up` with the volume: an upload made inside the container survives `docker compose down` and `up`; note explicitly if you cannot run this here
+- `grep -rn "revalidateTag([^,)]*)" src` returns nothing
+
+Report anything you could not verify, and why. If the container step cannot be verified in this environment, say so rather than reporting it as done.
+
+9. THEN
+
+1. Update AGENTS.md: `UPLOAD_DIR` and why it has no default, the two route handlers and the fact that the proxy does not gate `api` so each one authenticates itself, the path-traversal defence, the image and per-locale alt-text columns, the rule that a record with no image keeps its generated drawing, `NEXT_PUBLIC_MEDIA_URL` staying unset and what would change that, the volume and what a redeploy without it costs, and the three open decisions as resolved.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-10-image-uploads. Create and switch to it before making any changes.</pre>
+  </article>
+
+  <article class="card" data-card="11">
+    <div class="card-head">
+      <span class="chip">Prompt 11</span>
+      <h2 class="card-title">Drag-and-drop reordering with dnd-kit, everywhere a list has an order</h2>
+      <span class="badge">Opus 5 &middot; high</span>
+    </div>
+    <div class="card-meta">
+      <span class="branch">branch <b>prompt-11-dnd-reordering</b></span>
+    </div>
+    <p class="summary">Replace the up/down arrows with @dnd-kit across projects, design, media, taxonomy terms and galleries &mdash; keyboard sensor and announcements shipped in the same commit, auto-scroll for a 76-row table, and a new wire shape that still lets the server compute positions rather than trusting a posted ordering.</p>
+    <div class="actions">
+      <button type="button" class="copy" data-copy="11">Copy prompt</button>
+      <label class="sent"><input type="checkbox" data-sent="11"> Sent</label>
+      <button type="button" class="toggle" data-toggle="11">Show prompt text</button>
+    </div>
+    <pre data-prompt="11" hidden>Work on a new branch: prompt-11-dnd-reordering. Create and switch to it before making any changes.
+
+1. READ FIRST
+
+Read AGENTS.md in full — including its Bans section, which this prompt has to argue with rather than ignore, and its "Reordering sends an INTENT, not an order" paragraph, whose reasoning this prompt must preserve while changing the wire shape.
+
+Then the nextjs-app-architecture skill references in .claude/skills/nextjs-app-architecture/references/ — README.md first, then 04-actions-and-mutations.md and 08-state-and-data-flow.md.
+
+Then read, in this order:
+- src/modules/dashboard/components/RowReorder.tsx IN FULL, including its header, which argues against exactly what this prompt builds
+- src/modules/dashboard/components/ProjectRowActions.tsx, ProjectListScreen.tsx and RecordTable.tsx
+- src/modules/dashboard/actions/project-actions.ts, specifically `moveProjectAction` at line 250 and the header's four rules
+- `moveProject` in src/common/services/project-service.ts, and how it renumbers
+- src/modules/dashboard/index.ts — the barrel, especially the RowReorder export at line 57
+- src/app/(dashboard)/layout.tsx and its note on direction
+- the taxonomy term editor added by prompt 9, and the design, media and gallery list surfaces added by prompts 7 and 10
+
+2. CONTEXT
+
+Prompts 1 through 10 built the app, the dashboard, the i18n layer, the editable taxonomy and image uploads. Confirm src/modules/dashboard/components/RowReorder.tsx exists and that /dashboard/design and /dashboard/media are real routes; if they are not, prompt 7 has not been merged and this prompt is not ready to run.
+
+Reordering is a pair of up/down arrow buttons today. RowReorder.tsx's header, lines 5 through 13, argues explicitly against drag-and-drop on three grounds: AGENTS.md bans a new dependency for something the platform already does; a drag handle is a pointer-only affordance that needs a whole parallel keyboard implementation; and dragging inside a 76-row scrolling table is a poor interaction because the target is usually off-screen.
+
+This prompt overrides that decision at the request of the person who uses the tool. The second and third reasons are still TRUE, so they become requirements rather than objections — the keyboard path and the off-screen problem are both solved here, not dropped.
+
+The wire shape is the other half of the work. `moveProjectAction` at project-actions.ts:250 takes `{ id, direction }` and the service computes the new positions from the current rows, renumbering by index rather than swapping — AGENTS.md records that a swap is a silent no-op the moment two rows share a `sort_order`, and that a client posting 76 ids in a new order would silently revert every change anyone else made since the page loaded. A drag from position 3 to position 17 cannot be expressed as a direction, so a new shape is needed that keeps that property.
+
+3. GOAL
+
+When this is done, every ordered list in the dashboard is reordered by dragging — with a keyboard path that is equally complete — and the server still computes positions from the rows it holds rather than trusting an ordering posted by the client.
+
+4. SCOPE
+
+In scope:
+- @dnd-kit as a dependency, with the reversal recorded
+- One sortable-list component in the dashboard module, replacing RowReorder everywhere
+- A new reorder wire shape and the action and service changes behind it
+- Keyboard sensor, announcements and auto-scroll
+- Optimistic movement with honest reconciliation
+
+Out of scope, do not start any of it in this pass:
+- Reordering anything on the PUBLIC site. Readers do not reorder the archive.
+- Multi-select drag, drag between lists, or nested drag
+- Any change to what the lists show, filter or sort by
+- Any redesign of the dashboard
+- Persisting a per-user order. There is one order and it is the site's.
+
+5. SPECIFICS
+
+5.1 The dependency, and the ban.
+`npm i @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`. Verify each is compatible with React 19.2 and Next.js 16.3 before wiring anything — check the installed package, not a blog post.
+
+AGENTS.md's ban reads "No new dependency for something common/ or the design system already does; check first, and say what you checked." Say it, in the commit body and in AGENTS.md: what exists is the arrow control, drag reordering is not something common/ or the design system provides, and this is a deliberate, requested reversal of the decision RowReorder.tsx's header records. Rewrite that header — do not ship code whose own documentation argues it should not exist.
+
+5.2 The keyboard path is not optional.
+Wire dnd-kit's `KeyboardSensor` with `sortableKeyboardCoordinates`, so a row can be picked up, moved and dropped from the keyboard alone, and wire its screen-reader instructions and `announcements` so each of those steps is announced in a live region. RowReorder.tsx:7 is right that a drag handle by itself is an accessibility problem, and it names the parallel keyboard implementation as the fix — this is that implementation, and it ships in the same commit as the drag, not after it.
+
+Give `PointerSensor` an activation constraint — a small distance or delay — so a click on the row's Edit link or its delete button is not swallowed by a drag start. Without it the two most common actions on the row stop working and it reads as a broken table.
+
+The drag handle is its own focusable control with an accessible name that identifies the ROW, not just the action. RowReorder.tsx:81 explains why: "Move up" repeated 76 times is 76 identically-named controls to anyone navigating by control.
+
+5.3 The wire shape.
+Replace `{ id, direction }` with a shape that expresses an arbitrary move without posting the whole ordering.
+
+Recommended: `{ id, afterId: number | null }` — the record being moved and the record it now follows, with `null` meaning "first". A relative anchor survives a concurrent edit in a way an absolute index does not, it validates as two ids, and the server still renumbers by index exactly as `moveProject` does today. Whatever shape you choose, the rule is unchanged: the SERVER computes positions from the current rows, and the client never posts a full ordering.
+
+The action contract is unchanged and has no exceptions: `'use server'`; `readSession()` first and 401 before any parse; re-validate against an exact `strictObject` schema and return 422 with `fieldErrors`; call the service through `toActionResult`; purge both affected records' tags with `updateTag` on success only; return a discriminated ActionResult and never throw.
+
+A move whose anchor no longer exists — the row was deleted in another tab — is a stale request, not a crash. Answer it the way `moveProjectAction` already answers a no-op at project-actions.ts:262 and let the client refresh.
+
+5.4 Optimistic, but honest.
+These lists are server-rendered and the current control refreshes the router after a successful write; RowReorder.tsx:56 explains why it uses `useTransition` rather than a boolean — a plain flag clears the moment the action resolves, while the table still shows the old order, and a second interaction then moves the row twice.
+
+A drag that visibly snaps back to the old position for half a second before landing reads as a bug. Move the row optimistically, reconcile against the server's answer, and on failure put it back AND say why through ResultRegion. Never silently revert: a reorder that quietly does not stick is the failure mode people re-do five times before reporting.
+
+5.5 Seventy-six rows.
+Auto-scroll while dragging toward the edge of the viewport, so a row can reach a position that was off-screen when the drag started. That is RowReorder.tsx:10's third objection and it is the one that makes drag genuinely worse than arrows if it is skipped.
+
+Do not create a drag context per row. One context per list.
+
+Keep the rule ProjectListScreen.tsx:67 already applies to the arrows: when a column sort is active, "one position earlier in `sort_order`" is a position the reader cannot see, so dragging is DISABLED with the reason shown — not silently ignored, and not quietly reordering something invisible. The same holds for the filtered view: ProjectListScreen.tsx:11 computes the boundaries AFTER filtering for exactly this reason, and a drop target must mean a position among the rows on screen.
+
+5.6 Everywhere it applies.
+Every list with a `sort_order` column, without exception: projects, design works, media, the taxonomy terms from prompt 9, and the image galleries from prompt 10.
+
+Build ONE sortable-list component under src/modules/dashboard/components/, export it from src/modules/dashboard/index.ts, and use it in all five places. Five copies is five places to fix the announcement wording; src/modules/dashboard/index.ts:11 already lists the pieces that exist to be reused rather than copied and this joins them.
+
+Delete src/modules/dashboard/components/RowReorder.tsx and its barrel export at src/modules/dashboard/index.ts:57 once nothing imports it. Leaving both controls in place means two ways to do one thing that can disagree.
+
+5.7 Direction.
+src/app/(dashboard)/layout.tsx sets `dir="ltr"` with no `is-fa` class, deliberately — the dashboard is a monolingual English admin tool and only the Persian INPUTS carry their own `dir` and `lang`. So there is no RTL drag case to solve here; do not add one and do not mirror the transforms.
+
+Do verify a drag works on a row containing a Persian title. ProjectListScreen.tsx:142 renders `dir="rtl" lang="fa"` inside the title cell, and an RTL text run inside a dragged LTR row is where a transform-based drag preview goes wrong if it is going to.
+
+6. DECISIONS
+
+Assumptions made when this prompt was written. If one is wrong, stop and say so before building.
+
+- @dnd-kit is the library, as requested. Do not substitute another.
+- Drag REPLACES the arrows rather than sitting beside them. The keyboard path is dnd-kit's keyboard sensor, not a surviving pair of arrow buttons.
+- The server keeps computing positions from the rows it holds. The client never posts a full ordering, whatever the new shape is.
+- The dashboard stays LTR.
+- Reordering stays disabled while a column sort is active, for the reason the current code already states.
+
+Open decisions — do not resolve these silently. Record whichever you choose in AGENTS.md.
+
+- The exact wire shape. Recommended: `{ id, afterId }` with `null` for first, because a relative anchor degrades better than an absolute index under a concurrent edit.
+- Whether a drop writes immediately or the list has an explicit save. Recommended: immediate, matching every other write in this dashboard; an explicit save would be the only unsaved state in the tool.
+- Whether the whole row is draggable or only a handle. Recommended: a handle. The row contains a link and two buttons, and a fully draggable row fights all three.
+
+7. ARCHITECTURE NON-NEGOTIABLES
+
+- Every write Server Action returns a discriminated ActionResult, re-validates its input, re-authorizes from the session, and never accepts an identity as an argument.
+- Branch on status, code, or a named field key — never on message text.
+- Cache tags are purged with `updateTag` inside the action, using the exact strings src/common/services/cache-tags.ts declares. No single-argument `revalidateTag` anywhere.
+- Reads go through db to repository to service. A component never touches a repository and never builds a query.
+- Dashboard routes are never cached.
+- app/ is routing and composition only; the dashboard module is consumed through its index.ts barrel. No cross-module imports; anything shared is promoted to common/.
+- No colour, radius, duration or z-index literal outside the token layer in src/app/globals.css — including the drag overlay's. No `any`.
+- No `ignoreBuildErrors`, no `ignoreDuringBuilds`, no `--no-verify`, no blanket eslint-disable, no `.skip` on a test you just broke.
+- The gate is the four commands. All four pass, or the change is not done.
+
+8. VERIFICATION
+
+  npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run build &amp;&amp; npm run test
+
+All four pass, or the change is not done.
+
+Then, against the seeded database with `npm run dev`:
+- Dragging a project from near the top to near the bottom of the 76-row list persists after a reload, and the intervening rows renumber correctly
+- The list auto-scrolls while dragging toward the viewport edge, so an off-screen target is reachable
+- The same row can be picked up, moved several positions and dropped using ONLY the keyboard, with each step announced — verify with a screen reader if one is available, and say so if not
+- Clicking Edit or delete on a row does not start a drag and still works
+- With a column sort active, dragging is disabled and the reason is visible
+- With a filter applied, a drop lands the row where it appears to land relative to the visible rows
+- A failed reorder — simulate one — puts the row back AND shows why
+- The public /en/projects order matches the dashboard order immediately after a drop
+- The same checks pass on /dashboard/design, /dashboard/media, the taxonomy term editor and an image gallery
+- An unauthenticated POST to the reorder action returns 401 and writes nothing
+- A reorder naming a deleted anchor is answered without a crash
+- Dragging a row whose title cell contains Persian text behaves identically to one that does not
+- `grep -rn "RowReorder" src/` returns nothing
+- `grep -rn "revalidateTag([^,)]*)" src` returns nothing
+
+Report anything you could not verify, and why. If you could not test with a screen reader, say so explicitly rather than reporting the announcements as verified.
+
+9. THEN
+
+1. Update AGENTS.md: the @dnd-kit dependency with what you checked and why the ban was reversed, the replacement of the arrow control, the new reorder wire shape with the reason it is not an absolute index and not a full ordering, the keyboard path as a shipped requirement rather than a follow-up, the disabled-while-sorted rule carried forward, and the three open decisions as resolved.
+2. Switch to Sonnet at medium effort and commit the work following the git-commit-flow skill — one logical change per commit, type(scope) subjects, why-first bodies. Never commit directly to main.
+
+Work on a new branch: prompt-11-dnd-reordering. Create and switch to it before making any changes.</pre>
+  </article>
+
+<footer class="bot">
+  <p><b>These run after prompt 7</b>, not instead of it. Every one of them reads files prompt 7 creates &mdash; the design, media, studio, contact and messages areas, the container and the compose file &mdash; and each opens by naming a file to check before it starts.</p>
+  <p><b>Three decisions are baked in</b> and stated in each prompt&rsquo;s assumptions: uploaded files live on local disk under a mounted volume rather than in object storage or in the database; every closed axis becomes editable, not only the ones literally named &ldquo;category&rdquo;; and the dashboard stays monolingual English, so next-intl is wired for the public site only. If any of those is wrong, change it before prompt 8 rather than after prompt 10.</p>
+  <p><b>Each prompt names its own open decisions</b> in section 6 with a recommendation. Those are the calls the receiving session must not make silently &mdash; it records whichever it chooses in AGENTS.md.</p>
+  <p>Sent state is stored in this browser only.</p>
+</footer>
+
+</div>
+<script>
+(function () {
+  var NUMBERS = [8, 9, 10, 11];
+  var KEY = 'asansabt-prompt-';
+
+  function read(n) {
+    try { return localStorage.getItem(KEY + n) === '1'; } catch (e) { return false; }
+  }
+  function write(n, v) {
+    try { localStorage.setItem(KEY + n, v ? '1' : '0'); } catch (e) {}
+  }
+
+  function paintStrip() {
+    var done = 0;
+    NUMBERS.forEach(function (n) {
+      var on = read(n);
+      if (on) done++;
+      var seg = document.querySelector('[data-seg="' + n + '"]');
+      if (seg) seg.classList.toggle('is-done', on);
+    });
+    var note = document.getElementById('strip-note');
+    if (note) note.innerHTML = '<b>' + done + '</b> of ' + NUMBERS.length + ' sent';
+  }
+
+  NUMBERS.forEach(function (n) {
+    var card = document.querySelector('[data-card="' + n + '"]');
+    var pre = document.querySelector('[data-prompt="' + n + '"]');
+    var copy = document.querySelector('[data-copy="' + n + '"]');
+    var sent = document.querySelector('[data-sent="' + n + '"]');
+    var toggle = document.querySelector('[data-toggle="' + n + '"]');
+
+    if (sent && card) {
+      sent.checked = read(n);
+      card.classList.toggle('is-sent', sent.checked);
+      sent.addEventListener('change', function () {
+        write(n, sent.checked);
+        card.classList.toggle('is-sent', sent.checked);
+        paintStrip();
+      });
+    }
+
+    if (copy && pre) {
+      copy.addEventListener('click', function () {
+        var text = pre.textContent;
+        var done = function () {
+          var was = copy.textContent;
+          copy.textContent = 'Copied';
+          copy.classList.add('is-ok');
+          setTimeout(function () {
+            copy.textContent = was;
+            copy.classList.remove('is-ok');
+          }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else { fallback(); }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+      });
+    }
+
+    if (toggle && pre) {
+      toggle.addEventListener('click', function () {
+        var hidden = pre.hasAttribute('hidden');
+        if (hidden) { pre.removeAttribute('hidden'); toggle.textContent = 'Hide prompt text'; }
+        else { pre.setAttribute('hidden', ''); toggle.textContent = 'Show prompt text'; }
+      });
+    }
+  });
+
+  paintStrip();
+})();
+</script>
+</body>
+</html>
