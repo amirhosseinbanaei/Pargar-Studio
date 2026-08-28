@@ -21,11 +21,23 @@ const withNextIntl = createNextIntlPlugin('./src/common/i18n/request.ts');
  * need different config files, and the one nobody rebuilt serves broken images with a 400
  * from the optimizer.
  *
- * TODAY THIS RETURNS `[]` AND THAT IS CORRECT, not an oversight: the site ships zero image
- * files — every drawing is generated as SVG at runtime (see `legacy/js/art/draw.js`) — so
- * `NEXT_PUBLIC_MEDIA_URL` is unset and nothing remote is allowed. The function stays so
- * that the day the dashboard grows an upload field, the allowlist follows the env instead
- * of a literal.
+ * THIS STILL RETURNS `[]` AFTER PROMPT 10, AND THAT IS STILL CORRECT — but for a different
+ * reason than before, which is worth stating because the old reason has expired.
+ *
+ * The old reason: the site shipped zero image files, so there was nothing to allow. The
+ * dashboard grew an upload field in prompt 10, so that is no longer true.
+ *
+ * The reason now: uploaded images are served by THIS APP, at `/api/media/<path>`, from local
+ * disk under `UPLOAD_DIR`. They are same-origin URLs, and the image optimizer needs no
+ * `remotePatterns` entry for its own origin — it only gates FETCHING FROM ELSEWHERE, which
+ * is the open-image-proxy this list exists to prevent. `NEXT_PUBLIC_MEDIA_URL` is therefore
+ * still unset, and `src/common/config/env.ts` still declares it optional.
+ *
+ * WHAT WOULD CHANGE THIS: moving storage to another origin — object storage, a CDN, a
+ * separate media host. Then `NEXT_PUBLIC_MEDIA_URL` is set to that origin, this function
+ * derives the allowlist from it, and nothing else here has to be edited. That is exactly
+ * what it was written for, so it stays rather than being deleted as unreachable code: it
+ * fails closed today and is correct the day it is needed.
  *
  * Reading `process.env` here is safe and correct: this file runs on the build/server side
  * only, never in the browser bundle.

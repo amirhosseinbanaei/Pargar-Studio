@@ -114,6 +114,46 @@ details > .fgroup__body { grid-template-rows: 1fr; }
 a.detail__back { text-decoration: none; }
 
 /* --------------------------------------------------------------------------
+   Uploaded photographs (prompt 10)
+   --------------------------------------------------------------------------
+   A record may now carry a real photograph in a frame that has only ever held a
+   generated SVG. These rules make the two indistinguishable to the layout, and
+   they live HERE rather than in `panel.css` for the reason this file exists:
+   `panel.css` is a byte-identical port of `legacy/css/` and additions go beside
+   it, not into it.
+
+   `next/image`'s `fill` emits `position: absolute; inset: 0` inline, so each
+   rule below adds only what the SVG's own rule already gave its element:
+
+    - `object-fit: cover` reproduces `preserveAspectRatio="xMidYMid slice"`. The
+      drawings COVER their frame and are cropped; a photograph must do the same
+      or a 4:3 box would letterbox a 3:2 photograph and the grid would gain grey
+      bands the drawings never had.
+    - The card's `scale(1.04)` -> `scale(1)` on hover is the same exposure gesture
+      `.card__frame > svg` gets, so a photographed card and a drawn one behave
+      identically under the pointer.
+
+   NOTHING HERE TOUCHES THE FRAME. `clip-path`, `content-visibility` and
+   `contain-intrinsic-size` are all properties of `.card__frame` and `.card`, so
+   the reveal animation and the offscreen-skipping behaviour apply to a
+   photograph exactly as they do to a drawing — see `CardPlate`. */
+
+.card__frame > img {
+  object-fit: cover;
+  transform: scale(1.04);
+  transition: transform var(--d-xl) var(--e-expo);
+}
+.card:hover .card__frame > img { transform: scale(1); }
+
+.detail__plate > img { object-fit: cover; }
+
+/* `.person__plate` is sized by `aspect-ratio` and is not positioned in the port; a
+   `fill` image needs a positioned ancestor or it escapes to the nearest one, which
+   on the studio page is the whole document. One additive property. */
+.person__plate { position: relative; }
+.person__plate > img { object-fit: cover; }
+
+/* --------------------------------------------------------------------------
    No JavaScript
    -------------------------------------------------------------------------- */
 
@@ -121,7 +161,11 @@ a.detail__back { text-decoration: none; }
    the viewport — which needs an IntersectionObserver. With scripting off that reveal never
    runs, so every drawing on the page would be clipped to nothing: server-rendered SVG,
    present in the HTML, and invisible. `scripting: none` unclips them, so the grid degrades
-   to "no wipe" rather than to "no artwork". */
+   to "no wipe" rather than to "no artwork".
+
+   This covers an uploaded PHOTOGRAPH for free, and that is worth stating: the clip is on
+   the frame, so with scripting off an `<img>` inside it would be exactly as invisible as
+   an `<svg>`, and unclipping the frame reveals whichever one is there. */
 @media (scripting: none) {
   .card__frame { clip-path: inset(0 0 0 0); }
   .preload,

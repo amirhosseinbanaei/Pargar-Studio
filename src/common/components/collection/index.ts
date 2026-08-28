@@ -11,6 +11,7 @@
  * seed arithmetic, the empty-value rule), not merely when its markup rhymes.
  */
 export { BackLink, type BackLinkProps } from './BackLink';
+export { CardPlate, type CardPlateProps } from './CardPlate';
 export { CardReveal } from './CardReveal';
 export { DetailPlates, type DetailPlatesProps } from './DetailPlates';
 export { FacetRail, type FacetOption, type FacetRailProps } from './FacetRail';

@@ -24,6 +24,8 @@ const project = (over: Partial<Project>): Project => ({
   description: '',
   location: '',
   client: '',
+  cover: null,
+  gallery: [],
   ...over,
 });
 

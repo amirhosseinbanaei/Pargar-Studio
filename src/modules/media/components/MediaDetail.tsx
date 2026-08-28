@@ -70,7 +70,14 @@ export function MediaDetail({ entry, project, dictionary }: MediaDetailProps) {
             )}
           </blockquote>
 
-          <DetailPlates seed={seed} types={types} dictionary={dictionary} />
+          {/* A cover if this entry has one; otherwise all three plates stay drawings seeded
+              from the RELATED PROJECT, which is what makes a cutting carry the building. */}
+          <DetailPlates
+            seed={seed}
+            types={types}
+            dictionary={dictionary}
+            images={entry.cover ? [entry.cover] : []}
+          />
 
           <div className="detail__cols">
             <div className="spec">

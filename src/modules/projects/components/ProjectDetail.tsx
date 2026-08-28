@@ -38,7 +38,14 @@ export function ProjectDetail({ project, dictionary }: ProjectDetailProps) {
           <h1 className="detail__title">{project.title}</h1>
           <p className="detail__blurb">{project.blurb}</p>
 
-          <DetailPlates seed={project.slug} types={project.types} dictionary={dictionary} />
+          {/* Cover first, then the gallery in its stored order. Any slot without a
+              photograph keeps the drawing it always had — see `DetailPlates`. */}
+          <DetailPlates
+            seed={project.slug}
+            types={project.types}
+            dictionary={dictionary}
+            images={[...(project.cover ? [project.cover] : []), ...project.gallery]}
+          />
 
           <div className="detail__cols">
             <div className="spec">

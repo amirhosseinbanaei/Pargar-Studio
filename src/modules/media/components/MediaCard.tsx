@@ -14,9 +14,9 @@
  * inside Persian scrambles at a line boundary.
  */
 import Link from 'next/link';
+import { CardPlate } from '@/common/components/collection';
 import { Lat } from '@/common/components/layout';
-import { draw, kindFor } from '@/common/lib/art';
-import { PLATE_RATIO } from '@/common/constants/site';
+import { kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { Media } from '@/common/schemas/media';
@@ -39,10 +39,9 @@ export function MediaCard({ entry, projectTypes, dictionary }: MediaCardProps) {
       href={localeHref(locale, `/media/${entry.slug}`)}
       data-cursor={t('ui.view')}
     >
-      <span
-        className="card__frame"
-        dangerouslySetInnerHTML={{ __html: draw(kind, seed, PLATE_RATIO) }}
-      />
+      {/* An entry with its own cover shows it; without one the drawing is seeded from the
+          related PROJECT, which is the rule this card exists to preserve. */}
+      <CardPlate image={entry.cover} kind={kind} seed={seed} />
       <span className="card__body">
         <span className="card__title">{entry.title}</span>
         <span className="card__year">{num(entry.year)}</span>

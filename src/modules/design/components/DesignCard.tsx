@@ -11,8 +11,8 @@
  * single category, so the card and the detail page's first plate are the same picture.
  */
 import Link from 'next/link';
-import { draw, kindFor } from '@/common/lib/art';
-import { PLATE_RATIO } from '@/common/constants/site';
+import { CardPlate } from '@/common/components/collection';
+import { kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { DesignWork } from '@/common/schemas/design-work';
@@ -35,10 +35,7 @@ export function DesignCard({ work, dictionary }: DesignCardProps) {
       href={localeHref(locale, `/design/${work.slug}`)}
       data-cursor={t('ui.view')}
     >
-      <span
-        className="card__frame"
-        dangerouslySetInnerHTML={{ __html: draw(kind, work.slug, PLATE_RATIO) }}
-      />
+      <CardPlate image={work.cover} kind={kind} seed={work.slug} />
       <span className="card__body">
         <span className="card__title">{work.title}</span>
         <span className="card__year">{num(work.year)}</span>

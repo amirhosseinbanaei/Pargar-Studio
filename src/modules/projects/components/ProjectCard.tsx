@@ -7,10 +7,13 @@
  *
  *  - It is a LINK to `/{locale}/projects/{slug}`, not a `<button data-slug>` that swapped a
  *    detail view into the same panel. The project has a URL now.
- *  - The drawing is IN THE HTML. `draw()` runs here, on the server, seeded by the slug —
- *    which is why the card's drawing and the detail page's first plate are the same
- *    picture: same seed, same pure function, and the detail page is the same bytes for
- *    every visitor.
+ *  - The drawing is IN THE HTML. `draw()` runs on the server, seeded by the slug — which is
+ *    why the card's drawing and the detail page's first plate are the same picture: same
+ *    seed, same pure function, and the detail page is the same bytes for every visitor.
+ *
+ * SINCE PROMPT 10 a project may carry a real photograph, and `CardPlate` chooses between
+ * the two. `kindFor` is still called unconditionally, because the drawing is what a record
+ * with no cover shows and that is most of them — the seed contract above is unchanged.
  *
  * `content-visibility: auto` with `contain-intrinsic-size` stays exactly as `panel.css`
  * has it. It is what makes 76 cards cost roughly what the dozen on screen cost: an
@@ -18,8 +21,8 @@
  * scrollbar honest while it does.
  */
 import Link from 'next/link';
-import { draw, kindFor } from '@/common/lib/art';
-import { PLATE_RATIO } from '@/common/constants/site';
+import { CardPlate } from '@/common/components/collection';
+import { kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { Project } from '@/common/schemas/project';
@@ -39,12 +42,9 @@ export function ProjectCard({ project, dictionary }: ProjectCardProps) {
       href={localeHref(locale, `/projects/${project.slug}`)}
       data-cursor={t('ui.view')}
     >
-      <span
-        className="card__frame"
-        // Pure, seeded by the slug, and nothing user-supplied reaches it — see
-        // `ColumnShell` for the full note on why this is the right way in.
-        dangerouslySetInnerHTML={{ __html: draw(kind, project.slug, PLATE_RATIO) }}
-      />
+      {/* The uploaded cover if there is one, the drawing seeded from the slug if there is
+          not — and 76 of them have not. `CardPlate` owns that choice for all three grids. */}
+      <CardPlate image={project.cover} kind={kind} seed={project.slug} />
       <span className="card__body">
         <span className="card__title">{project.title}</span>
         <span className="card__year">{num(project.year)}</span>

@@ -22,7 +22,9 @@
  * the database verbatim. The NUMBERS are shaped at render by `num()`, because the columns
  * store Latin digits on purpose (AGENTS.md).
  */
+import Image from 'next/image';
 import { draw, portrait } from '@/common/lib/art';
+import { mediaUrl } from '@/common/constants/uploads';
 import type { Dictionary } from '@/common/i18n';
 import type { MessageKey } from '@/common/i18n';
 import type { Studio } from '@/common/schemas/studio';
@@ -113,12 +115,42 @@ export function StudioScreen({ studio, seeds, dictionary }: StudioScreenProps) {
           <div className="duo">
             {studio.founders.map((founder, i) => (
               <div className="person" key={founder.name}>
-                <span
-                  className="person__plate"
-                  dangerouslySetInnerHTML={{
-                    __html: portrait(seeds.founders[i] ?? seedOf(founder.name), FOUNDER_RATIO),
-                  }}
-                />
+                {/*
+                  THE PORTRAIT PATH COMES FROM THE ENGLISH RECORD, the alt text from the
+                  localized one. Same zip `seedOf` already needed — see `../lib/seeds` — and
+                  for the same reason: the English founders array is the authority on which
+                  picture a founder has, and only the sentence describing it is per-locale.
+
+                  A founder with no photograph, or with one nobody described in this
+                  language, keeps the GENERATED portrait. Requiring both halves before
+                  rendering the photograph is what stops an undescribed image reaching a
+                  page that has, until now, had nothing visual to get wrong.
+                */}
+                {seeds.founderImages[i] && founder.imageAlt.trim() ? (
+                  <span className="person__plate">
+                    <Image
+                      src={mediaUrl(seeds.founderImages[i] ?? '')}
+                      alt={founder.imageAlt}
+                      fill
+                      /*
+                        Derived from `.duo` in `panel.css`: `repeat(auto-fit, minmax(17rem,
+                        1fr))` over the two founders, inside a content region of ~92vw. It
+                        holds two columns — so ~46vw each — until the region drops below
+                        2 × 17rem, at which point `auto-fit` collapses to one full-width
+                        column. 34rem is that threshold.
+                      */
+                      sizes="(max-width: 34rem) 92vw, 46vw"
+                      className="person__photo"
+                    />
+                  </span>
+                ) : (
+                  <span
+                    className="person__plate"
+                    dangerouslySetInnerHTML={{
+                      __html: portrait(seeds.founders[i] ?? seedOf(founder.name), FOUNDER_RATIO),
+                    }}
+                  />
+                )}
                 <p className="person__name">{founder.name}</p>
                 <p className="person__role">{founder.role}</p>
                 <p className="person__born">{founder.born}</p>

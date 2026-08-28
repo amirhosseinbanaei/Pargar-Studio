@@ -45,7 +45,14 @@ export function DesignDetail({ work, dictionary }: DesignDetailProps) {
           <h1 className="detail__title">{work.title}</h1>
           <p className="detail__blurb">{work.blurb}</p>
 
-          <DetailPlates seed={work.slug} types={[work.category]} dictionary={dictionary} />
+          {/* Cover first, then the gallery in its stored order. Any slot without a
+              photograph keeps the drawing it always had — see `DetailPlates`. */}
+          <DetailPlates
+            seed={work.slug}
+            types={[work.category]}
+            dictionary={dictionary}
+            images={[...(work.cover ? [work.cover] : []), ...work.gallery]}
+          />
 
           <div className="detail__cols">
             <div className="spec">

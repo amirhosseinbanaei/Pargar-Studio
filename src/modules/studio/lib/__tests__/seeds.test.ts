@@ -30,8 +30,16 @@ describe('studioSeeds', () => {
   const english = {
     manifesto: '',
     founders: [
-      { name: 'Farhad Rastgar', role: '', born: '', bio: '' },
-      { name: 'Mahsa Aminzadeh', role: '', born: '', bio: '' },
+      {
+        name: 'Farhad Rastgar',
+        role: '',
+        born: '',
+        bio: '',
+        image: '2026/08/0123456789abcdef0123456789abcdef.jpg',
+        imageAlt: 'Farhad in the studio',
+      },
+      // No photograph — the normal state, and the one that must keep drawing a portrait.
+      { name: 'Mahsa Aminzadeh', role: '', born: '', bio: '', image: null, imageAlt: '' },
     ],
     stats: [],
     team: ['Sepehr Ansari', 'Golnaz Bahrami', 'Kaveh Daneshvar'],
@@ -45,6 +53,15 @@ describe('studioSeeds', () => {
     expect(seeds.founders).toEqual(['farhad-rastgar', 'mahsa-aminzadeh']);
     expect(seeds.team).toEqual(['sepehr-ansari', 'golnaz-bahrami', 'kaveh-daneshvar']);
     expect(new Set(seeds.team).size).toBe(seeds.team.length);
+  });
+
+  it("carries each founder's uploaded portrait, index-aligned, `null` where there is none", () => {
+    // The path comes from the ENGLISH record for the same reason the seed does: that array
+    // is the authority on which picture a founder has. `null` is what makes the page fall
+    // back to the generated portrait for the founder beside it, one position at a time.
+    const seeds = studioSeeds(english);
+    expect(seeds.founderImages).toEqual(['2026/08/0123456789abcdef0123456789abcdef.jpg', null]);
+    expect(seeds.founderImages).toHaveLength(seeds.founders.length);
   });
 
   it('is index-aligned with the arrays it was built from', () => {
