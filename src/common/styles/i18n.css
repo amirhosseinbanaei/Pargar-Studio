@@ -32,10 +32,21 @@
       size to sit comfortably next to the same layout.
    -------------------------------------------------------------------------- */
 
+/* `--f-vazirmatn` is set by `next/font/google` on the <html> element of the
+   PERSIAN document only (`src/app/[locale]/layout.tsx`). Before prompt 8 the
+   stack below named "Vazirmatn" as a plain family, so it rendered only for a
+   reader who happened to have it installed locally and fell through to Tahoma
+   for everyone else; the variable is the loaded copy, and next/font's own
+   adjusted fallback is folded into it.
+
+   The rest of the stack is unchanged and stays BEHIND it on purpose: if the
+   font file fails to arrive, Persian must land on IRANSansX or Tahoma, never on
+   a browser serif default. `var(--f-vazirmatn, "Vazirmatn")` also keeps the
+   locally-installed copy working if the request is blocked outright. */
 html.is-fa {
-  --f-sans: "Vazirmatn", "IRANSansX", "IRANSans", "Shabnam", "Geeza Pro",
+  --f-sans: var(--f-vazirmatn, "Vazirmatn"), "IRANSansX", "IRANSans", "Shabnam", "Geeza Pro",
             "Nadeem", "Al Bayan", "Noto Naskh Arabic", Tahoma, sans-serif;
-  --f-serif: "Vazirmatn", "IRANSansX", "Geeza Pro", "Al Bayan",
+  --f-serif: var(--f-vazirmatn, "Vazirmatn"), "IRANSansX", "Geeza Pro", "Al Bayan",
              "Noto Naskh Arabic", Tahoma, serif;
 
   --tr-wide: 0;

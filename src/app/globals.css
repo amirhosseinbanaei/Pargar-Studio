@@ -61,8 +61,11 @@
 
   /* Type families. These DO deliberately shadow Tailwind's defaults — replacing
      `--font-sans` is how a v4 app sets its own font, and `font-sans` should mean
-     this stack everywhere. Zero webfont bytes: no next/font, no CDN font CSS,
-     so there is no FOIT and no CLS. */
+     this stack everywhere. This stack requests nothing: it is system faces only,
+     so an English page still downloads no font file at all and has no FOIT and
+     no CLS. There is exactly ONE webfont in the app and it is not here — prompt 8
+     loads Vazirmatn through `next/font/google` for the PERSIAN document only, with
+     `display: swap`; see `common/styles/i18n.css` and `app/[locale]/layout.tsx`. */
   --font-sans:
     'Futura', 'Avenir Next', 'Avenir', 'Century Gothic', 'URW Gothic', 'Questrial', ui-sans-serif,
     system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -175,7 +178,11 @@
 
   /* ---- type ----------------------------------------------------------- */
   /* Geometric sans first — Futura/Avenir ship with macOS, Century Gothic
-     with Windows. No webfont request means no FOIT, no CLS, instant paint. */
+     with Windows. System faces only, so an English document requests no font
+     file: no FOIT, no CLS, instant paint. `i18n.css` REDEFINES `--f-sans` inside
+     `html.is-fa` onto the Vazirmatn stack, which is the app's one webfont and is
+     loaded for the Persian document alone (`display: swap`, so Persian paints in
+     the fallback first and never blanks). */
   --f-sans:
     'Futura', 'Avenir Next', 'Avenir', 'Century Gothic', 'URW Gothic', 'Questrial', ui-sans-serif,
     system-ui, -apple-system, 'Segoe UI', sans-serif;
