@@ -93,6 +93,13 @@ All four pass, or the change is not done.
   are part of the cached HTML with no hydration cost and no layout shift. **Never add
   `'use client'` under `src/common/lib/art/`** — that one directive puts ~47KB of generator
   back in the bundle, silently.
+- **~~The project filter taxonomy is DERIVED from the rows that exist.~~ HALF-REVERSED IN
+  PROMPT 9 — the CANON is a table now; presence still gates.** The option list comes from
+  `taxonomy_terms`, which an editor owns; what survives unchanged is the rule that an option
+  nothing uses is not offered and a value no term declares is appended rather than dropped.
+  See "Editable taxonomies (prompt 9)" below. The original decision, and the reasoning that
+  is still load-bearing:
+
 - **The project filter taxonomy is DERIVED from the rows that exist**, in
   `getProjectFilters()`, not stored as a constant. _(Open decision, resolved in prompt 2.)_
   It extends what `legacy/data/projects.js:424` already did for `type` to all four axes.
@@ -126,7 +133,7 @@ Non-negotiables, all machine-checkable:
 - Types are derived with `z.infer`. Read schemas tolerant at the leaves, strict at the
   shape; write schemas exact (`z.strictObject`).
 
-### The six tables
+### The seven tables
 
 Defined in `src/common/services/schema.ts`; migrations are **generated and committed** to
 `drizzle/`. `drizzle-kit push` is not the deploy path and must not become one.
@@ -139,6 +146,7 @@ Defined in `src/common/services/schema.ts`; migrations are **generated and commi
 | `studio`           | 1    | the editorial block — singleton, `id` pinned to 1 by a CHECK |
 | `contact`          | 1    | the editable CONTENT of the contact page — same pinning      |
 | `contact_messages` | —    | the INBOX: submissions from the public form                  |
+| `taxonomy_terms`   | 29   | every closed axis, for every subject — prompt 9              |
 
 `contact` and `contact_messages` are two different things that share a word, and both
 exist deliberately: one is page content an editor changes, the other is mail a stranger
@@ -181,17 +189,18 @@ a literal. **Prompts 6 and 7 purge these exact strings.** A tag set under one na
 purged under another is a no-op: the save succeeds, the toast is green, and the public page
 stays stale until the next deploy.
 
-| Tag                  | Set by                                              |
-| -------------------- | --------------------------------------------------- |
-| `projects`           | `listProjects`, `getProject`, `getProjectFilters`   |
-| `project:<slug>`     | `getProject`, `listMediaForProject`                 |
-| `design-works`       | `listDesignWorks`, `getDesignWork`                  |
-| `design-work:<slug>` | `getDesignWork`                                     |
-| `media`              | `listMedia`, `getMediaEntry`, `listMediaForProject` |
-| `media:<slug>`       | `getMediaEntry`                                     |
-| `studio`             | `getStudio`                                         |
-| `contact`            | `getContact`                                        |
-| `contact-messages`   | **nothing** — reserved, see below                   |
+| Tag                  | Set by                                                 |
+| -------------------- | ------------------------------------------------------ |
+| `projects`           | `listProjects`, `getProject`, `getProjectFilters`      |
+| `project:<slug>`     | `getProject`, `listMediaForProject`                    |
+| `design-works`       | `listDesignWorks`, `getDesignWork`                     |
+| `design-work:<slug>` | `getDesignWork`                                        |
+| `media`              | `listMedia`, `getMediaEntry`, `listMediaForProject`    |
+| `media:<slug>`       | `getMediaEntry`                                        |
+| `studio`             | `getStudio`                                            |
+| `contact`            | `getContact`                                           |
+| `contact-messages`   | **nothing** — reserved, see below                      |
+| `taxonomy-terms`     | `getPublicTerms`, and every rail read that composes it |
 
 Singletons have no instance tag: there is one record, so the collection tag already
 identifies it, and a second name is a second thing to forget to purge.
@@ -221,7 +230,9 @@ only place allowed to import `legacy/`** — which is its entire job.
   `sort_order` is the legacy array position (reverse-chronological); the dashboard edits it.
 
 Scripts: `db:generate` (write a migration from the schema), `db:migrate` (apply committed
-migrations), `db:seed`. The last two run under `tsx --conditions=react-server`, which is
+migrations), `db:seed` — which, since prompt 7 deleted the content seed and prompt 9 restored
+the NAME for a different script, seeds `taxonomy_terms` and nothing else. See "Editable
+taxonomies (prompt 9)". The last two run under `tsx --conditions=react-server`, which is
 what resolves the `server-only` package to its empty build outside a React Server
 Components bundle.
 
@@ -1061,6 +1072,8 @@ media 14 · studio 1 · contact 1 · contact_messages 0 (left untouched)` immedi
 `git rm`, matching every count AGENTS.md already declared.
 
 **`scripts/seed.ts` has no successor, and `npm run db:seed` is gone from `package.json`.**
+_(The script name came back in prompt 9 for `scripts/seed-taxonomy.ts`, which seeds the term
+table and nothing else — it is not this script reborn and has a different data source.)_
 Its entire job was porting `legacy/data/*.js` into the database; once that tree is gone there
 is nothing left to seed FROM. The database is now the only copy of the studio's content —
 the README documents restoring a new environment from a `turso db shell ... .dump` backup
@@ -1487,6 +1500,186 @@ next/server.js?". It is a test-resolution concern only; the Next.js bundler reso
   see the table above. The deciding case is that `project.year` is a `number` yet must not
   be grouped, so "is it a number" was the wrong question — "is it a quantity" is the right
   one.
+
+## Editable taxonomies (prompt 9)
+
+Every closed axis in the app was a frozen `as const` array in `src/common/schemas/enums.ts`
+and the write schemas enforced it with `z.enum`. So there was no way to add a category, hide
+a retired or empty one, change the order options appear in, or change a Persian label —
+every one of those was a code edit and a deploy, from a dashboard built so the studio would
+not need one. A term is a row now.
+
+```
+  src/common/services/schema.ts             taxonomy_terms + its unique index
+  src/common/schemas/taxonomy.ts            subjects, axes, SUBJECT_AXES, the row contract
+  src/common/services/taxonomy-repository.ts   queries + THE zod parse
+  src/common/services/taxonomy-service.ts   cached public half · uncached dashboard half
+  src/common/utils/taxonomy.ts              the rail's three-way degradation rule (pure)
+  src/modules/dashboard/components/TaxonomyEditor.tsx   ONE editor, mounted three times
+  src/modules/dashboard/actions/taxonomy-actions.ts     five actions
+  src/modules/dashboard/lib/taxonomy-guard.ts           the write-time check, as one clause
+  scripts/seed-taxonomy.ts                  `npm run db:seed`
+```
+
+### The table, and the index that is not optional
+
+`taxonomy_terms`: `id`, `subject` (`project|design|media`), `axis`
+(`type|status|scale|category`), `value`, `label_en`, `label_fa`, `sort_order`, `visible`, and
+the shared timestamps. **One table for all three subjects** — the axes differ but the shape
+does not, and three tables would be three migrations, three repositories and three editors
+for one change.
+
+**`UNIQUE (subject, axis, value)`.** That triple is a term's identity — it is what a content
+row's stored string resolves against. Without the index two rows can claim one value, and
+then the option list renders it twice, the usage count goes to whichever was read first, and
+deleting one leaves the other, with no error anywhere.
+
+**There is deliberately NO foreign key** from a content row to a term, for the same reason
+`media.project_slug` has none: a term may be hidden, deleted from a shell, or never have
+existed for a value an older row carries, and such a row must **degrade** — render its raw
+value, stay filterable — rather than disappear or fail a constraint.
+
+### The write path: `z.enum` became a runtime check
+
+`enums.ts` is **not deleted and is no longer the enforcement point**; its own header says so
+at the top, in those words. The arrays stay for two real jobs: they are what
+`scripts/seed-taxonomy.ts` writes into the table, in their declared order, and they are the
+historical record of the vocabulary the archive was authored with. The exported types are
+kept, now derived from the arrays rather than from a `z.enum`.
+
+Enforcement moved to **`unknownTermErrors()` in `taxonomy-service.ts`**, reached through
+`modules/dashboard/lib/taxonomy-guard.ts`'s `checkTaxonomy` — a plain module, not an export
+from a `'use server'` file, which would have published it as an endpoint. Every content write
+action runs it after the schema parse and answers `{ ok: false, status: 422, body: fieldErrors }`
+naming the offending field, so `RecordForm` binds it with no new branch. A compile-time enum
+is the wrong check once terms are editable: a type added five minutes ago would be rejected
+by code that shipped last week. **The rest of every write schema is exactly as strict** —
+still `strictObject`, still `.min(1)`.
+
+The check reads **all** terms, hidden ones included: hiding takes an option off the public
+rails, it does not retract the value from records that carry it, and those must stay saveable.
+
+### The rails read the table, and degrade in three steps
+
+`getProjectFilters(locale)`, `getDesignWorkFilters(locale)` and `getMediaFilters(locale)` each
+compose `getPublicTerms(subject)` with their own rows through `common/utils/taxonomy.ts`'s
+`optionsForAxis`. The rule has three branches and all three matter:
+
+| Term state                          | On the rail                                             |
+| ----------------------------------- | ------------------------------------------------------- |
+| declared, visible, some row uses it | offered, with its `label_en`/`label_fa`                 |
+| declared but HIDDEN                 | not offered at all, whatever the rows say               |
+| not declared, some row uses it      | **appended**, unlabelled, so its records stay reachable |
+
+- **Presence still gates.** A term nothing uses is not offered — the prompt-2 decision above,
+  unrepealed. `visible` is a VETO over that set, not a way to force an empty option onto a rail.
+- **The middle row was a real bug**, caught end-to-end and not by reading. The first
+  implementation filtered `visible` in the QUERY (`listVisibleBySubject`), which looks
+  obviously right and means a caller cannot tell a just-hidden term from a value nobody
+  declared — so the append branch put it straight back on the rail with its raw English
+  value, and hiding demoted a label and changed nothing else. The flag has to travel with the
+  row. `taxonomy-repository.ts` carries a comment where that function used to be.
+- **Labels degrade term → message catalog → raw value**, the same three steps the i18n layer
+  documents for `term()`. Verified: a project whose `status` was `Mothballed` rendered
+  `Mothballed` on the Persian rail and its detail page — never `status.Mothballed`, never blank.
+- **`year` is NOT a term** and stays derived from the rows. It has no label to translate and
+  no order to choose.
+
+### The editor is on each subject's own page
+
+`TaxonomyEditor`, exported from `@/modules/dashboard`, mounted three times with a different
+`subject` on `/dashboard/projects`, `/dashboard/design` and `/dashboard/media`, above the
+record list. **Not on a settings page**, and that placement is the feature: the count beside
+each term is counted from the very rows in the table below it, so "can I delete this?" is
+answerable without leaving the screen. One component rather than three copies, on the same
+rule the rest of `index.ts` already lists.
+
+Collapsed by default as a `<details>` — `FacetRail.tsx:64`'s pattern, inverted: that rail has
+one group and nothing below it so it opens; this page's job is the LIST. Per term it shows the
+English label, the Persian label in its own `dir`/`lang` the way `LocaleFieldPair` does, the
+wire value, the use count, a visible toggle, edit, delete and `RowReorder`'s arrows. It also
+lists **undeclared values** the records carry, so an option appearing on a public rail that
+the editor does not list is never a mystery.
+
+### Deleting an in-use term is refused with a 409 and a count
+
+There is no foreign key, so the database would accept the delete and silently orphan the
+rows: they keep the value, the value keeps rendering, and the only symptom is an option gone
+from a rail that nobody can explain. `deleteTaxonomyTermAction` answers
+`{ ok: false, status: 409, body: { count } }` and the editor says so and points at the visible
+toggle — the non-destructive way to take an option off the site. `DeleteRecordDialog` gained
+one prop for it (`resolveRefusal`), which branches on the status and the named key, never on
+message text.
+
+### Every term write purges TWO tags
+
+`taxonomy-terms` **and** the collection tag of the term's subject — `projects`, `design-works`
+or `media` — because a public rail is one cached entry composed from both tables. Purging only
+the first refreshes an inner read nobody renders and leaves the rail as stale as before;
+purging only the second updates the grid while the rail above it still offers the retired
+option. `taxonomySubjectTag()` in `cache-tags.ts` is the second half, spelled once.
+
+The subject is read from the ROW the write returned, never from an argument, so a crafted POST
+cannot purge — or fail to purge — the wrong collection.
+
+Nesting does not help: `getPublicTerms` carries `taxonomy-terms` on its OWN cache entry, and
+that tag is not lifted onto the entry of a function that calls it. Every composing read spells
+both tags out.
+
+### The seed, and the one thing prompt 7 left behind
+
+**`scripts/seed.ts` and `npm run db:seed` did not exist when this prompt ran** — prompt 7
+deleted them with `legacy/`, their only data source. `scripts/seed-taxonomy.ts` is a new
+script under the restored `db:seed` name, and its header says plainly that it seeds
+`taxonomy_terms` **and nothing else**. It has a data source that is still in the repository and
+always will be: the arrays in `enums.ts` plus the Persian labels in `i18n/messages/fa.json`.
+It is not a content seed reborn; a content seed would need its own name and its own source.
+
+- **Idempotent by UPSERT on the identity triple, not by delete-then-insert.** The old content
+  seed deleted first; here that would throw away every label an editor changed, every position
+  they reordered and every flag they cleared. A term that exists is left alone. Verified: two
+  runs leave 29 rows.
+- **`sort_order` is the position in the `enums.ts` array.** That order is the legacy one, is
+  deliberate and is not alphabetical, and the seed is the only chance to carry it across.
+  Verified: `Residential … Industrial`, `Completed / Under Construction / Concept`.
+- **One term has no Persian yet: the design status `In production`**, which the ported catalog
+  never carried (the legacy Persian layer translated a design work's status redundantly and
+  that value was deliberately dropped). The seed falls back to the English string, as the read
+  path does. It is owed a native reader, and the editor is now where it gets entered.
+
+### The two open decisions, resolved
+
+- **A term's `value` is IMMUTABLE after creation.** Taken as recommended. It is not on the
+  update form, and — more to the point — it is not in `taxonomyTermUpdateSubmissionSchema`, so
+  a POST carrying one is REFUSED by `strictObject` rather than ignored. A rename would have to
+  rewrite every content row holding the old string inside the same transaction, and a partial
+  rename is data corruption behind a green toast: both halves keep rendering. The labels carry
+  any change, which is what they are for.
+- **A hidden term still filters for someone holding its URL. Kept working.** Taken as
+  recommended, and it falls out of the design rather than needing a branch: `parseFacet` and
+  `parseProjectFilters` never validated against the taxonomy (`facets.ts:14` — 404-ing a stale
+  link is the wrong answer), so `?type=Retired` still matches its records and still renders
+  them. Verified on all three subjects.
+
+### The `kindFor` coupling — read this before renaming a project type
+
+`kindFor(seed, types)` at `src/common/lib/art/draw.ts:943` chooses a project's generated
+drawing by matching TYPE SUBSTRINGS, lowercased and joined: `/urban|complex|industrial/`,
+`/villa/`, `/interior|renovation/`, `/hospitality|office|commercial/`. A type that matches
+none of them falls through to the default weighting.
+
+**Nothing throws, and a project's drawing CHANGES when its types change.** Adding a type named
+`Warehouse` is harmless; renaming `Villa` to `Villas`, or giving a project a new type
+alongside its existing ones, silently redraws every card and detail page for that project —
+the archive redrawing itself, with no error and no failing test.
+
+This is a coupling between an editable taxonomy and the art layer, and it is the one thing in
+prompt 9 that a term edit can change outside the taxonomy. Two mitigations exist and neither
+is a guard: the wire `value` is immutable, so a term can never be _renamed_ into or out of one
+of those regexes — only a new value assigned to a project can move it — and
+`modules/projects/components/__tests__/drawing-identity.test.ts` pins the card/detail identity
+(confirmed still passing). If a type ever needs to map to a drawing deliberately, the place to
+do it is `kindFor`, not the term.
 
 ## Deviations from the architecture playbook
 
