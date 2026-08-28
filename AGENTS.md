@@ -51,8 +51,13 @@ All four pass, or the change is not done.
 - **Tokens are declared twice in `src/app/globals.css`**: `@theme` for what dashboard
   utilities must reach, raw `:root` custom properties for the ported shell CSS, which
   references them by name. That file says which token is which and why some are suffixed.
-- **Zero webfont bytes.** The geometric system stack in `--f-sans` is kept exactly as-is:
-  no `next/font`, no CDN font CSS, so no FOIT and no CLS.
+- **~~Zero webfont bytes.~~ REVERSED IN PROMPT 8 — one webfont, Persian only.** English is
+  unchanged and still requests nothing: the geometric system stack in `--f-sans` is kept
+  exactly as-is, so an English document downloads no font file, has no FOIT and no CLS.
+  Persian now loads **Vazirmatn** through `next/font/google`, because `i18n.css` had named
+  it first in the Persian stack since the port with nothing ever loading it — so Persian
+  rendered in Vazirmatn only for a reader who happened to have it installed and fell
+  through to Tahoma for everyone else. See "The Persian webfont" under prompt 8.
 - **Content services use `cacheLife('max')`** — no expiry timer. _(Open decision, resolved
   in prompt 2.)_ This is studio content: it changes when an editor saves and at no other
   moment, and every dashboard write purges its tags explicitly. A shorter profile would
@@ -363,7 +368,10 @@ to load on demand, no subscription to fire, and no overlay to merge
 the language is in the URL, which is a better memory than `localStorage` because it travels
 with a shared link.
 
-`getDictionary(locale)` replaces the module-level `let lang` singleton. That is not a style
+`getDictionary(locale)` replaces the module-level `let lang` singleton. **Prompt 8 renamed
+it `getIntl` and rebuilt it on next-intl** — see that prompt's section; the argument-not-a-
+singleton reasoning below is unchanged and is why `createTranslator` was chosen over the
+request-scoped `getTranslations`. That is not a style
 choice — two requests for two locales can render in one process at the same moment, and a
 module-scoped language would leak one visitor's language into another's HTML.
 
@@ -379,7 +387,7 @@ module-scoped language would leak one visitor's language into another's HTML.
   `legacy/data/i18n.js`: `ui.sections`, `error.title` and `ui.retry` (plus
   `error.notFound`). The legacy markup hardcoded an English `aria-label="Sections"`, and a
   route that can fail needs failure copy the panel model never had. **Their Persian is
-  AUTHORED, not ported** — everything else in `messages.ts` is verbatim — and is flagged
+  AUTHORED, not ported** — everything else in the dictionary is verbatim — and is flagged
   here for a native reader to confirm.
 - The dictionary applies the corrections at `legacy/data/i18n.js:326`, not the values they
   superseded: `ui.est` is `Est.` and `ui.projectsCount` is `Projects`, because the originals
@@ -394,8 +402,10 @@ module-scoped language would leak one visitor's language into another's HTML.
   is a route), and `router.prefetch` fires on `pointerdown` so the fetch overlaps the
   animation instead of following it.
 
-  **Closing is a clean cut, and that is the honest half of this decision.** `Closer`
-  navigates; it does not play the transition in reverse, because the outgoing view on a
+  **Closing is a clean cut, and that is the honest half of this decision.** Closing
+  navigates (the wordmark, Back, or the Escape key `SectionEscape` binds since prompt 8,
+  which deleted the `Closer` button that used to start it); it does not play the
+  transition in reverse, because the outgoing view on a
   section route has no columns to fly back — there is nothing on screen to animate. A
   half-played reverse is worse than no reverse.
 
@@ -472,8 +482,9 @@ owns its screens and its filter logic; `app/` imports the barrel and nothing dee
 ### Client leaves, and why each one is one
 
 Server Components are the default and the layout is one. Everything that carries
-`'use client'` is a leaf with a single reason: `Stage`, `SkipLink`, `SectionHint`, `Closer`
-and `LanguageSwitch` read the pathname; `MarkStepper` measures a box; `LiveClock` ticks;
+`'use client'` is a leaf with a single reason: `Stage`, `SkipLink`, `SectionHint` and
+`LanguageSwitch` read the pathname (as did `Closer`, deleted in prompt 8, whose Escape
+handler now lives in `SectionEscape`); `MarkStepper` measures a box; `LiveClock` ticks;
 `SiteMotion` owns the cursor and the preloader; `ShellTransition` drives the FLIP;
 `CardReveal` adds one class. The clock's first value is computed on the SERVER behind
 `await connection()` and a `<Suspense>`, so it is correct in the HTML with no hydration
@@ -586,7 +597,10 @@ a service (`createContactMessage`) rather than a repository.
   §5.1 — branch on which field the backend named, not on the status alone.
 - **`ContactForm` takes a `locale`, not a `Dictionary`.** A dictionary is an object of
   FUNCTIONS and cannot cross the server/client boundary; `@/common/i18n` is client-safe, so
-  the leaf builds its own, exactly as `(site)/error.tsx` does.
+  the leaf builds its own, exactly as `(site)/error.tsx` does. **Superseded in prompt 8:**
+  building one in the browser pulled both catalogs into the client bundle, so the form now
+  takes NO props and reads `useTranslations()` from `NextIntlClientProvider`. The reason
+  it could never take a `Dictionary` is unchanged.
 - **Tier 2, not tier 1**, though four flat fields would normally be tier 1: `FormButton`
   gates on `isValid`, which needs per-keystroke validation, and the zod messages have to
   come from the dictionary — which means a schema built per render, not a module constant.
@@ -868,8 +882,8 @@ file** — worth remembering when adding an optional variable.
 
 Every content area is now editable from the dashboard, `legacy/` is deleted, the app builds
 and runs in a container against Turso, CI runs the four-command gate, and Part C of the
-adoption playbook has been run against the finished repo. This is the last prompt in the
-sequence.
+adoption playbook has been run against the finished repo. (It was the last prompt in the
+planned sequence; prompt 8 follows, and reverses two of the decisions recorded above.)
 
 ```
   src/app/(dashboard)/dashboard/(shell)/design/       CRUD, create + edit + delete + reorder
@@ -1204,6 +1218,275 @@ re-scored.
   reason stated above (no Turso credentials in this environment); the production Turso
   database must still be seeded from `scripts/seed.ts` before this prompt's first real
   deploy, from the commit before this one.
+
+## next-intl, the Persian webfont and the masthead (prompt 8)
+
+Two decisions this file recorded are **deliberately reversed here**, and both reversals are
+written down beside the originals so the next agent does not "fix" them back: the
+hand-rolled i18n layer is now next-intl, and "zero webfont bytes" is now "one webfont,
+Persian only".
+
+```
+  src/common/i18n/routing.ts       defineRouting — locales, defaultLocale, prefix, no cookie
+  src/common/i18n/navigation.ts    createNavigation — Link, usePathname, getPathname (+ 2 wrappers)
+  src/common/i18n/request.ts       getRequestConfig, locale from next/root-params
+  src/common/i18n/catalog.ts       loads the JSON, declares AppConfig, TYPES the fa catalog
+  src/common/i18n/messages/{en,fa}.json   the strings
+  src/common/i18n/translator.ts    getIntl(locale) — t · num · count · term · list
+  src/common/components/layout/SectionEscape.tsx   the Escape key the deleted Closer had
+```
+
+### The installed version, and why the shape matters
+
+**next-intl `4.14.0`** (`npm i next-intl@latest`, 2026-08-28), against Next.js `16.3.2`.
+Its `peerDependencies` accept `next: ^16.0.0`, so 16.3 needed no pin and none was taken.
+
+The App Router API changed shape at v4 and a v3-shaped setup fails at build naming a file
+you did not write. What this repo uses is the v4 set: `defineRouting`, `createNavigation`,
+`getRequestConfig`, and `createNextIntlPlugin` in `next.config.ts` — the plugin is what
+aliases `next-intl/config` to `src/common/i18n/request.ts`, and **without it every
+next-intl server API throws "Invalid i18n request configuration detected"**. The path is
+non-default (`./src/common/i18n/request.ts`, not `src/i18n/request.ts`) because shared
+infrastructure lives under `common/` here.
+
+`request.ts` reads the locale from **`next/root-params`, not `requestLocale`**.
+`requestLocale` is deprecated in v4 and reads a header, which under Cache Components would
+make every page that touches it dynamic — this app prerenders 245 pages and must keep
+doing so. `next/root-params` reads the `[locale]` segment and is static-safe on 16.3.
+
+### Why the hand-rolled dictionary was reversed
+
+`messages.ts` was a 411-line TypeScript object and `translator.ts` a hand-written `t`/`num`/
+`term`/`list`. That was a defensible starting point and its header said so. It is reversed
+because next-intl owns plural rules, per-locale number and date formatting, ICU message
+arguments and rich text, and — the half that actually bit — it keeps **the routing, the
+redirect and the alternate links in one place**, where the hand-rolled version had them in
+three: a string-concatenating `localeHref`, a bespoke `Accept-Language` parser in the
+proxy, and a `localeAlternates` that agreed with both only by inspection.
+
+### The catalogs, and the two properties that had to survive the move
+
+`src/common/i18n/messages/en.json` and `fa.json`, **generated from `messages.ts`
+programmatically** rather than retyped, so every Persian string — zero-width non-joiners
+included — is byte-identical to the port.
+
+- **KEYS ARE NEVER RENAMED, REGROUPED OR TIDIED.** They are not an internal detail: the
+  ported stylesheets and the projects module name them directly, and `term()` composes
+  `${group}.${value}` from a **database column**, so `<group>.<value>` is load-bearing.
+  `type.Interior Design` still has a space in it. Renaming one is a repo-wide edit.
+- **Nested JSON, flat call site, and that is not a rename.** next-intl addresses a message
+  by a dotted PATH, so `{"nav": {"projects": …}}` is asked for as `t('nav.projects')` —
+  the exact string the old flat table used as its key. Every call site is unchanged.
+- **A missing Persian string is still a COMPILE error.** `catalog.ts` annotates the Persian
+  import as `Messages` (`const faMessages: Messages = fa`), which is what reproduces the old
+  `Record<MessageKey, string>`. Verified by deleting `nav.projects` from `fa.json`:
+  `npm run typecheck` fails and names the missing key. The `AppConfig` augmentation on top
+  of that makes `t('nav.projcts')` a type error too — also verified.
+- **The EXTRA-key direction is a test, not a type.** Excess-property checking does not apply
+  to a variable assignment, so a Persian key nothing renders is invisible to `tsc`.
+  `__tests__/catalog.test.ts` covers it, along with "no Persian numerals in a stored string"
+  and a guard against ICU-significant characters (`{`, `}`, `'`) — next-intl parses every
+  message as ICU, so one of those would be a silent parse failure rather than the string an
+  author meant.
+- **`term()` does NOT go through next-intl, deliberately.** next-intl renders the KEY for a
+  missing message, which would put the literal `status.Warehouse` on a public page. Its
+  argument comes from a database column and the dashboard can introduce a value nobody has
+  translated, so `term()` looks at the catalogs directly and degrades **fa → en → the raw
+  value**. Verified end to end: a project whose `status` column held `Mothballed` rendered
+  `Mothballed` on the card, in the spec table and in the filter rail — never
+  `status.Mothballed`, never blank.
+- **`ui.close` was removed from both catalogs.** Its only consumer was the deleted closer
+  (the button's label and `relang()`'s re-label of it). Grepped first, then removed together
+  with the `ShellStrings.close` plumbing that fed it. `ui.escToClose` STAYS — `SectionHint`
+  and the shell's `#hint` both still use it.
+
+### Numbers: two paths, and which call sites take which
+
+`num()` and `count()` are both on the dictionary and they are not interchangeable.
+
+| Path           | Implementation                                                                 | Takes              | Call sites                                                                                                                                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `num(value)`   | `faDigits` — a pure string transform, **digit shaping only, never grouping**   | `string \| number` | Years (`project.year`, `entry.year`, `work.year`, `chapter.year`, `award.year`, `BRAND.founded`), `contact.postcode`, zero-padded column and jump indices (`'01'`), and already-FORMATTED strings (`project.area` = `'1,240 m²'`) |
+| `count(value)` | next-intl's `createFormatter().number` — locale digits **and** locale grouping | `number`           | Genuine quantities: the footer's project count, the filter rails' option counts and "shown" figure, `shown.length` on the design and media screens, `studio.team.length` / `alumni.length`                                        |
+
+**`num` is not `format.number` and that is the whole point.** `format.number(2007)` is
+`'۲٬۰۰۷'`, so routing years through the formatter would print a thousands separator inside
+every project card's year. And several call sites hand it a string a number formatter
+cannot take at all — `digits.ts:28` records that deliberately. `count` exists so a genuine
+quantity still gets the separator right (U+066C in Persian) the day a collection passes a
+thousand; today every one of them is under a hundred, so the two agree on real data and
+`__tests__/translator.test.ts` pins the difference rather than the coincidence.
+
+### Routing: what each prompt-4 helper became
+
+| Prompt 4                         | Now                                                                                                                                                                                                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `localeHref(locale, path)`       | **Kept as a thin wrapper** over next-intl's `getPathname`. Fifteen callers need the STRING, not a `Link`: `basePath` props on the filter rails, `app/sitemap.ts`'s absolute URLs, the shell transition's imperative `router.push`                     |
+| `switchLocale(pathname, next)`   | **Deleted, no successor.** `LanguageSwitch` asks next-intl's `usePathname()` for the locale-less path and hands `<Link locale={…}>` the swap                                                                                                          |
+| `resolveLocale(acceptLanguage)`  | **Deleted.** next-intl negotiates with `Negotiator` + `@formatjs/intl-localematcher` inside the middleware                                                                                                                                            |
+| `localeAlternates(locale, path)` | Same name, same callers, **now sourced from `getPathname`** so the canonical and the hreflang set cannot disagree — and cannot disagree with next-intl's own `alternateLinks` response header either, since both compile down to one `routing` object |
+| `isLocale` / `DEFAULT_LOCALE`    | Kept, both now reading `routing` (`hasLocale`, `routing.defaultLocale`) rather than declaring a second copy                                                                                                                                           |
+
+Two configuration choices in `routing.ts` are decisions, not defaults:
+
+- **`localePrefix: 'always'`.** Both locales stay prefixed including the default. Dropping
+  the prefix for English would change every canonical URL, `app/sitemap.ts` and both
+  `generateStaticParams` sets at once.
+- **`localeCookie: false`.** next-intl writes `NEXT_LOCALE` by default and **prefers it over
+  `Accept-Language`**, which would reintroduce exactly the stored `kavan.lang` preference
+  prompt 4 dropped: the language is in the URL, which is a better memory because it travels
+  with a shared link. Asserted by a test (`set-cookie` must be absent) as well as by config.
+
+**`routing.ts` must not import `next/navigation`** — `src/proxy.ts` imports it, and the
+proxy runs before route resolution. That is the only reason `createNavigation` lives one
+file away in `navigation.ts` instead of beside the config it configures.
+
+**One behaviour regression, recorded rather than glossed over:** `resolveLocale` matched the
+obsolete `pe` / `pe-IR` tag as Persian (`legacy/js/core/i18n.js:97` tested `/^fa|^pe/`).
+next-intl's BCP-47 matcher does not, so `Accept-Language: pe-IR` now resolves to English
+rather than Persian. Every other case is identical — quality ordering, `q=0`, a partial
+match like `fan`, and an absent header — and all of them are pinned in
+`src/__tests__/proxy.test.ts`. `pe` was deprecated in favour of `fa` in 1989 and no current
+browser emits it; the fix, if one is ever wanted, is a `localeDetection` callback rather
+than a second parser.
+
+### The proxy composes two middlewares, in a fixed order
+
+`src/proxy.ts` still exports its own `proxy` function and its own matcher. next-intl's
+middleware is **built once at module scope and called INSIDE** it, after the
+`isPrivateRoute` early return:
+
+```ts
+const routeLocale = createMiddleware(routing);          // compiled once, not per request
+
+export default function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (isPrivateRoute(pathname)) return gateDashboard(request, pathname);   // leg 1
+  return routeLocale(request);                                             // leg 2
+}
+```
+
+- **The file is NOT replaced by `export default createMiddleware(routing)`**, the shape
+  next-intl documents. That would lose leg 1 entirely, and next-intl's matcher would then
+  see `/dashboard` — the one request that must never be locale-prefixed, because the
+  dashboard is deliberately outside `[locale]` and `/en/dashboard` is not a route.
+- **The matcher is unchanged and is not merged with next-intl's.** One matcher, and
+  `/dashboard` is caught by leg 1 before the locale leg ever runs.
+- **`x-current-path` and the exact spelling `NextResponse.next({ request: { headers } })`
+  are untouched.** The other spelling sets RESPONSE headers and breaks every Server Action
+  in the app with no server error and no stack — see the file header.
+- **The redirect is still a 307.** `NextResponse.redirect` defaults to 307 and next-intl
+  passes no status, so this was verified rather than configured: `curl` on `/` answers
+  `307`, `Location: /en`, and `/fa` under `Accept-Language: fa`.
+
+Verified against a production build: `/dashboard`, `/dashboard/login` and
+`/dashboard/projects` are never locale-prefixed even with `Accept-Language: fa`, and **two
+Server Actions still succeed** — signing in, and saving a project, which answered "Saved.
+The public site is already showing it" with no console error, wrote the row, and purged the
+tag so `/en/projects/<slug>` reflected it immediately.
+
+### The Persian webfont, and what it costs
+
+`Vazirmatn` via `next/font/google` in `src/app/[locale]/layout.tsx`, `subsets: ['arabic',
+'latin']`, `display: 'swap'`, exposed as the CSS variable `--f-vazirmatn` and referenced
+from the Persian stack in `common/styles/i18n.css`. No family literal outside the token
+layer, and `var(--f-vazirmatn, "Vazirmatn")` keeps a locally-installed copy working if the
+request is blocked. The rest of the fallback stack stays behind it, so a failed request
+lands on IRANSansX or Tahoma and never on a browser serif default.
+
+- **The variable is set on the `<html>` of the PERSIAN document only**, alongside `is-fa`.
+  English carries neither, so nothing there ever resolves to the family.
+- **`preload: false`, and that is the load-bearing option.** `next/font` preloads by
+  default, and the preload is emitted by the LAYOUT — which both locales share — so
+  `/en` was fetching both `.woff2` subsets with `--f-vazirmatn` unset and not one glyph
+  rendered from them. **This does not reproduce in `next dev` in a way you would notice and
+  the tag names the file by hash, so it was caught by measuring, not by reading.** With
+  preloading off the CSS drives the request, which happens under `html.is-fa` and nowhere
+  else. Measured in a real browser against a production build: **English = 0 font requests;
+  Persian = 2** (arabic + latin subsets), `document.fonts.check('16px Vazirmatn', 'کاوان')`
+  true.
+- **What it costs.** On Persian the fetch starts after the stylesheet is parsed rather than
+  at HTML parse — a slightly later swap. With the font request held back 3s, Persian text
+  paints immediately in the fallback (no FOIT, no blank) and reflows ~5% on swap. English
+  is unchanged and still request-free.
+- **The `@font-face` block itself rides in a stylesheet both locales link.** That is ~1KB of
+  CSS on an English page and **zero font bytes**, which is the claim that matters.
+- The two comments in `globals.css` that said "no next/font, no CDN font CSS" were corrected
+  in the same commit rather than left to mislead.
+
+### The closer is gone; the language switch stands in its place
+
+`Closer.tsx` and its barrel export are deleted. `LanguageSwitch` moved into the slot it
+occupied — the end of the masthead row — and is **moved, not duplicated**; nothing else
+replaces the closer. Its three known loose ends were all handled, and a **fourth was found
+by checking rather than assuming**:
+
+1. **CSS.** `.closer` / `.closer__x` in `shell.css` and their two `[dir="rtl"]` mirrors in
+   `i18n.css` are removed. No dead selectors.
+2. **`motion/shell.ts`.** `getElementById('closer')`, `onCloserClick`, its `addEventListener`,
+   its `destroy()` removal, and `relang()`'s re-label of the button's `<span>` are all gone
+   together.
+3. **The masthead's own positioning rule was rewritten, not just inherited.** The switch was
+   `position: absolute; inset-inline-end: 5.5rem` — offset to clear the closer at `right: 0`
+   — and hidden entirely when a section was open. It is now `margin-inline-start: auto` in
+   the flex row, so `dir` mirrors it with **no RTL rule at all**; the closer needed one
+   precisely because it was pinned to a physical edge. It inherits the closer's visibility
+   contract: shown in an open section (the footer carries the switch on the wide index), and
+   shown at every stage state below 860px where the footer has no room for it. Measured in
+   both directions at 1440 and 800: flush against the masthead's inline-end, right in
+   English and left in Persian.
+4. **ESCAPE DID NOT SURVIVE, contrary to the assumption — and `SectionEscape` is the fix.**
+   `Closer` bound Escape at the ROUTE level. The reasoning going in was that
+   `createShell`'s own `keydown` handler already covered it. **It does not**, and pressing
+   Escape on `/en/projects` did nothing at all: the shell is constructed by
+   `ShellTransition`, which only the INDEX route renders, and navigating to a section
+   unmounts it and runs `destroy()` — which takes that listener off `window` by design. A
+   reader who deep-links to a section never had a shell in the first place. So on every
+   route where Escape means anything, the handler was not bound.
+   `common/components/layout/SectionEscape.tsx` is a non-visual client leaf in the site
+   layout that restores it, with `Closer`'s exact rule (`history.length > 1 ? back() :
+push(home)`). Verified in a browser: Escape returns to the index from a section, goes to
+   the locale index from a deep link with no history behind it, and does nothing on the
+   index.
+
+### Client leaves stopped importing the catalogs
+
+`NextIntlClientProvider` sits in `src/app/[locale]/layout.tsx` with `locale` and `messages`
+passed **explicitly**, so the provider awaits no request scope — this layout is the root of
+every prerendered page and letting it read request config under Cache Components is exactly
+the thing `next/root-params` was chosen to avoid. What needs it is small and specific:
+`LanguageSwitch`'s `Link` and `usePathname` resolve the current locale from that context.
+
+It also paid for itself. `(site)/error.tsx` and `ContactForm` now call `useTranslations()`
+instead of building a dictionary from a `locale` prop — which had pulled **both** catalogs
+into the browser bundle. `ContactForm` therefore takes **no props at all** now, and
+`ContactScreen` lost the `locale` it existed only to forward; `createContactFormSchema`
+takes the `t` function rather than a whole `Dictionary`, so either accessor can feed it.
+The dashboard is **not** wrapped in a provider and is not localized — that decision stands
+unchanged.
+
+### One test-only configuration change
+
+`vitest.config.mts` gained `test.server.deps.inline: ['next-intl']`. next-intl ships ESM
+that imports `next/server` and `next/navigation` as BARE specifiers; externalized — the
+default for anything under `node_modules` — those reach Node's resolver, which cannot read
+the `exports` map that maps them, and every suite touching `next-intl/middleware` or
+`next-intl/navigation` fails with "Cannot find module … Did you mean to import
+next/server.js?". It is a test-resolution concern only; the Next.js bundler resolves both.
+
+### The two open decisions, resolved
+
+- **`messages.ts` is DELETED, not kept as a re-export shim.** Taken as recommended. Two
+  sources for one dictionary is the drift `cache-tags.ts:6` exists to prevent one concern
+  over, and a shim would have kept a 411-line file alive as the thing everyone edits while
+  the JSON quietly became the thing that ships. `catalog.ts` replaces it and is a **loader**,
+  not a second copy: it imports the JSON, types it, and exports `MESSAGES`. `grep -rn
+"getDictionary" src/` returns only three prose mentions in comments explaining the rename.
+- **Persian numerals come from `faDigits` for strings and from next-intl's formatter for
+  quantities.** Taken as recommended, and the split is sharper than the recommendation:
+  see the table above. The deciding case is that `project.year` is a `number` yet must not
+  be grouped, so "is it a number" was the wrong question — "is it a quantity" is the right
+  one.
 
 ## Deviations from the architecture playbook
 
