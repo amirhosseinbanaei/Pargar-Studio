@@ -1,12 +1,26 @@
 # Local full-stack composition against a real Turso database over the network.
 #
-# THIS PROJECT HAS NO SEPARATE BACKEND SERVICE AND NO VOLUME. Unlike the architecture
-# skill's generic template — which composes a `web` container against a local `api`
-# container — this app's only data dependency is Turso, reached directly over the network
-# from both the build (static generation needs real rows) and the running container. There
-# is therefore no "browser-facing URL vs. container-internal URL" split to encode here: the
-# `TURSO_DATABASE_URL` is the same value everywhere, and no local file needs a volume to
-# survive a restart.
+# THIS PROJECT HAS NO SEPARATE BACKEND SERVICE. Unlike the architecture skill's generic
+# template — which composes a `web` container against a local `api` container — this app's
+# only database dependency is Turso, reached directly over the network from both the build
+# (static generation needs real rows) and the running container. There is therefore no
+# "browser-facing URL vs. container-internal URL" split to encode here: the
+# `TURSO_DATABASE_URL` is the same value everywhere.
+#
+# ╔══════════════════════════════════════════════════════════════════════════════════╗
+# ║ IT DOES HAVE A VOLUME NOW, AND REMOVING IT DESTROYS THE STUDIO'S PHOTOGRAPHS.      ║
+# ║                                                                                   ║
+# ║ Prompt 10 gave the dashboard an upload field. Uploaded images are files on local   ║
+# ║ disk under `UPLOAD_DIR`, served by the app itself — they are not in Turso and not   ║
+# ║ in object storage. A container's writable layer is DESTROYED when the container is ║
+# ║ replaced, which is what every redeploy does. So without the `uploads` volume        ║
+# ║ below, `docker compose down && up` silently deletes every photograph the studio     ║
+# ║ ever uploaded, the database keeps pointing at paths that no longer exist, and the   ║
+# ║ public pages fall back to their generated drawings as though nothing had happened.  ║
+# ║                                                                                   ║
+# ║ This is the reason the earlier comment saying "no local file needs a volume" was    ║
+# ║ true and is not any more. Do not remove it as tidying.                              ║
+# ╚══════════════════════════════════════════════════════════════════════════════════╝
 
 services:
   web:
@@ -35,6 +49,21 @@ services:
 
     environment:
       NODE_ENV: production
+      # SET HERE, NOT IN `.env.local`, AND DELIBERATELY SO. `environment:` outranks
+      # `env_file:` in compose, so this wins over whatever absolute path a developer's
+      # `.env.local` names for their own machine — which is exactly what should happen:
+      # inside the container the only correct value is the volume's mount point.
+      UPLOAD_DIR: /data/uploads
+
+    # The uploaded images. See the box at the top of this file for what happens without it.
+    #
+    # The mount point exists in the image already, owned by the non-root `appuser` the
+    # container runs as (`Dockerfile`) — Docker seeds a NEW named volume from the image's
+    # directory, ownership included, so the first upload does not fail on a root-owned
+    # mount. That ordering is the whole reason the `mkdir` is in the Dockerfile rather
+    # than left to Docker's default.
+    volumes:
+      - uploads:/data/uploads
 
     # PID 1 reaper: without it, signals never reach Node, so `docker stop` waits out its
     # full 10-second timeout on every deploy and in-flight requests are killed.
@@ -47,3 +76,9 @@ services:
 
 networks:
   app:
+
+volumes:
+  # Named, not a bind mount: it survives `down`/`up` and image replacement, and it is not
+  # tied to a path on one host. `docker volume rm kavan_uploads` is the only thing that
+  # destroys it, and doing that destroys the studio's photographs.
+  uploads:

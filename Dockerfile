@@ -25,9 +25,13 @@
 # ║ and copied files straight back out, so a secret ARG is a published secret).         ║
 # ╚══════════════════════════════════════════════════════════════════════════════════╝
 #
-# NO VOLUME. The database is Turso, reached over the network — unlike the architecture
-# skill's generic template, this image has no local SQLite file to persist, so there is
-# nothing in `compose.yaml` for a volume to protect.
+# THE DATABASE NEEDS NO VOLUME — it is Turso, reached over the network. UPLOADED IMAGES DO.
+# Prompt 10 writes them to `UPLOAD_DIR` on local disk, and a container's writable layer is
+# destroyed on every redeploy, so `compose.yaml` mounts a named volume at `/data/uploads`.
+# The mount point is created below, owned by the non-root user this image runs as, because
+# Docker seeds a new named volume from the image's directory — ownership included. Without
+# that the volume arrives root-owned and the very FIRST upload fails in production and
+# nowhere else.
 
 FROM node:24-alpine AS base
 WORKDIR /app
@@ -64,6 +68,10 @@ ENV TURSO_DATABASE_URL=$TURSO_DATABASE_URL
 ENV TURSO_AUTH_TOKEN=$TURSO_AUTH_TOKEN
 ENV ADMIN_PASSWORD="build-time-placeholder"
 ENV SESSION_SECRET="build-time-placeholder-at-least-32-characters"
+# Also required by the schema at import time, also not a secret, and also never read during
+# a build — nothing prerenders an upload. The runtime value comes from the orchestrator; see
+# `compose.yaml`, which sets it to the volume's mount point.
+ENV UPLOAD_DIR="/data/uploads"
 
 RUN npm run build
 
@@ -86,6 +94,16 @@ RUN addgroup --system --gid 1001 nodejs \
 
 # Standalone tracing DELIBERATELY omits `public/` and `.next/static`. Forgetting either
 # gives you a running app that serves HTML with no CSS, no JS chunks and no images.
+# THE UPLOAD DIRECTORY, CREATED BEFORE THE VOLUME EXISTS AND OWNED BY THE RUNTIME USER.
+#
+# Docker initializes an empty named volume FROM the image's contents at that path,
+# ownership and permissions included. Creating it here is therefore what makes the mounted
+# volume writable by `appuser`; leaving it to Docker gives a root-owned directory, and the
+# container — which runs as uid 1001 by design — gets EACCES on the first upload. That
+# failure appears only in production, only on the first write, and produces no useful line
+# in `docker logs` (a production Next server logs no per-request access log).
+RUN mkdir -p /data/uploads && chown -R appuser:nodejs /data
+
 COPY --from=builder --chown=appuser:nodejs /app/public ./public
 COPY --from=builder --chown=appuser:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=appuser:nodejs /app/.next/static ./.next/static
