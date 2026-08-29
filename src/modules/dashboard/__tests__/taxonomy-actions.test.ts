@@ -21,7 +21,7 @@ import { CACHE_TAGS, taxonomySubjectTag } from '@/common/services/cache-tags';
 import type { TaxonomyTermRow } from '@/common/schemas/taxonomy';
 
 const updateTag = vi.fn();
-const revalidateTag = vi.fn();
+const revalidateTagSpy = vi.fn();
 
 const createTaxonomyTerm = vi.fn();
 const updateTaxonomyTerm = vi.fn();
@@ -34,7 +34,7 @@ const readSession = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
-  revalidateTag: (...args: unknown[]) => revalidateTag(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagSpy(...args),
 }));
 
 vi.mock('@/common/services/taxonomy-service', () => ({
@@ -103,7 +103,7 @@ describe('authorization', () => {
       updateTaxonomyTermAction({ id: 4, labelEn: 'A', labelFa: 'ب' }),
       setTaxonomyTermVisibilityAction({ id: 4, visible: false }),
       deleteTaxonomyTermAction(4),
-      moveTaxonomyTermAction({ id: 4, direction: 'up' }),
+      moveTaxonomyTermAction({ id: 4, afterId: null }),
     ]);
 
     for (const result of results) expect(result).toEqual({ ok: false, status: 401 });
@@ -177,14 +177,14 @@ describe('the two-tag purge', () => {
     expect(updateTag).toHaveBeenCalledTimes(2);
     // `updateTag`, never `revalidateTag`: stale-while-revalidate is indistinguishable from a
     // save that did not work.
-    expect(revalidateTag).not.toHaveBeenCalled();
+    expect(revalidateTagSpy).not.toHaveBeenCalled();
   });
 
   it('purges the pair on update, visibility, delete and move alike', async () => {
     await updateTaxonomyTermAction({ id: 4, labelEn: 'A', labelFa: 'ب' });
     await setTaxonomyTermVisibilityAction({ id: 4, visible: false });
     await deleteTaxonomyTermAction(4);
-    await moveTaxonomyTermAction({ id: 4, direction: 'up' });
+    await moveTaxonomyTermAction({ id: 4, afterId: null });
 
     const purged = updateTag.mock.calls.map(([tag]) => tag);
     expect(purged.filter(tag => tag === CACHE_TAGS.taxonomy)).toHaveLength(4);
@@ -203,11 +203,12 @@ describe('the two-tag purge', () => {
   });
 
   it('purges NOTHING when a move had nowhere to go', async () => {
-    // `null` is "nothing happened" — the first term asked to move up. Discarding a valid
-    // cache for a no-op makes every reader pay for a refetch that changes nothing.
+    // `null` is "nothing happened" — a stale id, an anchor since deleted, or a drop back
+    // where the term already was. Discarding a valid cache for a no-op makes every reader
+    // pay for a refetch that changes nothing.
     moveTaxonomyTerm.mockResolvedValue(null);
 
-    const result = await moveTaxonomyTermAction({ id: 4, direction: 'up' });
+    const result = await moveTaxonomyTermAction({ id: 4, afterId: 999 });
 
     expect(result).toEqual({ ok: true, data: undefined });
     expect(updateTag).not.toHaveBeenCalled();

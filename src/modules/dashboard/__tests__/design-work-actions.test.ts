@@ -10,7 +10,7 @@ import { CACHE_TAGS, designWorkTag } from '@/common/services/cache-tags';
 import type { DesignWorkRow } from '@/common/schemas/design-work';
 
 const updateTag = vi.fn();
-const revalidateTag = vi.fn();
+const revalidateTagSpy = vi.fn();
 
 const createDesignWork = vi.fn();
 const updateDesignWork = vi.fn();
@@ -23,7 +23,7 @@ const unknownTermErrors = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
-  revalidateTag: (...args: unknown[]) => revalidateTag(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagSpy(...args),
 }));
 
 vi.mock('@/common/services/design-work-service', () => ({
@@ -135,7 +135,7 @@ describe('authorization', () => {
       createDesignWorkAction(VALID),
       updateDesignWorkAction(3, VALID),
       deleteDesignWorkAction(3),
-      moveDesignWorkAction({ id: 3, direction: 'up' }),
+      moveDesignWorkAction({ id: 3, afterId: null }),
     ]);
 
     for (const result of results) expect(result).toEqual({ ok: false, status: 401 });
@@ -215,7 +215,7 @@ describe('the write path', () => {
     expect(result).toEqual({ ok: true, data: { slug: 'new-object' } });
     expect(updateTag).toHaveBeenCalledWith(CACHE_TAGS.designWorks);
     expect(updateTag).toHaveBeenCalledWith(designWorkTag('new-object'));
-    expect(revalidateTag).not.toHaveBeenCalled();
+    expect(revalidateTagSpy).not.toHaveBeenCalled();
   });
 
   it('purges the OLD slug too when updating renames the record', async () => {
@@ -247,11 +247,15 @@ describe('the write path', () => {
     expect(updateTag).toHaveBeenCalledWith(designWorkTag('doomed'));
   });
 
-  it('purges both rows a move traded places between', async () => {
-    moveDesignWork.mockResolvedValue({ moved: row({ slug: 'a' }), displaced: row({ slug: 'b' }) });
+  it('purges every row a move renumbered', async () => {
+    moveDesignWork.mockResolvedValue({
+      moved: row({ slug: 'a' }),
+      changed: [row({ slug: 'a' }), row({ slug: 'b' })],
+    });
 
-    await moveDesignWorkAction({ id: 3, direction: 'down' });
+    await moveDesignWorkAction({ id: 3, afterId: 9 });
 
+    expect(moveDesignWork).toHaveBeenCalledWith(3, 9);
     expect(updateTag).toHaveBeenCalledWith(designWorkTag('a'));
     expect(updateTag).toHaveBeenCalledWith(designWorkTag('b'));
   });
