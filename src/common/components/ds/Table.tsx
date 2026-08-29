@@ -34,6 +34,21 @@ export interface TableColumn<T> {
   className?: string;
 }
 
+/**
+ * One row, as this component prepared it: the record, its key, the class list the variants
+ * decided, and its cells already rendered.
+ *
+ * Handed to `renderRows` so a caller can supply its own row ELEMENT — the drag-and-drop list
+ * needs the `<tr>` to carry a ref and a transform — without owning, or copying, the cell
+ * markup. Copying it is how one table ends up with a different padding from the rest.
+ */
+export interface TableRowRender<T> {
+  row: T;
+  key: string;
+  className: string;
+  cells: React.ReactNode;
+}
+
 export interface TableProps<T> extends TableVariantProps {
   columns: ReadonlyArray<TableColumn<T>>;
   rows: readonly T[];
@@ -46,6 +61,17 @@ export interface TableProps<T> extends TableVariantProps {
   captionVisible?: boolean;
   onRowClick?: (row: T) => void;
   isRowSelected?: (row: T) => boolean;
+  /**
+   * Takes over rendering of the body's ROWS — not their contents. Given every row already
+   * reduced to `{ row, key, className, cells }`, it returns whatever goes inside `<tbody>`.
+   *
+   * It exists for one thing this component cannot do itself: a sortable table needs its
+   * `<tr>` to be rendered by a Client Component that can attach a drag ref to it, while the
+   * cells stay server-rendered. Without the slot the only alternative is a second copy of the
+   * cell markup outside the design system. The empty state is NOT routed through it — an
+   * empty list has no rows to render and no order to change.
+   */
+  renderRows?: (rows: ReadonlyArray<TableRowRender<T>>) => React.ReactNode;
   className?: string;
 }
 
@@ -58,9 +84,37 @@ export function Table<T>({
   captionVisible = false,
   onRowClick,
   isRowSelected,
+  renderRows,
   density,
   className,
 }: TableProps<T>) {
+  const body: TableRowRender<T>[] = rows.map(row => ({
+    row,
+    key: rowKey(row),
+    className: cn(
+      tableRowVariants({
+        interactive: !!onRowClick,
+        selected: isRowSelected?.(row) ?? false,
+      }),
+    ),
+    cells: (
+      <>
+        {columns.map(column => (
+          <BaseTableCell
+            key={column.key}
+            className={cn(
+              tableCellVariants(),
+              column.align === 'end' ? 'text-end' : 'text-start',
+              column.className,
+            )}
+          >
+            {column.cell(row)}
+          </BaseTableCell>
+        ))}
+      </>
+    ),
+  }));
+
   return (
     <BaseTable className={cn(tableVariants({ density }), className)}>
       {caption && (
@@ -99,30 +153,16 @@ export function Table<T>({
               {empty ?? 'Nothing here yet'}
             </BaseTableCell>
           </BaseTableRow>
+        ) : renderRows ? (
+          renderRows(body)
         ) : (
-          rows.map(row => (
+          body.map(item => (
             <BaseTableRow
-              key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn(
-                tableRowVariants({
-                  interactive: !!onRowClick,
-                  selected: isRowSelected?.(row) ?? false,
-                }),
-              )}
+              key={item.key}
+              onClick={onRowClick ? () => onRowClick(item.row) : undefined}
+              className={item.className}
             >
-              {columns.map(column => (
-                <BaseTableCell
-                  key={column.key}
-                  className={cn(
-                    tableCellVariants(),
-                    column.align === 'end' ? 'text-end' : 'text-start',
-                    column.className,
-                  )}
-                >
-                  {column.cell(row)}
-                </BaseTableCell>
-              ))}
+              {item.cells}
             </BaseTableRow>
           ))
         )}

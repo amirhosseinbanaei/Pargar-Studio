@@ -13,5 +13,5 @@ export { Field, type FieldProps } from './Field';
 export { Input, type InputProps } from './Input';
 export { Label, type LabelProps } from './Label';
 export { Select, type SelectOption, type SelectProps } from './Select';
-export { Table, type TableColumn, type TableProps } from './Table';
+export { Table, type TableColumn, type TableProps, type TableRowRender } from './Table';
 export { Textarea, type TextareaProps } from './Textarea';
