@@ -14,6 +14,7 @@ import type {
 import type { Locale } from '@/common/schemas/locale';
 import type { TermOption } from '@/common/schemas/taxonomy';
 import { optionsForAxis } from '@/common/utils/taxonomy';
+import { planReorder } from '@/common/utils/reorder';
 import * as designWorkRepo from './design-work-repository';
 import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, designWorkTag } from './cache-tags';
@@ -104,27 +105,25 @@ export async function deleteDesignWork(id: number): Promise<boolean> {
   return designWorkRepo.remove(id);
 }
 
-/** Same renumber-by-index algorithm as `moveProject` — see that function for why. */
+/**
+ * Same anchor-and-renumber algorithm as `moveProject` — see that function for why the action
+ * sends the record it now FOLLOWS rather than an index or a whole ordering, and
+ * `common/utils/reorder.ts` for the arithmetic itself.
+ *
+ * `null` when nothing happened: an unknown id, an anchor that has since been deleted, or a
+ * drop back where the design work already was.
+ */
 export async function moveDesignWork(
   id: number,
-  direction: 'up' | 'down',
-): Promise<{ moved: DesignWorkRow; displaced: DesignWorkRow } | null> {
+  afterId: number | null,
+): Promise<{ moved: DesignWorkRow; changed: DesignWorkRow[] } | null> {
   const rows = await designWorkRepo.list();
-  const from = rows.findIndex(row => row.id === id);
-  if (from === -1) return null;
-
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (to < 0 || to >= rows.length) return null;
-
-  const reordered = [...rows];
-  const [moved] = reordered.splice(from, 1);
-  reordered.splice(to, 0, moved);
+  const plan = planReorder(rows, id, afterId);
+  if (!plan) return null;
 
   await Promise.all(
-    reordered.flatMap((row, index) =>
-      row.sortOrder === index ? [] : [designWorkRepo.update(row.id, { sortOrder: index })],
-    ),
+    plan.writes.map(write => designWorkRepo.update(write.row.id, { sortOrder: write.sortOrder })),
   );
 
-  return { moved, displaced: rows[to] };
+  return { moved: plan.moved, changed: plan.writes.map(write => write.row) };
 }

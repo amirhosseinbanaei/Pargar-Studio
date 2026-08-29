@@ -22,7 +22,7 @@ import { CACHE_TAGS, projectTag } from '@/common/services/cache-tags';
 import type { ProjectRow } from '@/common/schemas/project';
 
 const updateTag = vi.fn();
-const revalidateTag = vi.fn();
+const revalidateTagSpy = vi.fn();
 
 const createProject = vi.fn();
 const updateProject = vi.fn();
@@ -35,7 +35,7 @@ const unknownTermErrors = vi.fn();
 
 vi.mock('next/cache', () => ({
   updateTag: (...args: unknown[]) => updateTag(...args),
-  revalidateTag: (...args: unknown[]) => revalidateTag(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagSpy(...args),
 }));
 
 vi.mock('@/common/services/project-service', () => ({
@@ -156,7 +156,7 @@ describe('authorization', () => {
         createProjectAction(VALID),
         updateProjectAction(7, VALID),
         deleteProjectAction(7),
-        moveProjectAction({ id: 7, direction: 'up' }),
+        moveProjectAction({ id: 7, afterId: null }),
       ]);
 
       for (const result of results) expect(result).toEqual({ ok: false, status: 401 });
@@ -365,7 +365,7 @@ describe('updateProjectAction', () => {
     // `revalidateTag` serves stale while it refreshes, which to an editor is indistinguishable
     // from a save that did not work. Its single-argument form also still compiles on 16,
     // which is exactly why it survives review.
-    expect(revalidateTag).not.toHaveBeenCalled();
+    expect(revalidateTagSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -422,33 +422,61 @@ describe('deleteProjectAction', () => {
 });
 
 describe('moveProjectAction', () => {
-  it('purges BOTH rows that traded places', async () => {
-    moveProject.mockResolvedValue({ moved: row({ slug: 'a' }), displaced: row({ slug: 'b' }) });
+  it('purges EVERY row the move renumbered, not just the one that was dragged', async () => {
+    // A drag past two rows rewrites `sortOrder` on all three. A cached read of any of them
+    // is now describing a row that changed, and missing one is a page that stays wrong.
+    moveProject.mockResolvedValue({
+      moved: row({ slug: 'a' }),
+      changed: [row({ slug: 'a' }), row({ slug: 'b' }), row({ slug: 'c' })],
+    });
 
-    const result = await moveProjectAction({ id: 7, direction: 'down' });
+    const result = await moveProjectAction({ id: 7, afterId: 4 });
 
     expect(result).toEqual({ ok: true, data: undefined });
-    expect(moveProject).toHaveBeenCalledWith(7, 'down');
+    expect(moveProject).toHaveBeenCalledWith(7, 4);
     expect(updateTag).toHaveBeenCalledWith(projectTag('a'));
     expect(updateTag).toHaveBeenCalledWith(projectTag('b'));
+    expect(updateTag).toHaveBeenCalledWith(projectTag('c'));
     expect(updateTag).toHaveBeenCalledWith(CACHE_TAGS.projects);
   });
 
+  it('passes null through as "first", rather than dropping the key', async () => {
+    moveProject.mockResolvedValue({ moved: row({ slug: 'a' }), changed: [row({ slug: 'a' })] });
+
+    await moveProjectAction({ id: 7, afterId: null });
+
+    expect(moveProject).toHaveBeenCalledWith(7, null);
+  });
+
   it('succeeds without purging when nothing moved', async () => {
-    // The first row asked to move up, or an unknown id. Both are a no-op rather than a
-    // failure: the boundary arrows render disabled, so reaching here means a stale page.
+    // An unknown id, an ANCHOR DELETED IN ANOTHER TAB, or a drop back where the row already
+    // was. All three are stale requests rather than failures: the client refreshes on this
+    // success and sees the order the database actually holds.
     moveProject.mockResolvedValue(null);
 
-    const result = await moveProjectAction({ id: 7, direction: 'up' });
+    const result = await moveProjectAction({ id: 7, afterId: 999 });
 
     expect(result).toEqual({ ok: true, data: undefined });
     expect(updateTag).not.toHaveBeenCalled();
   });
 
-  it('rejects a direction outside up/down', async () => {
-    const result = await moveProjectAction({ id: 7, direction: 'sideways' });
+  it('refuses a payload carrying the whole ordering, or the old direction', async () => {
+    // `strictObject`: the point of the wire shape is that the SERVER computes the positions,
+    // so an extra key is refused rather than ignored.
+    const posted = await moveProjectAction({ id: 7, afterId: null, order: [3, 7, 1] });
+    const legacy = await moveProjectAction({ id: 7, direction: 'up' });
+
+    expect(posted.ok).toBe(false);
+    expect(legacy.ok).toBe(false);
+    expect(moveProject).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing afterId rather than treating it as "first"', async () => {
+    const result = await moveProjectAction({ id: 7 });
 
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.status).toBe(422);
     expect(moveProject).not.toHaveBeenCalled();
   });
 });

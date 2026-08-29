@@ -37,6 +37,7 @@ import {
 import type { Locale } from '@/common/schemas/locale';
 import type { TermOption } from '@/common/schemas/taxonomy';
 import { optionsForAxis } from '@/common/utils/taxonomy';
+import { planReorder } from '@/common/utils/reorder';
 import * as projectRepo from './project-repository';
 import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, projectTag } from './cache-tags';
@@ -238,50 +239,38 @@ export async function deleteProject(id: number): Promise<boolean> {
 }
 
 /**
- * Move one project one position within the archive's order, and return the row it moved.
+ * Move one project to the position it now occupies, and return the rows that had to be
+ * renumbered for it.
  *
- * THE ORDER IS COMPUTED HERE, NOT SENT BY THE CLIENT. The action receives an id and a
- * direction, and this function reads the current order and works out what that means. The
- * alternative — the client posting the full list of ids in its new order — is what a drag
- * interface would want, and it is strictly worse for a pair of arrow buttons: the payload
- * carries 76 numbers that must be re-validated, and a list the client assembled from a
- * page it loaded five minutes ago silently reverts every change made in between.
+ * THE ORDER IS COMPUTED HERE, NOT SENT BY THE CLIENT. The action receives the record that
+ * moved and the record it now FOLLOWS (`afterId`, `null` for first), and this function reads
+ * the current order and works out what that means. The alternative — the client posting all
+ * seventy-six ids in their new order — carries seventy-six numbers that all have to be
+ * re-validated, and silently reverts every change made by anyone else since the page loaded.
  *
- * WHY IT RENUMBERS FROM THE INDEX RATHER THAN SWAPPING TWO VALUES. Swapping the two rows'
- * `sortOrder` values is one update fewer and is wrong the moment two rows share a value —
- * the swap is then a no-op and the arrow button appears broken with nothing in the logs.
- * Renumbering by position is total: it repairs ties as a side effect, and only the rows
- * whose number actually changed are written, so the common case is still two updates.
+ * The arithmetic itself is `planReorder` in `common/utils/reorder.ts`, which is pure and
+ * carries the rest of the reasoning: why an anchor beats an absolute index under a concurrent
+ * edit, and why it renumbers by position rather than swapping two `sortOrder` values.
  *
- * Returns `null` when the id is unknown, or when the move has nowhere to go (already first
- * and asked to move up). Both are "nothing happened", not failures — the caller renders the
- * boundary arrows disabled anyway, and a 404 for clicking a disabled button is noise.
+ * Returns `null` when nothing happened — an unknown id, an anchor that no longer exists
+ * (deleted in another tab), or a drop back where the row already was. All three are stale
+ * requests rather than failures; the caller answers them with a success that purges nothing
+ * and lets the client refresh onto the truth.
  */
 export async function moveProject(
   id: number,
-  direction: 'up' | 'down',
-): Promise<{ moved: ProjectRow; displaced: ProjectRow } | null> {
-  // `list()` is already ordered by `sortOrder`, which is what makes index arithmetic
-  // meaningful here rather than a guess about how the rows arrived.
+  afterId: number | null,
+): Promise<{ moved: ProjectRow; changed: ProjectRow[] } | null> {
+  // `list()` is already ordered by `sortOrder`, which is what `planReorder` requires.
   const rows = await projectRepo.list();
-  const from = rows.findIndex(row => row.id === id);
-  if (from === -1) return null;
+  const plan = planReorder(rows, id, afterId);
+  if (!plan) return null;
 
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (to < 0 || to >= rows.length) return null;
-
-  const reordered = [...rows];
-  const [moved] = reordered.splice(from, 1);
-  reordered.splice(to, 0, moved);
-
-  // Write only what changed. On a single move that is the two rows that traded places,
-  // even though the loop considers all of them — and on a list with pre-existing ties it
-  // is however many it takes to make the order unambiguous again.
+  // Write only what changed. On a settled archive that is the moved row plus the ones it
+  // passed; on a list with pre-existing ties it is however many it takes to repair them.
   await Promise.all(
-    reordered.flatMap((row, index) =>
-      row.sortOrder === index ? [] : [projectRepo.update(row.id, { sortOrder: index })],
-    ),
+    plan.writes.map(write => projectRepo.update(write.row.id, { sortOrder: write.sortOrder })),
   );
 
-  return { moved, displaced: rows[to] };
+  return { moved: plan.moved, changed: plan.writes.map(write => write.row) };
 }

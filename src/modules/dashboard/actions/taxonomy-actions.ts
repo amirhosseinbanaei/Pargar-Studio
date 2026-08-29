@@ -54,10 +54,10 @@ import {
 } from '@/common/schemas/taxonomy';
 import {
   taxonomyTermCreateSubmissionSchema,
-  taxonomyTermMoveSubmissionSchema,
   taxonomyTermUpdateSubmissionSchema,
   taxonomyTermVisibilitySubmissionSchema,
 } from '../schemas/taxonomy-form';
+import { reorderSubmissionSchema } from '../schemas/reorder';
 
 /* ────────────────────────────────────────────────────────────────────────────────
    Shared preconditions — NEITHER IS EXPORTED. See the header.
@@ -257,32 +257,30 @@ export async function deleteTaxonomyTermAction(input: unknown): Promise<ActionRe
    ──────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Move one term one position within its own axis.
+ * Move one term within its own axis.
  *
- * An id and a direction, never a list of ids in a new order — the same intent-not-an-order
- * rule `moveProjectAction` states, and the same `RowReorder` control sends it. Prompt 11
- * replaces that control with drag and drop everywhere in the dashboard, including here;
- * until then the arrows are the whole interaction and they are also the keyboard
- * implementation a drag handle would need anyway.
+ * The term and the term it now FOLLOWS, never a list of ids in a new order — the same
+ * intent-not-an-order rule `moveProjectAction` states, in the shape a drag needs. `null`
+ * means first ON THIS AXIS, not first in the table: the axis is the list the editor sees and
+ * the only one an anchor is looked up in. See `moveTaxonomyTerm` in the service.
  */
 export async function moveTaxonomyTermAction(input: unknown): Promise<ActionResult> {
   const denied = await requireSession();
   if (denied) return denied;
 
-  const parsed = taxonomyTermMoveSubmissionSchema.safeParse(input);
+  const parsed = reorderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
-  const result = await toActionResult(() =>
-    moveTaxonomyTerm(parsed.data.id, parsed.data.direction),
-  );
+  const result = await toActionResult(() => moveTaxonomyTerm(parsed.data.id, parsed.data.afterId));
   if (!result.ok) return result;
 
   /**
-   * `null` is "nothing moved" — an unknown id, or the first term asked to move up. Both are
-   * a no-op rather than a failure: the boundary arrows render disabled, so reaching here
-   * means a stale page or a hand-made request. Nothing changed, so nothing is purged.
+   * `null` is "nothing moved" — an unknown id, an anchor no longer on this axis, or a drop
+   * that travelled nowhere. All three are a no-op rather than a failure: reaching here means
+   * a stale page or a hand-made request, and the client refreshes onto the truth either way.
+   * Nothing changed, so nothing is purged.
    */
   if (result.data === null) return { ok: true, data: undefined };
 

@@ -14,14 +14,18 @@
  * here would be worse: the action's reference would be serialized into the RSC payload once
  * per row. Importing it directly is one module reference in the client bundle regardless of
  * how many rows there are.
+ *
+ * The REORDER action is the exception, and it is not a contradiction: it belongs to the list,
+ * not to a row, so `ProjectListScreen` passes it to `RecordTable` once and `SortableList`
+ * holds it. One reference per table is the thing this rule was protecting.
  */
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/common/components/ds';
-import { deleteProjectAction, moveProjectAction } from '../actions/project-actions';
+import { deleteProjectAction } from '../actions/project-actions';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
-import { RowReorder } from './RowReorder';
+import { SortableDragHandle } from './SortableList';
 
 export interface ProjectRowActionsProps {
   id: number;
@@ -29,33 +33,21 @@ export interface ProjectRowActionsProps {
   /** The English title — what the delete dialog names. Falls back to the slug if blank. */
   title: string;
   editHref: string;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  /** Set when the table is sorted by a column, which makes "up" and "down" meaningless. */
-  reorderDisabledReason?: string;
 }
 
-export function ProjectRowActions({
-  id,
-  slug,
-  title,
-  editHref,
-  canMoveUp,
-  canMoveDown,
-  reorderDisabledReason,
-}: ProjectRowActionsProps) {
+export function ProjectRowActions({ id, slug, title, editHref }: ProjectRowActionsProps) {
   const router = useRouter();
   const name = title.trim() === '' ? slug : title;
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <RowReorder
-        recordName={name}
-        canMoveUp={canMoveUp}
-        canMoveDown={canMoveDown}
-        disabledReason={reorderDisabledReason}
-        onMove={direction => moveProjectAction({ id, direction })}
-      />
+      {/*
+        THE DRAG HANDLE. It reaches its row through `SortableList`'s context rather than
+        taking props, which is what lets it sit here — where the two arrows used to be —
+        instead of forcing the table to grow a handle column. Whether it is disabled, and
+        why, is the LIST's answer, not this row's.
+      */}
+      <SortableDragHandle />
 
       <Button variant="ghost" size="sm" asChild>
         <Link href={editHref}>Edit</Link>

@@ -116,7 +116,7 @@ describe('authorization', () => {
       createMediaAction(VALID),
       updateMediaAction(5, VALID),
       deleteMediaAction(5),
-      moveMediaAction({ id: 5, direction: 'up' }),
+      moveMediaAction({ id: 5, afterId: null }),
     ]);
 
     for (const result of results) expect(result).toEqual({ ok: false, status: 401 });

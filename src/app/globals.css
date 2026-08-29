@@ -253,6 +253,11 @@
   --z-rule: 5;
   --z-title: 10;
   --z-panel: 20;
+  /* Not from the port: the dashboard had no drag until prompt 11. A row being dragged has
+     to paint over the rows it passes, and nothing else in that document stacks — so it
+     needs a number above the plates and below the head, and it needs to be a token
+     because a component may not carry a z-index literal. */
+  --z-drag: 30;
   --z-head: 40;
   --z-wipe: 60;
   --z-preload: 80;

@@ -18,9 +18,23 @@
  * The hairline treatment, the empty state and the density all come from the design system.
  * What this adds is the sortable header and the URL arithmetic behind it — the part that is
  * about being a dashboard rather than about being a table.
+ *
+ * ─── AND SINCE PROMPT 11 IT CARRIES THE DRAG ──────────────────────────────────────
+ * Pass `reorder` and the body's rows come from `SortableList` instead of from `ds/Table`:
+ * the CELLS are still rendered here, on the server, and only the `<tr>` around them is a
+ * client element that can hold a drag ref. That is what `ds/Table`'s `renderRows` slot is
+ * for, and it is why a reorderable table ships no more markup to the browser than the row
+ * contents it was already sending.
+ *
+ * The two sorts do not coexist, deliberately. "One position earlier in `sort_order`" is a
+ * position a title-sorted table does not display, so a screen that is sorted by a column
+ * passes `reorder.disabledReason` and the handles render disabled with the reason SHOWN.
+ * Silently reordering something invisible is the alternative, and it is worse.
  */
 import Link from 'next/link';
 import { Table, type TableColumn } from '@/common/components/ds';
+import type { ActionResult } from '@/common/services/action-result';
+import { SortableList } from './SortableList';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -39,6 +53,28 @@ export interface RecordTableColumn<T> extends TableColumn<T> {
   sortValue?: (row: T) => string | number;
 }
 
+/**
+ * What a reorderable table needs beyond an ordinary one. Absent = the rows are not
+ * reorderable and no drag context is created at all.
+ */
+export interface RecordTableReorder<T> {
+  /** The record's database id — what `afterId` carries to the action. */
+  itemId: (row: T) => number;
+  /** What the row IS, in words: the handle's accessible name and every announcement's. */
+  itemName: (row: T) => string;
+  /** Singular, lowercase: "project", "design work", "media entry". */
+  itemNoun: string;
+  /**
+   * The Server Action, passed straight through. One reference per list rather than per row,
+   * which is why passing it here does not repeat `ProjectRowActions`' import-don't-pass rule.
+   */
+  action: (input: { id: number; afterId: number | null }) => Promise<ActionResult>;
+  /** Distinguishes this table's drag context from every other one on the page. */
+  contextId: string;
+  /** Set while a column sort is active; every handle is then disabled and says why. */
+  disabledReason?: string;
+}
+
 export interface RecordTableProps<T> {
   columns: ReadonlyArray<RecordTableColumn<T>>;
   rows: readonly T[];
@@ -51,6 +87,7 @@ export interface RecordTableProps<T> {
   sortHref: (sort: SortState) => string;
   caption: React.ReactNode;
   empty?: React.ReactNode;
+  reorder?: RecordTableReorder<T>;
 }
 
 export function RecordTable<T>({
@@ -61,6 +98,7 @@ export function RecordTable<T>({
   sortHref,
   caption,
   empty,
+  reorder,
 }: RecordTableProps<T>) {
   const headed = columns.map(column => ({
     ...column,
@@ -79,6 +117,26 @@ export function RecordTable<T>({
       caption={caption}
       empty={empty}
       density="compact"
+      renderRows={
+        reorder
+          ? body => (
+              <SortableList<number>
+                id={reorder.contextId}
+                variant="row"
+                columnCount={columns.length}
+                itemNoun={reorder.itemNoun}
+                disabledReason={reorder.disabledReason}
+                commit={{ to: 'server', action: reorder.action }}
+                items={body.map(item => ({
+                  id: reorder.itemId(item.row),
+                  name: reorder.itemName(item.row),
+                  className: item.className,
+                  children: item.cells,
+                }))}
+              />
+            )
+          : undefined
+      }
     />
   );
 }

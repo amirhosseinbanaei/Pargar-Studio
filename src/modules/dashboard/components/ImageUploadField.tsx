@@ -27,7 +27,8 @@
  * whose only way in is a drop cannot be used by a large number of people. The label is
  * styled as the button, `peer-focus-visible:` puts the focus ring on it when the hidden
  * input takes focus, and the drop handling is an ENHANCEMENT layered over a control that
- * already worked. Same reasoning `RowReorder` records for shipping arrows instead of drag.
+ * already worked. `SortableList` answers the same question the other way and says why: a
+ * drag needs a keyboard implementation of its own, and prompt 11 shipped one.
  *
  * ═══ THE PREVIEW SHOWS WHAT IS STORED ═════════════════════════════════════════════
  * While the request is in flight the preview is the local `URL.createObjectURL` — instant

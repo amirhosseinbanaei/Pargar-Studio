@@ -127,7 +127,10 @@ export const taxonomyTermVisibilitySubmissionSchema = z.strictObject({
   visible: z.boolean(),
 });
 
-export const taxonomyTermMoveSubmissionSchema = z.strictObject({
-  id: z.number().int().positive(),
-  direction: z.enum(['up', 'down']),
-});
+/*
+ * There is no move schema here any more. Reordering is `reorderSubmissionSchema` in
+ * `./reorder` — one shape shared by all four reorderable lists, because the payload is the
+ * contract and four copies is four chances for one of them to accept something the others
+ * refuse. Prompt 11 replaced `{ id, direction }` with `{ id, afterId }` when the arrows
+ * became a drag: a move from position 3 to position 17 has no direction.
+ */

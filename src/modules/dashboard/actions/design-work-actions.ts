@@ -20,6 +20,7 @@ import {
 import { readSession } from '@/common/services/session';
 import { checkTaxonomy } from '../lib/taxonomy-guard';
 import { designWorkSubmissionSchema, withPersianFallback } from '../schemas/design-work-form';
+import { reorderSubmissionSchema } from '../schemas/reorder';
 
 async function requireSession(): Promise<{ ok: false; status: number } | null> {
   const session = await readSession();
@@ -122,25 +123,28 @@ export async function deleteDesignWorkAction(id: number): Promise<ActionResult> 
   return { ok: true, data: undefined };
 }
 
-const moveSchema = z.strictObject({
-  id: z.number().int().positive(),
-  direction: z.enum(['up', 'down']),
-});
-
+/**
+ * Move one record to the position a drag or a keyboard move left it in. Same shape as
+ * `moveProjectAction` — see that action for why the payload names the record it now FOLLOWS
+ * rather than an index or a whole ordering, and why every renumbered row's tag is purged.
+ */
 export async function moveDesignWorkAction(input: unknown): Promise<ActionResult> {
   const denied = await requireSession();
   if (denied) return denied;
 
-  const parsed = moveSchema.safeParse(input);
+  const parsed = reorderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
-  const result = await toActionResult(() => moveDesignWork(parsed.data.id, parsed.data.direction));
+  const result = await toActionResult(() => moveDesignWork(parsed.data.id, parsed.data.afterId));
   if (!result.ok) return result;
+
+  // `null` is "nothing moved" — a stale id, a deleted anchor, or a drop that travelled
+  // nowhere. A success that purges nothing; the client refreshes onto the truth.
   if (result.data === null) return { ok: true, data: undefined };
 
-  purgeDesignWork(result.data.moved.slug);
-  purgeDesignWork(result.data.displaced.slug);
+  updateTag(CACHE_TAGS.designWorks);
+  for (const row of result.data.changed) updateTag(designWorkTag(row.slug));
   return { ok: true, data: undefined };
 }

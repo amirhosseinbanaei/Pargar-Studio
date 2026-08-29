@@ -8,10 +8,12 @@
  * rows the server already has.
  *
  * ─── THE ORDER OF OPERATIONS MATTERS ──────────────────────────────────────────────
- * Filter, THEN sort, THEN compute the reorder boundaries. Computing "can this row move up"
- * before filtering would answer the question about the unfiltered archive, so the first row
- * of a filtered view would show an enabled up-arrow that moves it past rows nobody can see.
- * Doing it after is what makes the arrows describe what is actually on screen.
+ * Filter, THEN sort, THEN hand the result to the table. The rows the drag sees are the rows
+ * ON SCREEN, which is what makes a drop mean what it looks like it means: dropping between
+ * two visible rows posts the visible predecessor as `afterId`, so the row lands after that
+ * record in the archive's full order — after it, and before everything that followed it,
+ * hidden rows included. Handing the drag the unfiltered archive instead would let a drop land
+ * relative to rows nobody can see.
  *
  * ─── WHY THE ROW LINKS TO THE SLUG ────────────────────────────────────────────────
  * `/dashboard/projects/<slug>`, not `/dashboard/projects/<id>`. The slug is the same
@@ -39,6 +41,7 @@ import {
   type RecordTableColumn,
   type SortState,
 } from './RecordTable';
+import { moveProjectAction } from '../actions/project-actions';
 import { ProjectListFilters } from './ProjectListFilters';
 import { TaxonomyEditor } from './TaxonomyEditor';
 import { ProjectRowActions } from './ProjectRowActions';
@@ -67,12 +70,13 @@ export function ProjectListScreen({ rows, searchParams, terms, usage }: ProjectL
   const ordered = sortRows(filtered, columns, sort);
 
   /**
-   * The arrows are meaningless in a sorted view — "up" is a position in `sort_order`, which
-   * a title-sorted table does not display. Saying so is better than either silently moving
-   * a row somewhere invisible or hiding the control with no explanation.
+   * Dragging is meaningless in a sorted view — a drop expresses "this row now follows that
+   * one" in `sort_order`, which a title-sorted table does not display, so the row would
+   * appear to jump somewhere arbitrary or not to move at all. Saying so is better than either
+   * silently reordering something invisible or hiding the control with no explanation.
    */
   const reorderDisabledReason = sort.key
-    ? 'Clear the column sort to reorder. Order is only meaningful in the archive’s own order.'
+    ? 'Clear the column sort to reorder. Dragging only means something in the archive’s own order.'
     : undefined;
 
   return (
@@ -109,15 +113,19 @@ export function ProjectListScreen({ rows, searchParams, terms, usage }: ProjectL
       />
 
       <RecordTable
-        columns={columns.map(column =>
-          column.key === 'actions'
-            ? { ...column, cell: rowActionsCell(ordered, reorderDisabledReason) }
-            : column,
-        )}
+        columns={columns}
         rows={ordered}
         rowKey={row => String(row.id)}
         sort={sort}
         sortHref={(next: SortState) => projectListHref(LIST_PATH, query, next)}
+        reorder={{
+          itemId: row => row.id,
+          itemName: row => (row.titleEn.trim() === '' ? row.slug : row.titleEn),
+          itemNoun: 'project',
+          action: moveProjectAction,
+          contextId: 'project-order',
+          disabledReason: reorderDisabledReason,
+        }}
         caption="Projects, with their taxonomy and archive position"
         empty={
           hasAnyProjectFilter(query)
@@ -201,26 +209,14 @@ function buildColumns(): RecordTableColumn<ProjectRow>[] {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
       align: 'end',
-      // Replaced in the render with a cell that knows the row's position. This placeholder
-      // keeps the column list — and therefore `parseSortState` — in one place.
-      cell: () => null,
+      cell: row => (
+        <ProjectRowActions
+          id={row.id}
+          slug={row.slug}
+          title={row.titleEn}
+          editHref={`${LIST_PATH}/${row.slug}`}
+        />
+      ),
     },
   ];
-}
-
-function rowActionsCell(ordered: readonly ProjectRow[], reorderDisabledReason?: string) {
-  return function ActionsCell(row: ProjectRow) {
-    const index = ordered.indexOf(row);
-    return (
-      <ProjectRowActions
-        id={row.id}
-        slug={row.slug}
-        title={row.titleEn}
-        editHref={`${LIST_PATH}/${row.slug}`}
-        canMoveUp={index > 0}
-        canMoveDown={index < ordered.length - 1}
-        reorderDisabledReason={reorderDisabledReason}
-      />
-    );
-  };
 }

@@ -21,6 +21,7 @@ import {
   type RecordTableColumn,
   type SortState,
 } from './RecordTable';
+import { moveDesignWorkAction } from '../actions/design-work-actions';
 import { DesignWorkRowActions } from './DesignWorkRowActions';
 import { TaxonomyEditor } from './TaxonomyEditor';
 
@@ -49,8 +50,13 @@ export function DesignWorkListScreen({
   );
   const ordered = sortRows(rows, columns, sort);
 
+  /**
+   * Dragging expresses "this row now follows that one" in `sort_order`, a position a
+   * column-sorted table does not display — so it is disabled here, with the reason shown
+   * rather than silently ignored. Same rule as `ProjectListScreen`.
+   */
   const reorderDisabledReason = sort.key
-    ? 'Clear the column sort to reorder. Order is only meaningful in the collection’s own order.'
+    ? 'Clear the column sort to reorder. Dragging only means something in the collection’s own order.'
     : undefined;
 
   const sortHref = (next: SortState) => {
@@ -81,15 +87,19 @@ export function DesignWorkListScreen({
       <TaxonomyEditor subject="design" terms={terms} usage={usage} />
 
       <RecordTable
-        columns={columns.map(column =>
-          column.key === 'actions'
-            ? { ...column, cell: rowActionsCell(ordered, reorderDisabledReason) }
-            : column,
-        )}
+        columns={columns}
         rows={ordered}
         rowKey={row => String(row.id)}
         sort={sort}
         sortHref={sortHref}
+        reorder={{
+          itemId: row => row.id,
+          itemName: row => (row.titleEn.trim() === '' ? row.slug : row.titleEn),
+          itemNoun: 'design work',
+          action: moveDesignWorkAction,
+          contextId: 'design-work-order',
+          disabledReason: reorderDisabledReason,
+        }}
         caption="Design works, with their taxonomy and collection position"
         empty="No design works yet. Seed the database, or create one."
       />
@@ -157,24 +167,14 @@ function buildColumns(): RecordTableColumn<DesignWorkRow>[] {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
       align: 'end',
-      cell: () => null,
+      cell: row => (
+        <DesignWorkRowActions
+          id={row.id}
+          slug={row.slug}
+          title={row.titleEn}
+          editHref={`${LIST_PATH}/${row.slug}`}
+        />
+      ),
     },
   ];
-}
-
-function rowActionsCell(ordered: readonly DesignWorkRow[], reorderDisabledReason?: string) {
-  return function ActionsCell(row: DesignWorkRow) {
-    const index = ordered.indexOf(row);
-    return (
-      <DesignWorkRowActions
-        id={row.id}
-        slug={row.slug}
-        title={row.titleEn}
-        editHref={`${LIST_PATH}/${row.slug}`}
-        canMoveUp={index > 0}
-        canMoveDown={index < ordered.length - 1}
-        reorderDisabledReason={reorderDisabledReason}
-      />
-    );
-  };
 }

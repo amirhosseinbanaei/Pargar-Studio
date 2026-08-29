@@ -4,41 +4,30 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/common/components/ds';
-import { deleteMediaAction, moveMediaAction } from '../actions/media-actions';
+import { deleteMediaAction } from '../actions/media-actions';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
-import { RowReorder } from './RowReorder';
+import { SortableDragHandle } from './SortableList';
 
 export interface MediaRowActionsProps {
   id: number;
   slug: string;
   title: string;
   editHref: string;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  reorderDisabledReason?: string;
 }
 
-export function MediaRowActions({
-  id,
-  slug,
-  title,
-  editHref,
-  canMoveUp,
-  canMoveDown,
-  reorderDisabledReason,
-}: MediaRowActionsProps) {
+export function MediaRowActions({ id, slug, title, editHref }: MediaRowActionsProps) {
   const router = useRouter();
   const name = title.trim() === '' ? slug : title;
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <RowReorder
-        recordName={name}
-        canMoveUp={canMoveUp}
-        canMoveDown={canMoveDown}
-        disabledReason={reorderDisabledReason}
-        onMove={direction => moveMediaAction({ id, direction })}
-      />
+      {/*
+        THE DRAG HANDLE. It reaches its row through `SortableList`'s context rather than
+        taking props, which is what lets it sit here — where the two arrows used to be —
+        instead of forcing the table to grow a handle column. Whether it is disabled, and
+        why, is the LIST's answer, not this row's.
+      */}
+      <SortableDragHandle />
 
       <Button variant="ghost" size="sm" asChild>
         <Link href={editHref}>Edit</Link>

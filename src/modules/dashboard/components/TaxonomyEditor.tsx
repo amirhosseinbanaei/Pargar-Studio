@@ -67,7 +67,7 @@ import {
 } from '../schemas/taxonomy-form';
 import { RecordForm } from './RecordForm';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
-import { RowReorder } from './RowReorder';
+import { SortableDragHandle, SortableList } from './SortableList';
 
 export interface TaxonomyEditorProps {
   subject: TaxonomySubject;
@@ -146,15 +146,25 @@ function AxisGroup({
       </h3>
 
       <ul className="flex flex-col">
-        {terms.map((term, index) => (
-          <TermRow
-            key={term.id}
-            term={term}
-            count={usage[term.value] ?? 0}
-            canMoveUp={index > 0}
-            canMoveDown={index < terms.length - 1}
-          />
-        ))}
+        {/*
+          ONE drag context per AXIS, not per subject and not per page. An axis is the list an
+          editor sees and the only list a position means anything in — the table holds every
+          axis of every subject, so a term dragged across an axis boundary would be moved
+          against options it never appears beside. `moveTaxonomyTerm` refuses such an anchor
+          on the server too; this is the half that makes it unreachable in the interface.
+        */}
+        <SortableList<number>
+          id={`taxonomy-${subject}-${axis}`}
+          variant="item"
+          itemNoun="term"
+          commit={{ to: 'server', action: moveTaxonomyTermAction }}
+          items={terms.map(term => ({
+            id: term.id,
+            name: term.labelEn,
+            className: 'flex flex-col gap-3 border-t border-rule py-3',
+            children: <TermRow term={term} count={usage[term.value] ?? 0} />,
+          }))}
+        />
 
         {terms.length === 0 && (
           <li className="border-t border-rule py-3 text-fs-xs text-t-xlo">
@@ -176,17 +186,12 @@ function AxisGroup({
    One term
    ──────────────────────────────────────────────────────────────────────────────── */
 
-function TermRow({
-  term,
-  count,
-  canMoveUp,
-  canMoveDown,
-}: {
-  term: TaxonomyTermRow;
-  count: number;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-}) {
+/**
+ * One term's contents. It renders NO `<li>` of its own: the element belongs to `SortableList`,
+ * which has to hold the drag ref on it. The class list the row used to carry moved to the
+ * item, one line above.
+ */
+function TermRow({ term, count }: { term: TaxonomyTermRow; count: number }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
@@ -207,7 +212,7 @@ function TermRow({
   };
 
   return (
-    <li className="flex flex-col gap-3 border-t border-rule py-3">
+    <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="min-w-[10rem] flex-1 text-fs-sm tracking-flat-kavan text-t-hi">
           {term.labelEn}
@@ -276,12 +281,7 @@ function TermRow({
             }
           />
 
-          <RowReorder
-            onMove={direction => moveTaxonomyTermAction({ id: term.id, direction })}
-            canMoveUp={canMoveUp}
-            canMoveDown={canMoveDown}
-            recordName={term.labelEn}
-          />
+          <SortableDragHandle />
         </div>
       </div>
 
@@ -317,7 +317,7 @@ function TermRow({
           </RecordForm>
         </div>
       )}
-    </li>
+    </>
   );
 }
 

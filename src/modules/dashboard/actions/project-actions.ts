@@ -66,6 +66,7 @@ import {
 import { readSession } from '@/common/services/session';
 import { checkTaxonomy } from '../lib/taxonomy-guard';
 import { projectSubmissionSchema, withPersianFallback } from '../schemas/project-form';
+import { reorderSubmissionSchema } from '../schemas/reorder';
 
 /* ────────────────────────────────────────────────────────────────────────────────
    Shared preconditions
@@ -258,44 +259,41 @@ export async function deleteProjectAction(id: number): Promise<ActionResult> {
    Reorder
    ──────────────────────────────────────────────────────────────────────────────── */
 
-const moveSchema = z.strictObject({
-  id: z.number().int().positive(),
-  direction: z.enum(['up', 'down']),
-});
-
 /**
- * Move one project one position in the archive's order.
+ * Move one project to the position a drag or a keyboard move left it in.
  *
- * The SERVER computes what that means — see `moveProject` in the service for why an id and a
- * direction beat the client posting seventy-six ids in a new order.
+ * The SERVER computes what that means. The payload is the record that moved and the record it
+ * now FOLLOWS — see `../schemas/reorder` for why that beats an index and why it is not the
+ * whole ordering, and `moveProject` in the service for the renumbering itself.
  *
- * Both moved rows' instance tags are purged, not just the one that was clicked. Their detail
- * pages do not show the order, but the LIST does, and `projects` covers that; the pair is
- * purged anyway because `sortOrder` is a column on both rows and a cached read of either is
- * now describing a row that changed. Purging a tag that did not strictly need it costs one
- * regeneration; missing one costs a page that is wrong until the next deploy.
+ * EVERY renumbered row's instance tag is purged, not just the moved one's. A drag from
+ * position 3 to position 17 rewrites `sortOrder` on fourteen rows in between, and a cached
+ * read of any of them is now describing a row that changed. Purging a tag that did not
+ * strictly need it costs one regeneration; missing one costs a page that is wrong until the
+ * next deploy.
  */
 export async function moveProjectAction(input: unknown): Promise<ActionResult> {
   const denied = await requireSession();
   if (denied) return denied;
 
-  const parsed = moveSchema.safeParse(input);
+  const parsed = reorderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
-  const result = await toActionResult(() => moveProject(parsed.data.id, parsed.data.direction));
+  const result = await toActionResult(() => moveProject(parsed.data.id, parsed.data.afterId));
   if (!result.ok) return result;
 
   /**
-   * `null` is "nothing moved" — an unknown id, or the first row asked to move up. Both are
-   * a no-op rather than a failure: the boundary arrows render disabled, so reaching here
-   * means a stale page or a hand-made request, and neither deserves an error screen. Nothing
-   * changed, so nothing is purged.
+   * `null` is "nothing moved" — an unknown id, an anchor deleted in another tab, or a drop
+   * back where the row already was. All three are a no-op rather than a failure: reaching
+   * here means a stale page or a hand-made request, and neither deserves an error screen.
+   * The client refreshes on this success and sees the order the database actually holds,
+   * which is exactly what a stale drop needs. Nothing changed, so nothing is purged.
    */
   if (result.data === null) return { ok: true, data: undefined };
 
-  purgeProject(result.data.moved.slug);
-  purgeProject(result.data.displaced.slug);
+  updateTag(CACHE_TAGS.projects);
+  for (const row of result.data.changed) updateTag(projectTag(row.slug));
   return { ok: true, data: undefined };
 }

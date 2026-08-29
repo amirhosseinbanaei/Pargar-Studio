@@ -10,6 +10,7 @@ import type { MediaCreate, MediaRow, MediaUpdate } from '@/common/schemas/media'
 import type { Locale } from '@/common/schemas/locale';
 import type { TermOption } from '@/common/schemas/taxonomy';
 import { optionsForAxis } from '@/common/utils/taxonomy';
+import { planReorder } from '@/common/utils/reorder';
 import * as mediaRepo from './media-repository';
 import { getPublicTerms } from './taxonomy-service';
 import { CACHE_TAGS, mediaTag, projectTag } from './cache-tags';
@@ -108,26 +109,25 @@ export async function deleteMediaEntry(id: number): Promise<boolean> {
   return mediaRepo.remove(id);
 }
 
+/**
+ * Same anchor-and-renumber algorithm as `moveProject` — see that function for why the action
+ * sends the record it now FOLLOWS rather than an index or a whole ordering, and
+ * `common/utils/reorder.ts` for the arithmetic itself.
+ *
+ * `null` when nothing happened: an unknown id, an anchor that has since been deleted, or a
+ * drop back where the media entry already was.
+ */
 export async function moveMediaEntry(
   id: number,
-  direction: 'up' | 'down',
-): Promise<{ moved: MediaRow; displaced: MediaRow } | null> {
+  afterId: number | null,
+): Promise<{ moved: MediaRow; changed: MediaRow[] } | null> {
   const rows = await mediaRepo.list();
-  const from = rows.findIndex(row => row.id === id);
-  if (from === -1) return null;
-
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (to < 0 || to >= rows.length) return null;
-
-  const reordered = [...rows];
-  const [moved] = reordered.splice(from, 1);
-  reordered.splice(to, 0, moved);
+  const plan = planReorder(rows, id, afterId);
+  if (!plan) return null;
 
   await Promise.all(
-    reordered.flatMap((row, index) =>
-      row.sortOrder === index ? [] : [mediaRepo.update(row.id, { sortOrder: index })],
-    ),
+    plan.writes.map(write => mediaRepo.update(write.row.id, { sortOrder: write.sortOrder })),
   );
 
-  return { moved, displaced: rows[to] };
+  return { moved: plan.moved, changed: plan.writes.map(write => write.row) };
 }

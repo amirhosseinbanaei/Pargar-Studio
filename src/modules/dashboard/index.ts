@@ -52,13 +52,30 @@ export {
   sortRows,
   type RecordTableColumn,
   type RecordTableProps,
+  type RecordTableReorder,
   type SortDirection,
   type SortState,
 } from './components/RecordTable';
 export { DeleteRecordDialog, type DeleteRecordDialogProps } from './components/DeleteRecordDialog';
 export { ResultRegion, type ResultRegionProps } from './components/ResultRegion';
 export { LocaleFieldPair, type LocaleFieldPairProps } from './components/LocaleFieldPair';
-export { RowReorder, REORDER_BUTTON_CLASS, type RowReorderProps } from './components/RowReorder';
+/**
+ * THE REORDER CONTROL (prompt 11). One drag-and-drop list, mounted on all five ordered lists
+ * in the dashboard — projects, design works, media, the taxonomy terms and a record's image
+ * gallery. It REPLACES the pair of arrow buttons that preceded it, which are deleted: two
+ * one thing is two things that can disagree.
+ *
+ * Exported for the same reason `RecordForm` is, and the reason is sharper here than anywhere
+ * else on this list: five copies would be five places to fix the announcement wording, the
+ * keyboard protocol or the pointer activation constraint, and four of them would be missed.
+ */
+export {
+  SortableList,
+  SortableDragHandle,
+  type SortableListCommit,
+  type SortableListItem,
+  type SortableListProps,
+} from './components/SortableList';
 /**
  * THE UPLOADER (prompt 10). One control, mounted everywhere a record takes a picture — a
  * cover on projects, design works and media, every gallery row, and every founder's

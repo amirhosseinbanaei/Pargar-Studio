@@ -15,17 +15,17 @@
  * other, and item `i` would stop being the same picture in both. The symptom appears only
  * on the Persian page, which is the language fewer people check.
  *
- * ═══ ORDER IS PART OF THE RECORD, SO THE ARROWS ARE LOCAL ═════════════════════════
- * These arrows call `useFieldArray`'s `move` and nothing else. They are NOT `RowReorder`,
- * and the difference is real rather than cosmetic: `RowReorder` posts `{ id, direction }` to
- * a Server Action because it reorders ROWS IN A TABLE that exist independently of any form.
- * A gallery's order is a field of the record being edited, so it moves with the rest of the
- * unsaved values and is written by the same save — reordering and then cancelling leaves the
- * stored order alone, which is what an editor expects of anything inside a form.
+ * ═══ ORDER IS PART OF THE RECORD, SO THE DROP IS LOCAL ════════════════════════════
+ * This is the same `SortableList` the tables use, with the one difference that matters:
+ * `commit.to === 'form'`, so a drop calls `useFieldArray`'s `move` and posts NOTHING. A
+ * table's rows exist independently of any form and their order is written the moment it
+ * changes; a gallery's order is a field of the record being edited, so it moves with the rest
+ * of the unsaved values and is written by the same save — reordering and then cancelling
+ * leaves the stored order alone, which is what an editor expects of anything inside a form.
  *
- * They share `REORDER_BUTTON_CLASS` with `RowReorder` so the two look identical.
- * Drag-and-drop is explicitly out of scope (prompt 11); the arrows are also the keyboard
- * implementation a drag handle would need anyway.
+ * One component rather than a second local one means the drag handle, the keyboard protocol
+ * and the announcements are identical here and in the tables, which is the whole reason
+ * `SortableList` takes the commit as a parameter instead of assuming one.
  *
  * ═══ AN EMPTY ROW IS AN INVALID ROW, ON PURPOSE ═══════════════════════════════════
  * "Add image" appends a row with no path, and the schema refuses it — so `FormButton` stays
@@ -46,7 +46,7 @@ import {
 } from '@/common/components/form';
 import type { GalleryFormItem } from '../schemas/image';
 import { ImageUploadField } from './ImageUploadField';
-import { REORDER_BUTTON_CLASS } from './RowReorder';
+import { SortableDragHandle, SortableList } from './SortableList';
 
 export interface GalleryFieldProps<TValues extends FieldValues> {
   name: Path<TValues>;
@@ -83,74 +83,68 @@ export function GalleryField<TValues extends FieldValues>({
               </p>
             )}
 
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex flex-col gap-3 border border-rule bg-s-1 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">
-                    Image {index + 1}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => move(index, index - 1)}
-                      disabled={index === 0}
-                      // Names the POSITION, because every row's controls are otherwise
-                      // identically labelled to anyone navigating by control.
-                      aria-label={`Move image ${index + 1} earlier`}
-                      title="Move earlier"
-                      className={REORDER_BUTTON_CLASS}
-                    >
-                      <span aria-hidden>↑</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => move(index, index + 1)}
-                      disabled={index === fields.length - 1}
-                      aria-label={`Move image ${index + 1} later`}
-                      title="Move later"
-                      className={REORDER_BUTTON_CLASS}
-                    >
-                      <span aria-hidden>↓</span>
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      onClick={() => remove(index)}
-                      aria-label={`Remove image ${index + 1}`}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
+            <SortableList<string>
+              id={`gallery-${String(name)}`}
+              variant="block"
+              itemNoun="image"
+              // `move` straight through: the field array IS the list, so there is no
+              // optimistic copy to keep and nothing to reconcile against.
+              commit={{ to: 'form', move: (from, to) => move(from, to) }}
+              items={fields.map((field, index) => ({
+                id: field.id,
+                // Names the POSITION, because every row here is otherwise identical to
+                // anyone navigating by control — a gallery row has no title of its own.
+                name: `image ${index + 1}`,
+                className: 'flex flex-col gap-3 border border-rule bg-s-1 p-3',
+                children: (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">
+                        Image {index + 1}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <SortableDragHandle />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => remove(index)}
+                          aria-label={`Remove image ${index + 1}`}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
 
-                <ImageUploadField<TValues>
-                  name={`${name}.${index}.path` as Path<TValues>}
-                  label={`Image ${index + 1} file`}
-                  itemLabel="image"
-                />
+                    <ImageUploadField<TValues>
+                      name={`${name}.${index}.path` as Path<TValues>}
+                      label={`Image ${index + 1} file`}
+                      itemLabel="image"
+                    />
 
-                {/*
+                    {/*
                   Both descriptions, side by side, with the Persian one in its own direction
                   and language — the same treatment `LocaleFieldPair` gives every other
                   translated field. Neither is optional and neither is filled in from the
                   other: see `../schemas/image` for why alt text is the one exception to the
                   Persian-falls-back-to-English rule.
                 */}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <GalleryAltInput<TValues>
-                    name={`${name}.${index}.altEn` as Path<TValues>}
-                    label={`Image ${index + 1} description · English`}
-                  />
-                  <GalleryAltInput<TValues>
-                    name={`${name}.${index}.altFa` as Path<TValues>}
-                    label={`Image ${index + 1} description · Persian`}
-                    dir="rtl"
-                    lang="fa"
-                  />
-                </div>
-              </div>
-            ))}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <GalleryAltInput<TValues>
+                        name={`${name}.${index}.altEn` as Path<TValues>}
+                        label={`Image ${index + 1} description · English`}
+                      />
+                      <GalleryAltInput<TValues>
+                        name={`${name}.${index}.altFa` as Path<TValues>}
+                        label={`Image ${index + 1} description · Persian`}
+                        dir="rtl"
+                        lang="fa"
+                      />
+                    </div>
+                  </>
+                ),
+              }))}
+            />
           </div>
 
           <Button

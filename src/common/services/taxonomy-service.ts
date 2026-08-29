@@ -30,6 +30,7 @@ import {
   type TaxonomySubject,
   type TaxonomyTermRow,
 } from '@/common/schemas/taxonomy';
+import { planReorder } from '@/common/utils/reorder';
 import * as taxonomyRepo from './taxonomy-repository';
 import * as projectRepo from './project-repository';
 import * as designWorkRepo from './design-work-repository';
@@ -298,24 +299,26 @@ export async function deleteTaxonomyTerm(id: number): Promise<TaxonomyDeleteOutc
 }
 
 /**
- * Move one term one position WITHIN ITS OWN AXIS.
+ * Move one term WITHIN ITS OWN AXIS.
  *
  * Within its axis is the whole subtlety: the table holds every axis of every subject, so the
- * row physically above a project `status` term may be a project `type` term. Moving against
- * the table's order rather than the axis's would swap two options that never appear in the
- * same list.
+ * row physically above a project `status` term may be a project `type` term. Reordering
+ * against the table's order rather than the axis's would move two options that never appear
+ * in the same list — which is also why the anchor is looked up among the SIBLINGS below and
+ * an `afterId` naming a term on another axis is rejected as unknown.
  *
- * It renumbers from the index rather than swapping two `sortOrder` values, for the reason
- * `moveProject` gives: a swap is a silent no-op the moment two rows share a value, and every
- * term starts at the column default of 0, so ties are the NORMAL state of a freshly seeded
- * axis rather than an edge case. Renumbering repairs them as a side effect.
+ * The action sends `{ id, afterId }` — the term and the term it now follows, `null` for
+ * first. `planReorder` in `common/utils/reorder.ts` carries the reasoning for that shape and
+ * for renumbering by index rather than swapping two values; the tie-repair half matters more
+ * here than anywhere else, because every term starts at the column default of 0 and ties are
+ * the NORMAL state of a freshly seeded axis.
  *
- * `null` for an unknown id or a move with nowhere to go. Both are "nothing happened" — the
- * boundary arrows render disabled, so reaching either means a stale page.
+ * `null` for an unknown id, an anchor no longer on this axis, or a drop that travelled
+ * nowhere. All three are "nothing happened" rather than failures.
  */
 export async function moveTaxonomyTerm(
   id: number,
-  direction: 'up' | 'down',
+  afterId: number | null,
 ): Promise<{ moved: TaxonomyTermRow; subject: TaxonomySubject } | null> {
   const term = await taxonomyRepo.byId(id);
   if (!term) return null;
@@ -327,22 +330,13 @@ export async function moveTaxonomyTerm(
     row => row.axis === term.axis,
   );
 
-  const from = siblings.findIndex(row => row.id === id);
-  if (from === -1) return null;
-
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (to < 0 || to >= siblings.length) return null;
-
-  const reordered = [...siblings];
-  const [moved] = reordered.splice(from, 1);
-  reordered.splice(to, 0, moved);
+  const plan = planReorder(siblings, id, afterId);
+  if (!plan) return null;
 
   // Write only what changed: two rows on a settled axis, more on one with ties to repair.
   await Promise.all(
-    reordered.flatMap((row, index) =>
-      row.sortOrder === index ? [] : [taxonomyRepo.update(row.id, { sortOrder: index })],
-    ),
+    plan.writes.map(write => taxonomyRepo.update(write.row.id, { sortOrder: write.sortOrder })),
   );
 
-  return { moved, subject };
+  return { moved: plan.moved, subject };
 }
