@@ -869,7 +869,7 @@ built to be reused rather than copied, and are exported from `@/modules/dashboar
 | `DeleteRecordDialog`                          | The confirmation. Names the record, stays OPEN on failure, `useTransition` so it does not close onto a stale list                                                                                                        |
 | `ResultRegion`                                | The inline outcome region, rendering the one normalized `{ status, code, message, fieldErrors }` shape                                                                                                                   |
 | `LocaleFieldPair`                             | English and Persian side by side, `dir="rtl"` + `lang="fa"` on the Persian INPUT only. Every remaining area has translated columns                                                                                       |
-| `RowReorder`                                  | Two arrows, disabled at the boundaries AND whenever the table is sorted by a column                                                                                                                                      |
+| `RowReorder`                                  | Two arrows, disabled at the boundaries AND whenever the table is sorted by a column. **DELETED in prompt 11**, replaced by `SortableList`, which is dragged                                                              |
 | `requireDashboardSession`                     | The page-level gate above                                                                                                                                                                                                |
 | `DASHBOARD_AREAS`                             | The six areas. **Flip `available: true` and add the route folder** — that is the whole navigation change                                                                                                                 |
 
@@ -1602,7 +1602,8 @@ rule the rest of `index.ts` already lists.
 Collapsed by default as a `<details>` — `FacetRail.tsx:64`'s pattern, inverted: that rail has
 one group and nothing below it so it opens; this page's job is the LIST. Per term it shows the
 English label, the Persian label in its own `dir`/`lang` the way `LocaleFieldPair` does, the
-wire value, the use count, a visible toggle, edit, delete and `RowReorder`'s arrows. It also
+wire value, the use count, a visible toggle, edit, delete and — since prompt 11 — a drag
+handle where the arrows were. It also
 lists **undeclared values** the records carry, so an option appearing on a public rail that
 the editor does not list is never a mystery.
 
@@ -1910,7 +1911,8 @@ projects, design works and media, every gallery row, and every founder's portrai
   ring through `peer-focus-visible:`. That input is the whole reason the control is usable
   without a pointer: a drop zone is a pointer-only affordance — there is no keyboard gesture
   for "drag" — so the drop handling is an ENHANCEMENT layered over a control that already
-  worked. Same reasoning `RowReorder` records for shipping arrows instead of drag.
+  worked. Prompt 11 answers the same question the other way for REORDERING and says why: there
+  the drag is the only control, so it ships with a keyboard implementation of its own.
 - **The preview shows what is STORED**, not only the local file: the object URL during the
   request, then `/api/media/<stored path>` fetched back the moment it lands. A preview that
   only ever showed the local file looks identical whether the bytes reached the disk, a full
@@ -1923,9 +1925,11 @@ deliberately does not mirror the storage: with two independent editors (the shap
 uses for the founders, which predates this) an editor could add a photograph to one language
 and not the other, or reorder one and not the other, and item `i` would stop being the same
 picture in both — with no symptom in the language most people check. One list makes the
-alignment structural. Its reorder arrows are LOCAL (`useFieldArray`'s `move`), not
-`RowReorder`: a gallery's order is a field of the record being edited, so it is written by the
-same save and reordering-then-cancelling changes nothing.
+alignment structural. Its reordering is LOCAL (`useFieldArray`'s `move`) rather than a write of
+its own: a gallery's order is a field of the record being edited, so it is written by the same
+save and reordering-then-cancelling changes nothing. **Prompt 11 made it a drag** — the same
+`SortableList` the tables use, with `commit.to === 'form'`; the local-versus-posted distinction
+is unchanged and is now a parameter of one component rather than a second control.
 
 **A founder's portrait has one author.** `RepeatableGroupField` gained an `imageKey` prop, set
 on the ENGLISH founders editor only; the save copies each path into the Persian array by
@@ -2025,6 +2029,200 @@ later one after the first was removed.
   gallery of eight photographs described by one sentence is one sentence read eight times,
   which is worse than useless — it actively misdescribes seven of them.
 
+## Drag-and-drop reordering (prompt 11)
+
+Every ordered list in the dashboard is reordered by dragging now, with a keyboard path that is
+equally complete, and the server still computes positions from the rows it holds. The pair of
+arrow buttons is deleted.
+
+```
+  src/common/utils/reorder.ts                          planReorder — THE arithmetic, pure
+  src/modules/dashboard/schemas/reorder.ts             { id, afterId } — one wire shape, four actions
+  src/modules/dashboard/components/SortableList.tsx    THE control, mounted five places
+  src/common/components/ds/Table.tsx                   `renderRows` — a pluggable row ELEMENT
+```
+
+### The dependency, and the ban it reverses
+
+**`@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/utilities` 3.2.2.** The Bans
+section below says "No new dependency for something `common/` or the design system already
+does; check first, and say what you checked." This is what was checked, and it is a
+**deliberate, requested reversal** rather than an oversight:
+
+- What `common/` and the design system provide for this job is the arrow control, `RowReorder`,
+  which this prompt deletes. Neither tier has a sortable list, a keyboard drag protocol, drag
+  announcements or auto-scroll, and there is nothing to reuse from prompt 10's uploader — that
+  drop zone is a file target, not a sortable list.
+- The PLATFORM has no drag primitive that works from a keyboard at all. HTML5 drag-and-drop is
+  pointer-only; the keyboard path has to be built either way, and building the pointer half by
+  hand as well (measurement, collision detection, auto-scroll, the live region) is the library's
+  entire content.
+- **Compatibility was checked against the INSTALLED packages, not a changelog.** All three
+  declare `react: >=16.8.0` (and `react-dom: >=16.8.0`), so React `19.2.8` needs no override and
+  none was taken — `npm ls` resolves them deduped against the app's own React with no peer
+  warning. The only `react-dom` API `@dnd-kit/core` imports is `createPortal` +
+  `unstable_batchedUpdates`, and both are still exported by `react-dom` 19.2.8 (verified by
+  requiring it). Its accessibility markup returns `null` until mounted, so it is SSR-safe under
+  Next 16.3 / Cache Components; `npm run build` is clean.
+
+**Pass `id` to every `DndContext`.** dnd-kit derives the draggable's `aria-describedby` from it,
+and with no `id` it falls back to a MODULE-LEVEL counter (`useUniqueId` in
+`@dnd-kit/utilities`) — which counts differently on a server that has rendered other requests
+than in a browser that just started, i.e. a hydration mismatch on every server-rendered list.
+Every mount here passes one (`project-order`, `design-work-order`, `media-order`,
+`taxonomy-<subject>-<axis>`, `gallery-<field>`), and it doubles as what keeps five drag contexts
+on one page apart.
+
+### The wire shape: `{ id, afterId }`, not an index and not an ordering
+
+_(Open decision, resolved as recommended.)_ `moveProjectAction` took `{ id, direction }` and a
+drag from position 3 to position 17 has no direction, so the shape had to change. **The rule
+AGENTS.md recorded for the arrows is unchanged and is the reason this shape and not another:**
+
+- **The SERVER computes the positions.** The client says which record moved and which record it
+  now FOLLOWS (`afterId`, `null` = first). Everything else — what number each row gets, which
+  rows have to be rewritten — is worked out from the rows the database currently holds.
+- **The client never posts an ordering.** Seventy-six ids assembled from a page loaded five
+  minutes ago silently revert every change anyone else made in between, and carry seventy-six
+  numbers to re-validate. `strictObject` refuses a payload carrying one, and a test asserts it.
+- **A relative anchor beats an absolute index under a concurrent edit.** `{ id, toIndex: 17 }`
+  means a different position the moment somebody deletes a row above the target in another tab,
+  and lands the move one place off with nothing reporting it. An anchor names a RECORD, so it
+  means the same thing whatever happened above it — and when the anchor itself is gone, that is
+  **detectable**, which an index is not.
+- **A stale request is a no-op, not a failure.** Unknown id, anchor since deleted, or a drop
+  back where the row already was: `planReorder` answers `null`, the action answers
+  `{ ok: true }` and purges nothing, and the client refreshes onto the truth — the same answer
+  `moveProjectAction` has always given a no-op. Verified end to end: with a term deleted in a
+  second session, the stale page's drop posted, was answered without a crash or an error
+  message, and refreshed to the real list.
+
+`planReorder` in `common/utils/reorder.ts` is the whole arithmetic, pure and unit-tested, and it
+is now the ONLY copy of it — the four services had four near-identical loops. **It still
+renumbers by index rather than swapping**, for the reason `moveProject` always gave: a swap is a
+silent no-op the moment two rows share a `sortOrder`, and every taxonomy term starts at the
+column default of 0, so ties are the normal state of a freshly seeded axis. Renumbering repairs
+them as a side effect.
+
+**Every renumbered row's instance tag is purged, not just the moved one's.** A drag from 3 to 17
+rewrites fourteen rows in between and a cached read of any of them now describes a row that
+changed. The services return `{ moved, changed }` for exactly that.
+
+### The keyboard path shipped in the same commit as the drag
+
+`RowReorder`'s header was right that a drag handle alone is an accessibility problem, and it
+named the parallel keyboard implementation as the fix. That is `KeyboardSensor` +
+`sortableKeyboardCoordinates`, and it is not a follow-up:
+
+- The handle is a real focusable button. Tab to it, **space** picks the row up, **arrow keys**
+  move it, **space** drops it, **escape** cancels. Verified in a browser: a project moved three
+  positions and persisted through a reload with no pointer involved, and escape left the order
+  untouched.
+- `announcements` and `screenReaderInstructions` are written HERE, once, so five surfaces cannot
+  drift. Every step lands in dnd-kit's live region: "Picked up X. It is at position 1 of 76…",
+  "X would move to position 4 of 76.", "X dropped at position 4 of 76. Saving the new order.",
+  "Reordering cancelled. X is back at position 1." The over-announcement is suppressed while the
+  row is over ITSELF, which is the state a keyboard pick-up starts in — otherwise it reads the
+  position back over the top of the instructions.
+- **This was verified by reading the live region's text in a real browser at each step, NOT with
+  a screen reader** — none was available in this environment. The wiring and the wording are
+  confirmed; how a given screen reader voices them is not.
+- **`PointerSensor` carries an activation constraint of 8px.** Without it the sensor claims the
+  gesture on `pointerdown` and swallows the click on the row's Edit link and Delete button — the
+  two most common actions on a row — and the table reads as broken. Verified: both still work.
+- **The handle names the ROW** ("Reorder Qeytarieh 08 Residence"), the rule the arrows already
+  followed. It reaches its row through a React context rather than props, which is what lets it
+  sit exactly where the arrows sat — in the row's own actions cell — instead of forcing every
+  table to grow a handle column.
+
+### Optimistic, and honest
+
+The row moves on drop, because a row that visibly snaps back for half a second before landing
+reads as a bug. **The optimistic order applies exactly while the write is in flight** — that one
+rule replaces a reconciliation step: `useTransition`'s `isPending` stays true until the action
+has answered AND the `router.refresh()` behind it has re-rendered the list (the same property
+`RowReorder` used it for), so the override is never dropped before the truth has arrived. The
+instant it clears, the server's answer is the only thing on screen. On failure the row goes back
+on its own and `ResultRegion` says why, branching on status and never on message text. Verified
+by clearing the session cookie mid-page: 401, the row back in place, the sentence shown, and a
+fresh session confirming nothing was written.
+
+### Seventy-six rows
+
+- **`autoScroll` is configured, not defaulted.** Verified: holding a drag against the bottom of
+  the viewport scrolled the window from 0 to ~3100px, so a target that was off-screen when the
+  drag started is reachable — the third objection the arrows recorded.
+- **`canScroll` is the load-bearing option.** `ds/Table` wraps itself in an `overflow-x-auto`
+  element, and CSS makes such a box scrollable on BOTH axes, so without a predicate the scroller
+  aims at a container with no vertical overflow and the window never moves.
+- **One drag context per list**, never per row.
+- **Reordering stays DISABLED while a column sort is active**, with the reason SHOWN rather than
+  left in a tooltip — the rule prompt 6 already applied to the arrows, carried forward for the
+  same reason: "this row now follows that one" in `sort_order` is a position a title-sorted table
+  does not display. Verified: all 76 handles disabled and the sentence visible.
+- **The filtered view works because the anchor is relative.** The rows the drag sees are the rows
+  ON SCREEN, so dropping between two visible rows posts the visible predecessor — and the row
+  lands after that record in the full order, which is after everything visible above it and
+  before everything visible below. An index could not express that. Verified on a 12-row filter.
+
+### `ds/Table` grew a `renderRows` slot, and why it had to
+
+A sortable row needs its `<tr>` to carry a drag ref and a transform, so the `<tr>` must be
+rendered by a Client Component — while the CELLS stay server-rendered. `renderRows` hands the
+caller every row already reduced to `{ row, key, className, cells }`; without it the only
+alternative is a second copy of the cell markup outside the design system, which is how one
+table ends up with a different padding from the rest. The empty state is deliberately not routed
+through it: an empty list has no rows to render and no order to change.
+
+**A dev-only artefact found while measuring, and fixed as far as it goes.** Handing 76 rows'
+cells to a Client Component as an array of elements made React's Flight payload outline each
+CELL separately, and `next dev` staged each streamed segment in a hidden `<table>` left behind in
+the DOM — 371 of them on `/dashboard/projects`, about a fifth of the document. Wrapping each
+row's cells in one fragment took it to 53. **The production build emits zero**, measured against
+`next start` rather than assumed, so this is a `next dev` streaming artefact and not a shipped
+defect — but the fragment is kept, because fewer outlined models is the right shape either way.
+
+### Everywhere it applies
+
+ONE component, `SortableList`, exported from `@/modules/dashboard` and mounted five times:
+projects, design works, media, the taxonomy terms (one context per AXIS — the table holds every
+axis of every subject, so a term dragged across an axis boundary would be moved against options
+it never appears beside) and a record's image gallery. Five copies would be five places to fix
+the announcement wording, the keyboard protocol or the activation constraint, and four of them
+would be missed.
+
+**The gallery is the one that commits differently, and that difference is a parameter rather than
+a second component.** `commit.to === 'form'` calls `useFieldArray`'s `move` and posts NOTHING: a
+gallery's order is a field of the record being edited, so it moves with the rest of the unsaved
+values and is written by the same save — reordering and then cancelling leaves the stored order
+alone. `commit.to === 'server'` posts `{ id, afterId }` and refreshes the router. Verified: three
+gallery rows reordered from the keyboard alone, with no request made.
+
+`RowReorder.tsx` and its barrel export are deleted, and `grep -rn "RowReorder" src/` returns
+nothing — including the prose, which now names the arrow control rather than a symbol that no
+longer exists, so that grep stays a real check. `GalleryField`'s local arrows are gone with it.
+
+### The three open decisions, resolved
+
+- **The wire shape is `{ id, afterId }` with `null` for first.** Taken as recommended, for the
+  concurrent-edit reason above.
+- **A drop writes IMMEDIATELY; there is no explicit save.** Taken as recommended. Every other
+  write in this dashboard is immediate, and an explicit save here would be the only unsaved state
+  in the tool — a person who reorders and navigates away would silently lose it. The gallery is
+  not an exception to this: its order is part of a form that already has a save button.
+- **A HANDLE, not a whole-row drag.** Taken as recommended. The row contains a link and two
+  buttons, and a fully draggable row fights all three — the activation constraint alone would not
+  save it, because a drag started anywhere in the row would still contend with text selection in
+  the title cell.
+
+### One incidental fix, stated rather than smuggled
+
+The three dashboard action test files named their `revalidateTag` mock spy `revalidateTag`, which
+made `grep -rn "revalidateTag([^,)]*)" src` match three passthrough definitions — the false
+positive prompt 7's audit had to explain in prose. The spy is renamed `revalidateTagSpy`; the
+mock still forwards the real name, the assertion still proves no action calls it, and that grep
+now returns NOTHING, so a real hit would stand out instead of hiding among known noise.
+
 ## Deviations from the architecture playbook
 
 Each is deliberate. Re-enable conditions are stated so the next agent does not "fix" them.
@@ -2089,6 +2287,12 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
 - No new dependency for something `common/` or the design system already does; check
   first, and say what you checked. Prompt 10 added image uploads with none: the byte sniff,
   the dimension read, the drop zone and the progress bar are all platform APIs.
+  **Prompt 11 is the one deliberate exception on record** — `@dnd-kit/*`, added at the request
+  of the person who uses the tool, after checking that what `common/` and the design system
+  provided was the arrow control it replaces and that the platform has no keyboard-capable drag
+  primitive at all. See "Drag-and-drop reordering (prompt 11)" for what was checked and against
+  which installed versions. The rule is not repealed: the next dependency needs the same
+  argument made in the same detail.
 - **Never add a key to a stored JSON object without making the read schema tolerate its
   ABSENCE.** Every row already in the database predates it, `jsonArray` degrades an
   item-schema failure to `[]` on purpose, and the result is a section of a page silently
