@@ -138,20 +138,21 @@ Non-negotiables, all machine-checkable:
 - Types are derived with `z.infer`. Read schemas tolerant at the leaves, strict at the
   shape; write schemas exact (`z.strictObject`).
 
-### The seven tables
+### The eight tables
 
 Defined in `src/common/services/schema.ts`; migrations are **generated and committed** to
 `drizzle/`. `drizzle-kit push` is not the deploy path and must not become one.
 
-| Table              | Rows | Holds                                                        |
-| ------------------ | ---- | ------------------------------------------------------------ |
-| `projects`         | 76   | the archive, 2013–2025                                       |
-| `design_works`     | 9    | objects, marks and details                                   |
-| `media`            | 14   | publications, awards, lectures, exhibitions                  |
-| `studio`           | 1    | the editorial block — singleton, `id` pinned to 1 by a CHECK |
-| `contact`          | 1    | the editable CONTENT of the contact page — same pinning      |
-| `contact_messages` | —    | the INBOX: submissions from the public form                  |
-| `taxonomy_terms`   | 29   | every closed axis, for every subject — prompt 9              |
+| Table              | Rows | Holds                                                           |
+| ------------------ | ---- | --------------------------------------------------------------- |
+| `projects`         | 76   | the archive, 2013–2025                                          |
+| `design_works`     | 9    | objects, marks and details                                      |
+| `media`            | 14   | publications, awards, lectures, exhibitions                     |
+| `studio`           | 1    | the editorial block — singleton, `id` pinned to 1 by a CHECK    |
+| `contact`          | 1    | the editable CONTENT of the contact page — same pinning         |
+| `contact_messages` | —    | the INBOX: submissions from the public form                     |
+| `taxonomy_terms`   | 29   | every closed axis, for every subject — prompt 9                 |
+| `index_cards`      | 5    | the words and the picture on each front-page column — prompt 13 |
 
 `contact` and `contact_messages` are two different things that share a word, and both
 exist deliberately: one is page content an editor changes, the other is mail a stranger
@@ -204,11 +205,15 @@ stays stale until the next deploy.
 | `media:<slug>`       | `getMediaEntry`                                        |
 | `studio`             | `getStudio`                                            |
 | `contact`            | `getContact`                                           |
+| `index-cards`        | `listIndexCards`                                       |
 | `contact-messages`   | **nothing** — reserved, see below                      |
 | `taxonomy-terms`     | `getPublicTerms`, and every rail read that composes it |
 
 Singletons have no instance tag: there is one record, so the collection tag already
-identifies it, and a second name is a second thing to forget to purge.
+identifies it, and a second name is a second thing to forget to purge. **`index-cards` has
+none for the adjacent reason**: there are five rows but they are only ever read as a set,
+by one function, for one page — a per-section tag would be five names to purge for a save
+that always invalidates the same thing.
 
 **`contact_messages` reads are never cached.** The dashboard inbox must be dynamic — a
 cached list shows "no new messages" while a message sits in the database, and the person
@@ -2428,6 +2433,270 @@ viewport gets a layout jump when the content lands, which is exactly what a shap
 skeleton exists to prevent (`references/10-routing-and-app-shell.md`, the `loading.tsx`
 invariant). Both files were out of this prompt's scope and neither blocked it. The fix is a
 media query on the skeleton's rail, or the skeleton rendering the bar's box below 900px.
+
+## Index cards and the return bug (prompt 13)
+
+Three things: the five columns stopped responding after a round trip to a section and back,
+only the title text was clickable, and the words on those columns were not editable by
+anybody. The first is a state-cleanup fix in the shell, the second is one CSS rule, and the
+third is a new table and a new dashboard area.
+
+```
+  src/common/lib/motion/shell.ts                  destroy() reverses what runOpen wrote
+  src/common/lib/motion/__tests__/shell.test.ts   THE new test — 8 cases pinning that
+  src/common/components/layout/Stage.tsx          who owns `is-open`, written down
+  src/common/styles/route.css                     the stretched link + the column photo rules
+  src/common/services/schema.ts                   index_cards
+  drizzle/0003_bitter_black_bolt.sql              the table + its five rows
+  src/common/schemas/index-card.ts                read / locale / write contracts
+  src/common/services/index-card-repository.ts    the parse, and the UPSERT
+  src/common/services/index-card-service.ts       'use cache' + the degradation
+  src/modules/dashboard/{schemas,actions,components}/index-card*   the editor
+  src/app/(dashboard)/dashboard/(shell)/index-cards/               two routes
+```
+
+### 4.1 — the diagnosis: React never unmounts the columns
+
+**Reproduction, from a fresh document:** load `/en`, click the PROJECTS column, wait for the
+transition, click the KAVAN wordmark. `/en` renders and four of the five columns are dead —
+no hover, no artwork under the pointer, no click. A reload fixes it until the next trip.
+
+What the DOM said in the broken state, measured over CDP before anything was changed:
+
+| Checked                     | Found                                               |
+| --------------------------- | --------------------------------------------------- |
+| `#stage`'s class list       | `"stage"` — **correct**, `is-open` had been removed |
+| any `.col` with `is-active` | yes — `projects`                                    |
+| any `.col` with `inert`     | yes — `design`, `media`, `studio`, `contact`        |
+| a console error from `:349` | none; the console was clean                         |
+| a second `#cols` or shell   | no. One `#stage`, one `#cols`, one `#wipe`          |
+
+**The cause is candidate (c), with its premise corrected.** `destroy()` released listeners
+and the observer and reversed none of the state `runOpen` wrote. The prompt's (c) assumed
+the surviving writes were only the ones on layout-owned elements, "which survive the
+navigation the columns do not". The columns do not go anywhere either:
+
+> **The App Router keeps a visited segment MOUNTED AND HIDDEN, not unmounted.** On
+> `/en/projects` the stage still contains `NAV.cols#cols`, carrying the inline attribute
+> `style="display: none !important;"` — React's Activity hide. A hard load of the same URL
+> has no `#cols` at all. An expando stamped on the five `.col` elements before the
+> navigation is still on them afterwards: they are the same nodes throughout.
+
+So `inert` (`shell.ts:415`) and `is-active` (`:411`) came back with them, and an `inert`
+element receives no pointer event, no hover and no focus. The one column that still worked
+in every run was the one that had been opened — the only one never marked `inert`.
+
+**This is not a router bug, and the §5 stop-condition does not apply.** Preserving the
+outgoing segment is what makes Back instant, and it is not specific to the shell: navigating
+`/en/projects` → a project detail page, a plain `next/link` with no shell involved, leaves
+two `.route#main` elements in `#stage` the same way. Effects _do_ tear down and re-run
+(window `keydown` add/remove counts stay balanced across a round trip), so `destroy()` runs
+and `createShell` runs again — over the same, still-dirty, DOM.
+
+The other three candidates, for the record: **(a)** is a real hazard but not this failure —
+`Stage`'s className prop genuinely changed, so React rewrote it. **(b)** is reachable but
+was not the mechanism: an `inert` column dispatches no click at all. **(d)** is not the
+case — the rebuilt shell binds to the right elements; they were simply dirty.
+
+### The three properties, and how each is now guaranteed
+
+- **ONE owner per class.** `Stage` owns the durable `is-open` and renders it from the
+  pathname; `shell.ts` may only ANTICIPATE it inside the FLIP's layout mutation, for the
+  navigation its own `onChange` is about to cause. `destroy()` therefore deliberately does
+  **not** remove it, and a test asserts that it does not. Taken this way round rather than
+  the literal "if it stays imperative, `Stage` must not render it", because both halves are
+  forced: the FLIP cannot work without the class flipping a second before the route commits,
+  and the class cannot leave the server HTML without every deep link to a section route
+  painting the index layout for a frame. Removing it in cleanup is what would break it —
+  React does not rewrite a `className` prop that has not changed, so the section route would
+  lose its chrome with nothing able to put it back. The rule is stated in `Stage.tsx`'s
+  header and in `resetColumnState`'s.
+- **`destroy()` leaves the document as a fresh load would.** `resetColumnState()` removes
+  `is-active`, `is-hover`, `is-focus` and `inert` from every column, clears the inline
+  `background` `setRule` painted on the rules, clears the wipe's parked inline transform and
+  opacity, cancels the `fill: 'forwards'` mark animations this shell started on the masthead
+  and clears the inline opacity it set on the active dot, and resets `openId`. Five of the
+  eight cases in `shell.test.ts` are that list.
+- **A click either navigates or does not `preventDefault`.** The handler now looks the id up
+  in `byId` BEFORE preventing anything, so a `[data-open]` this shell cannot open is left to
+  its own anchor. And `runOpen` records the navigation it owes in `pendingNav`; if anything
+  throws before `onChange` fires, `pump`'s catch honours it rather than leaving a prevented
+  click that goes nowhere.
+
+Verified in a browser: five wordmark round trips per locale, one per section, checking after
+each that no column is `inert`, none is `is-active`, `#stage` is clean and every _other_
+column is hoverable again — 100 assertions, all passing. Then the browser's Back button,
+section-to-section-to-index, and opening a column with Enter from the keyboard. Console
+clean throughout.
+
+### 4.2 — the whole column is the link, and the anchor did not move
+
+`.col__hit::after` is a stretched link covering its column. The anchor stays exactly where
+it is inside the `<h2>`, so all four things that address `.col__hit` by name keep working
+untouched: the per-glyph FLIP reads `.col__title .ch`, `setTitles` rewrites `.col__hit`, the
+click delegation matches `[data-open]`, and the cursor's magnet selector lists `.col__hit`.
+The accessible name, the tab order and the focus ring are the anchor's own and are
+unchanged, and with scripting off the whole column still navigates, because the overlay IS
+the anchor.
+
+**The prompt's spelling for it does not work, and the reason is worth keeping.** `position:
+absolute; inset: 0` resolves against the nearest POSITIONED ancestor, and that is
+`.col__title` (`shell.css:166`), not `.col` — so `inset: 0` reproduces the title's own box.
+Every one of `.col`'s children is absolutely positioned, so no descendant pseudo-element
+resolves against the column at all. Two workarounds were rejected with measurements:
+
+- **Over-covering with big negative insets** makes column 5's overlay claim every click in
+  the row, because the columns are siblings with no clipping between them.
+- **Clipping `.col`** to contain that would cut real copy: the captions genuinely overflow
+  their columns between about 860px and 1000px — a 190px caption in a 164px column at 900px,
+  measured — and `overflow: hidden` there is a visible regression.
+
+So the box is SIZED from the column with container units instead: `.col` is
+`container-type: size`, the overlay is `100cqw × 100cqh`, and the offset back to the
+column's edges is `calc(50% - 50cq*)` — the percentage half is half the title (the
+containing block), the container half is half the column, and the title is centred in the
+column, so the difference is exactly the gap. `container-type: size` applies size, layout
+and style containment but **not paint**, so nothing is clipped, and `.col`'s own size never
+came from its contents anyway. It is written with logical properties and needs no
+`[dir="rtl"]` rule.
+
+**No z-index, deliberately.** The overlay inherits `.col__title`'s stacking context
+(`--z-title`), which already sits above `.col__art` (`--z-art`) and below `.col__caption` —
+a later sibling at the same level. The band the prompt asked for comes from the cascade, so
+this adds no z-index literal and no new token. Two consequences, both verified with
+`elementFromPoint` and both deliberate:
+
+- The **caption** paints over the overlay and stays selectable, which is the prompt's own
+  check that the layer is right. It is therefore not itself a link target — the standard
+  trade of a stretched link. Making it one (`pointer-events: none`) would make selecting it
+  impossible, which is the failure being avoided.
+- The **numeral** is under the overlay, so a tap on `01` opens the section. It is
+  transparent, so the numeral looks no different. The prompt asked for both "the numeral
+  paints over it" and "a click on the numeral opens that section"; those conflict, and this
+  takes the second.
+
+While a section is opening, `.col__title` moves to the column's top-left and stops being
+centred, so the arithmetic stops describing the column. `.stage.is-open .col__hit::after`
+is `display: none` rather than left somewhere slightly wrong.
+
+Verified: a click on the artwork, the numeral, the title and the far bottom corner of four
+different columns opens the right section, at 1440px and 375px, in both locales — sixteen
+navigations. Five tab stops, all `tabIndex 0`, names unchanged (`Projects`… `Contact`), the
+focus ring still on the title's own box. `hoverIn` was never at risk: it delegates from
+`colsWrap` via `closest('.col')` and already fired from anywhere in the column.
+
+### 4.3 — `index_cards`, and the bounded reversal of a recorded decision
+
+`src/common/constants/site.ts` says the wordmark and the five section ids are chrome and are
+not editable, because a dashboard save could otherwise delete a route. **That reasoning is
+correct, stands, and is the reason the reversal is bounded exactly where it is:**
+
+| Editable, in `index_cards`             | NOT editable, still constants in `site.ts` |
+| -------------------------------------- | ------------------------------------------ |
+| `title_en` / `title_fa`                | `id` — `.col[data-id]`, the shell's lookup |
+| `caption_en` / `caption_fa`            | `path` — the route tree                    |
+| `cover_image` + `cover_alt_en` / `_fa` | `art` and `seed` — the generated drawing   |
+
+Nothing on the left is referenced by anything but a renderer, so the worst a bad save can do
+is show the wrong words on the front page. `section_id` is the PRIMARY KEY and is one of the
+five NAV ids, so the table cannot grow a sixth meaningful row and deleting one deletes
+content, never a route.
+
+**`labelKey` and `captionKey` stay, and are the FALLBACK now rather than dead copy.** The
+five `nav.*` and `cap.*` entries in `en.json` and `fa.json` are unchanged and must not be
+deleted — removing them breaks the degradation below. No public copy changed in this prompt.
+
+**It degrades, it does not throw.** `listIndexCards(locale)` walks NAV rather than the
+table, so it always returns exactly five cards in column order: a section with no row gets
+`emptyIndexCard`, a row for an id NAV does not list is ignored, and an empty column stays
+empty and is filled in by `ColumnShell` from `nav.<id>` / `cap.<id>`. That is the same shape
+as prompt 9's rails — the table is the canon, and the message catalog is the floor nothing
+falls through — and it is what let this ship before the editor was ever opened. The five
+rows the migration seeds are a convenience for the editor, never a requirement.
+
+**The migration seeds its own rows.** `drizzle/0003_*.sql` is the generated `CREATE TABLE`
+with five hand-written `INSERT OR IGNORE`s appended. There is no seed script, because
+`section_id` comes from a constant rather than from content anybody authored — there is
+nothing for a script to read and no second source to drift against.
+
+**The repository UPSERTS where the other singletons UPDATE.** `updateStudioAction` answers
+404 when its row is missing, correctly: a studio row is content nobody could reconstruct. A
+missing index card is not — the column has been rendering from the catalog all along — so a
+save writes the row, and an editor on a database migrated before the table existed never
+meets a refusal they cannot act on. There is no create and no delete.
+
+**The render.** `(site)/page.tsx` reads the service and passes `cards` into `ColumnShell` as
+a prop; the component does not import the service, because `app/` is composition and the
+page already owns the locale. The photograph goes INSIDE `.col__art` — `position: absolute;
+inset: 0; overflow: hidden` — so `shell.css`'s vignette and hover scale apply over it
+unchanged, with two rules in `route.css` mirroring `.col__art > svg`'s resting `scale(1.06)`
+and its relaxation under the pointer. `data-art` and `data-seed` stay on the host in BOTH
+branches, photographed included, because they are `ensureArt`'s fallback contract and
+dropping them makes that path unreachable. `sizes` is `(max-width: 860px) 100vw, 20vw`,
+derived from `.col { flex: 1 1 20% }` and the 860px stack rather than guessed.
+
+**The dashboard.** `/dashboard/index-cards` lists the five and marks which are still showing
+the site's own wording; `/dashboard/index-cards/[section]` edits one. The route refuses a
+segment that is not a NAV id with `notFound()`, and `indexCardSubmissionSchema` refuses it
+again — `isNavSectionId` is the single place that question is answered, because an action is
+a public endpoint that never passes through a route. `IndexCardForm` is `RecordForm` +
+`LocaleFieldPair` + `ImageUploadField`, exactly as `ProjectForm` is, and the alt rule is
+`requireAltWithImage` IMPORTED from `schemas/image.ts` on both the form and the submission
+side, not restated.
+
+**The Persian half does NOT fall back to English here, and it is the only editor where that
+is right.** `withPersianFallback` exists because a blank Persian page is worse than an
+untranslated one. There is no blank to avoid on these five: an empty Persian title renders
+`nav.<id>`, which is real authored Persian. Copying the English word in would replace good
+Persian with English _and_ populate the column, so nothing afterwards could tell the
+translation was never done. The alt text is not copied either, for the reason `image.ts`
+already gives — that one is about being heard, and applies everywhere.
+
+### The decisions
+
+- **5.1 — a column with no picture KEEPS its drawing.** Taken as recommended, and
+  deliberately the opposite of what prompt 14 does for records: these five are chrome rather
+  than records, the seed is a constant rather than a slug, and five empty frames is an empty
+  front page. It is one branch in `ColumnShell` if that is ever reversed.
+- **5.2 — the new area is FIRST, above Projects.** Taken as recommended. The navigation
+  reads top to bottom as "what is this site made of", and the answer starts with the page
+  every visitor sees before any of the others.
+- **5.3 — title required, caption optional, both falling back to the catalog.** Taken as
+  recommended. The requirement is about the editor, not the renderer — the front page cannot
+  break either way. **The cost, stated rather than left to be discovered: a title cannot be
+  cleared back to the catalog once it is saved**, so the `nav.<id>` fallback is reachable
+  only for a card nobody has edited. Dropping `.min(1)` from `requiredTitle` is the whole
+  reversal. Prompt 14's change to what "required" means for the Persian half is likewise one
+  line — `persianField` in `schemas/index-card-form.ts`, named for exactly that.
+- **No copy on the public site changed.** The five nav labels and captions stay byte-identical
+  in both catalogs, because they are the fallback now.
+
+### Verified in a browser, and what could not be
+
+Signed in, edited one card's title and caption in both languages, and confirmed `/en` and
+`/fa` showed the new text with no rebuild; uploaded a picture and confirmed it renders in
+that column with the vignette over it and the `scale(1.06)` intact, at 1440px and 375px in
+both locales, with the other four still drawing; cleared it and confirmed the column returns
+to its drawing. An unknown section id answers a real 404.
+
+**Two things could not be verified as the prompt described them, both pre-existing:**
+
+- **"the refusal lands on the Persian field rather than at the top of the form" — half.** It
+  does once that field has been touched: `aria-invalid="true"` with the sentence from
+  `requireAltWithImage` under it. But in the state right after an upload, `FormButton` gates
+  on `isValid` and disables Save while `mode: 'onChange'` has only surfaced an error for the
+  field that changed — so the editor sees a **disabled Save with no message**. The server
+  side is correct and is pinned by a unit test (422 with `body.coverAltFa`); it is simply
+  unreachable through the form. **Reproduced identically on `ProjectForm`, so this is
+  pre-existing `RecordForm`/`FormButton` behaviour shared by all five prompt-10 editors**,
+  not something this prompt introduced, and `RecordForm` is shared by the areas this prompt
+  puts out of scope. Owed, not fixed here: surface the whole error set on the fields when the
+  submit is gated, or explain the gate beside the button.
+- **A duplicate-key React warning on `/en/contact` and `/fa/contact`.**
+  `ContactScreen.tsx:126` keys the socials list on `social.handle`, and the seeded row has
+  `@kavanstudio` twice (Instagram, Telegram) and `kavan-studio` twice (LinkedIn, Divisare).
+  Pre-existing, untouched by this branch, and out of scope — noted because it is the only
+  console output on the public site.
 
 ## Deviations from the architecture playbook
 
