@@ -1,6 +1,8 @@
 // src/modules/dashboard/lib/areas.ts
 /**
- * The six content areas the dashboard manages, in the order they appear in the navigation.
+ * The seven content areas the dashboard manages, in the order they appear in the navigation.
+ *
+ * Prompt 13 added `index-cards` at the top — see the entry itself for why it goes there.
  *
  * ─── FIVE OF THEM ARE DELIBERATELY DISABLED ───────────────────────────────────────
  * Prompt 6 builds the projects CRUD; prompt 7 repeats the pattern for the other five. Until
@@ -35,6 +37,20 @@ export interface DashboardArea {
 }
 
 export const DASHBOARD_AREAS = [
+  /**
+   * FIRST, ABOVE PROJECTS — taken as recommended (AGENTS.md), and the order is the reason.
+   * This list is read top to bottom as "what is this site made of", and the answer starts
+   * with the page every visitor sees before any of the others. It is also the smallest area
+   * by far, so putting it first costs the areas below it nothing.
+   */
+  {
+    segment: 'index-cards',
+    label: 'Index cards',
+    table: 'index_cards',
+    summary:
+      'The five columns of the front page: what each one says, in both languages, and the picture behind it.',
+    available: true,
+  },
   {
     segment: 'projects',
     label: 'Projects',

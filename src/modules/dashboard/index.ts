@@ -103,6 +103,19 @@ export {
  */
 export { TaxonomyEditor, type TaxonomyEditorProps } from './components/TaxonomyEditor';
 
+/* ── Index cards (prompt 13) ───────────────────────────────────────────────────── */
+/**
+ * The five columns of the front page. A singleton editor five times over, on the pattern
+ * `StudioForm` and `ContactForm` established: no list table, no create, no delete — the
+ * five rows are the schema's and their identity is `NAV`.
+ */
+export {
+  IndexCardListScreen,
+  type IndexCardListRow,
+  type IndexCardListScreenProps,
+} from './components/IndexCardListScreen';
+export { IndexCardForm, type IndexCardFormProps } from './components/IndexCardForm';
+
 /* ── Projects ──────────────────────────────────────────────────────────────────── */
 export { ProjectListScreen, type ProjectListScreenProps } from './components/ProjectListScreen';
 export { ProjectForm, type ProjectFormProps } from './components/ProjectForm';
@@ -170,6 +183,7 @@ export {
   setTaxonomyTermVisibilityAction,
   updateTaxonomyTermAction,
 } from './actions/taxonomy-actions';
+export { updateIndexCardAction } from './actions/index-card-actions';
 export { updateStudioAction } from './actions/studio-actions';
 export { updateContactAction } from './actions/contact-actions';
 export {
