@@ -3,19 +3,22 @@
  * The contact page: where the studio is, and the one form on the public site.
  *
  * Ported from `legacy/js/ui/panel.js:447` — the tall band, the three-column detail grid,
- * and the drawn site plan. A Server Component; the only client JavaScript below it is the
- * form's own leaf.
+ * and the site-plan slot beside the address. A Server Component; the only client JavaScript
+ * below it is the form's own leaf.
  *
- * ─── THE SITE PLAN, AND THE OPEN DECISION IT SETTLES ──────────────────────────────
- * There is no embedded map and there never was. `legacy/js/ui/panel.js:508` draws
- * `court` at the FIXED seed `kavan-dezashib-site` and puts a pin over it — a picture of a
- * courtyard, captioned with the coordinates, rather than a third-party map with a
- * third-party script, a consent question and a tile bill. Both halves of that are kept:
- * the generator is `court` (not `contour`, which the brief guessed at), and the seed is a
- * FIXED STRING, not the coordinates and not the address. That is the open decision
- * resolved, and the legacy source resolves it the same way the reasoning does: seeding
- * from the address would silently redraw the plan the first time an editor fixes a typo in
- * it, and the drawing is not a depiction of the address in the first place.
+ * ─── ~~THE DRAWN SITE PLAN~~ TWO PHOTOGRAPH SLOTS SINCE PROMPT 14 ────────────────
+ * Both pictures on this page were generated from CONSTANTS: an `elevation` at
+ * `kavan-dezashib-street` across the top, and a `court` at `kavan-dezashib-site` beside the
+ * address with a pin over it. Neither was ever a fact about this studio — that was the
+ * point of the fixed seeds, and prompt 5's decision that seeding from the address would
+ * "silently redraw the plan the first time an editor fixes a typo in it" was correct for
+ * as long as the alternative was another generated picture.
+ *
+ * Prompt 14 gave the record a cover and a gallery, so the alternative is now a real
+ * photograph and both slots take one — the cover on the band, the gallery's first image on
+ * the plan. With neither uploaded the boxes are empty. THERE IS STILL NO EMBEDDED MAP and
+ * that half of the decision is unchanged and unrelated: no third-party script, no consent
+ * question, no tile bill. The coordinates are still the caption.
  *
  * ─── LATIN RUNS ARE ISOLATED ──────────────────────────────────────────────────────
  * Phone, both email addresses, every social handle and the coordinate pair go through
@@ -30,15 +33,26 @@
  * a link that goes nowhere for a link that may go somewhere wrong. When the dashboard
  * grows a URL column, these become anchors.
  */
+import Image from 'next/image';
+import { GalleryBand } from '@/common/components/collection';
 import { Lat } from '@/common/components/layout';
-import { draw } from '@/common/lib/art';
+import { mediaUrl } from '@/common/constants/uploads';
 import type { Dictionary } from '@/common/i18n';
 import type { Contact } from '@/common/schemas/contact';
 import { ContactForm } from './ContactForm';
 
-/** `legacy/js/ui/panel.js:459` and `:508` — kind, seed and ratio, unchanged. */
-const BAND = { kind: 'elevation', seed: 'kavan-dezashib-street', ratio: 0.4 } as const;
-const PLAN = { kind: 'court', seed: 'kavan-dezashib-site', ratio: 0.62 } as const;
+/**
+ * `.band--tall` runs the full content width — `100vw` less `.stage`'s
+ * `clamp(1.25rem, 4.5vw, 5rem)` on each side, about 92vw at every width.
+ */
+const BAND_SIZES = '92vw';
+
+/**
+ * `.cmapwrap` is a two-column grid (`panel.css:745`) collapsing to one below 900px, and
+ * `.cmap` is its first column. So the plate is about half the ~92vw content region on a
+ * wide screen and the whole of it on a narrow one.
+ */
+const PLAN_SIZES = '(max-width: 900px) 92vw, 46vw';
 
 export interface ContactScreenProps {
   contact: Contact;
@@ -53,15 +67,33 @@ export interface ContactScreenProps {
 export function ContactScreen({ contact, dictionary }: ContactScreenProps) {
   const { t, num, list } = dictionary;
 
+  // The gallery's first image fills the site-plan slot; the rest become a band below it.
+  // The COVER is separate and fills the hero band at the top — see below.
+  const [planImage, ...restOfGallery] = contact.gallery;
+
   return (
     <div className="route route--solo" id="main">
       <div className="route__main">
         <div className="sheet">
+          {/*
+            THE BAND HOLDS THE RECORD'S COVER NOW, OR NOTHING (prompt 14).
+            It used to draw `elevation` at the fixed seed `kavan-dezashib-street` — seeded
+            from a CONSTANT, so it depicted no particular street and nothing an editor saved
+            could change it. The cover column this table gained is the honest occupant.
+            Empty, the band keeps its ratio, ground and hairline from `panel.css`.
+          */}
           <section className="band band--tall">
-            <div
-              className="band__art"
-              dangerouslySetInnerHTML={{ __html: draw(BAND.kind, BAND.seed, BAND.ratio) }}
-            />
+            <div className="band__art">
+              {contact.cover && (
+                <Image
+                  src={mediaUrl(contact.cover.path)}
+                  alt={contact.cover.alt}
+                  fill
+                  sizes={BAND_SIZES}
+                  className="band__photo"
+                />
+              )}
+            </div>
             <div className="band__cap">
               <span className="band__k">{contact.district}</span>
               <span className="band__v">{t('brand.name')}</span>
@@ -139,9 +171,28 @@ export function ContactScreen({ contact, dictionary }: ContactScreenProps) {
 
           <h2 className="sheet__h">{t('contact.findUs')}</h2>
           <div className="cmapwrap">
+            {/*
+              ─── THE DRAWN SITE PLAN IS GONE, AND SO IS ITS PIN (prompt 14) ───────────
+              `legacy/js/ui/panel.js:508` drew `court` at the fixed seed
+              `kavan-dezashib-site` with a pin over it: a courtyard nobody had built, seeded
+              from a constant. Prompt 14's rule for a constant-seeded band applies, so the
+              slot takes the first image of this record's gallery instead.
+
+              THE PIN GOES WITH THE DRAWING RATHER THAN SURVIVING IT. A pin marks a point on
+              a PLAN; over a photograph it would assert that the studio is at the centre of
+              whatever was photographed, which nothing in the record says. The coordinates
+              stay — they were always the caption, and they are the fact the pin stood for.
+            */}
             <div className="cmap">
-              <div dangerouslySetInnerHTML={{ __html: draw(PLAN.kind, PLAN.seed, PLAN.ratio) }} />
-              <i className="cmap__pin" />
+              {planImage && (
+                <Image
+                  src={mediaUrl(planImage.path)}
+                  alt={planImage.alt}
+                  fill
+                  sizes={PLAN_SIZES}
+                  className="cmap__photo"
+                />
+              )}
               <span className="cmap__note">
                 {`${contact.district} — `}
                 <Lat>{`${contact.lat}, ${contact.lng}`}</Lat>
@@ -153,6 +204,9 @@ export function ContactScreen({ contact, dictionary }: ContactScreenProps) {
               </div>
             </div>
           </div>
+
+          {/* Everything past the site-plan slot. Nothing until somebody uploads. */}
+          <GalleryBand images={restOfGallery} heading={t('ui.photographs')} />
 
           <h2 className="sheet__h">{t('form.write')}</h2>
           <p className="cblock__v cblock__v--sm">{t('form.intro')}</p>

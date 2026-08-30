@@ -5,16 +5,18 @@
  * A Server Component in full, filtered on the server, with `CardReveal` as its only
  * client JavaScript — the same shape as the projects and design lists.
  *
- * IT TAKES THE PROJECT LIST, and that is not incidental. Every card's drawing is seeded
- * from the building the piece is about, and `kindFor` needs that project's TYPES to
- * choose a generator (`legacy/js/ui/panel.js:264`). Resolving fourteen projects one at a
- * time would be fourteen cached reads to answer one question; the archive is one cached
- * read, and the page hands it in.
+ * ─── IT NO LONGER TAKES THE PROJECT ARCHIVE (prompt 14) ──────────────────────────
+ * It used to, and that was not incidental: every card's DRAWING was seeded from the
+ * building the piece was about, and choosing a generator needed that project's types
+ * (`legacy/js/ui/panel.js:264`), so this screen read all 76 projects to render 14 cards.
+ *
+ * Prompt 14 removed the generated fallback for records — a card shows the entry's own
+ * uploaded cover or an empty frame — so nothing here needs a seed and the second read is
+ * gone with it. The list route makes one cached call instead of two.
  */
 import { CardReveal, FacetRail, type FacetOption } from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
 import type { Media } from '@/common/schemas/media';
-import type { Project } from '@/common/schemas/project';
 import type { TermOption } from '@/common/schemas/taxonomy';
 import { MediaCard } from './MediaCard';
 
@@ -25,8 +27,6 @@ export const MEDIA_FACET = 'type';
 
 export interface MediaScreenProps {
   entries: readonly Media[];
-  /** The whole archive, for the card seeds. Missing slugs simply draw from their own. */
-  projects: readonly Project[];
   /** The kind options, from `taxonomy_terms` via `getMediaFilters()`. */
   kinds: readonly TermOption[];
   /** The selected kind, or undefined for all fourteen. */
@@ -35,17 +35,8 @@ export interface MediaScreenProps {
   dictionary: Dictionary;
 }
 
-export function MediaScreen({
-  entries,
-  projects,
-  kinds,
-  type,
-  basePath,
-  dictionary,
-}: MediaScreenProps) {
+export function MediaScreen({ entries, kinds, type, basePath, dictionary }: MediaScreenProps) {
   const { t, num, term } = dictionary;
-
-  const typesBySlug = new Map(projects.map(project => [project.slug, project.types]));
 
   // Options from the terms table, counts from these rows — see `DesignScreen` for the full
   // reasoning. The catalog group is `kind` while the column and the axis are both `type`.
@@ -72,14 +63,7 @@ export function MediaScreen({
       <div className="route__main">
         <div className="grid" id={GRID_ID}>
           {shown.map(entry => (
-            <MediaCard
-              key={entry.slug}
-              entry={entry}
-              projectTypes={
-                (entry.projectSlug ? typesBySlug.get(entry.projectSlug) : undefined) ?? []
-              }
-              dictionary={dictionary}
-            />
+            <MediaCard key={entry.slug} entry={entry} dictionary={dictionary} />
           ))}
         </div>
 

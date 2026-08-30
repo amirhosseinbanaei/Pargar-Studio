@@ -7,12 +7,12 @@
  * project carries a type and a status), and there is a `.card__note` under it holding the
  * blurb — the design panel showed the sentence on the card, the projects grid did not.
  *
- * The drawing is generated HERE, on the server, seeded by the slug and steered by the
- * single category, so the card and the detail page's first plate are the same picture.
+ * The picture is the work's uploaded cover, or an empty frame. It used to be a drawing
+ * seeded by the slug and steered by the single category; prompt 14 reversed that, and
+ * `CardPlate`'s header carries the argument. This file no longer calls the art layer.
  */
 import Link from 'next/link';
 import { CardPlate } from '@/common/components/collection';
-import { kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { DesignWork } from '@/common/schemas/design-work';
@@ -24,10 +24,6 @@ export interface DesignCardProps {
 
 export function DesignCard({ work, dictionary }: DesignCardProps) {
   const { t, num, term, locale } = dictionary;
-  // A single-element array, matching `legacy/js/ui/panel.js:204`: `kindFor` reads the
-  // types as one lowercased string, so the category steers the generator the same way a
-  // project's type list does.
-  const kind = kindFor(work.slug, [work.category]);
 
   return (
     <Link
@@ -35,7 +31,7 @@ export function DesignCard({ work, dictionary }: DesignCardProps) {
       href={localeHref(locale, `/design/${work.slug}`)}
       data-cursor={t('ui.view')}
     >
-      <CardPlate image={work.cover} kind={kind} seed={work.slug} />
+      <CardPlate image={work.cover} />
       <span className="card__body">
         <span className="card__title">{work.title}</span>
         <span className="card__year">{num(work.year)}</span>

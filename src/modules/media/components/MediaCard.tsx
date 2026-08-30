@@ -2,12 +2,18 @@
 /**
  * One media entry in the grid.
  *
- * Ported from `legacy/js/ui/panel.js:259`, including the one thing about it that is not
- * obvious: THE PLATE SHOWS THE BUILDING, NOT THE PUBLICATION. The drawing is seeded from
- * the related project's slug and steered by that project's types, so a press cutting about
- * Qeytarieh 08 carries the same picture the project itself does. An entry with no project
- * — four of the fourteen are about the practice rather than a building — falls back to its
- * own slug, which is why the seed is computed rather than assumed.
+ * Ported from `legacy/js/ui/panel.js:259`.
+ *
+ * ─── THE SEEDED-FROM-THE-PROJECT DRAWING IS GONE (prompt 14) ──────────────────────
+ * This card used to draw a picture seeded from the RELATED project's slug and steered by
+ * that project's types, so a press cutting about Qeytarieh 08 carried the same picture the
+ * project itself did. Prompt 14 removed the generated fallback for records, so an entry
+ * shows its own uploaded cover or an empty frame.
+ *
+ * `projectTypes` therefore has no consumer here and is gone with it. The RULE it served is
+ * not lost, only its implementation: an entry with no cover of its own now shows nothing
+ * rather than borrowing the building's drawing, and an editor who wants the building's
+ * photograph on a cutting uploads it. That is a real change and is recorded in AGENTS.md.
  *
  * `outlet` is bidi-isolated with `<Lat>`: it is Latin in some records and Persian in
  * others (`legacy/data/works.fa.js:283` keeps "ArchDaily"), and an un-isolated Latin run
@@ -16,22 +22,17 @@
 import Link from 'next/link';
 import { CardPlate } from '@/common/components/collection';
 import { Lat } from '@/common/components/layout';
-import { kindFor } from '@/common/lib/art';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { Media } from '@/common/schemas/media';
 
 export interface MediaCardProps {
   entry: Media;
-  /** The related project's types, or empty when the entry has no project (or it is gone). */
-  projectTypes: readonly string[];
   dictionary: Dictionary;
 }
 
-export function MediaCard({ entry, projectTypes, dictionary }: MediaCardProps) {
+export function MediaCard({ entry, dictionary }: MediaCardProps) {
   const { t, num, term, locale } = dictionary;
-  const seed = entry.projectSlug ?? entry.slug;
-  const kind = kindFor(seed, projectTypes);
 
   return (
     <Link
@@ -39,9 +40,9 @@ export function MediaCard({ entry, projectTypes, dictionary }: MediaCardProps) {
       href={localeHref(locale, `/media/${entry.slug}`)}
       data-cursor={t('ui.view')}
     >
-      {/* An entry with its own cover shows it; without one the drawing is seeded from the
-          related PROJECT, which is the rule this card exists to preserve. */}
-      <CardPlate image={entry.cover} kind={kind} seed={seed} />
+      {/* The entry's own cover, or an empty frame — since prompt 14 there is no drawing to
+          fall back to. */}
+      <CardPlate image={entry.cover} />
       <span className="card__body">
         <span className="card__title">{entry.title}</span>
         <span className="card__year">{num(entry.year)}</span>

@@ -2,10 +2,9 @@
 /**
  * The media index. Routing and composition only.
  *
- * IT READS THE PROJECT ARCHIVE TOO, and that is not a layering slip: every card's drawing
- * is seeded from the building the piece is about, and choosing a generator needs that
- * project's types. Both reads are cached services, both are independent, so they run in
- * one `Promise.all` — and the module receives records, never a service.
+ * IT USED TO READ THE PROJECT ARCHIVE TOO, to seed each card's generated drawing from the
+ * building the piece was about. Prompt 14 removed that fallback, so this route makes one
+ * cached read fewer — see `MediaScreen`'s header.
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -14,7 +13,6 @@ import { isLocale } from '@/common/i18n/routing';
 import { localeAlternates, localeHref } from '@/common/i18n/navigation';
 import { parseFacet, type RawSearchParams } from '@/common/utils/facets';
 import { getMediaFilters, listMedia } from '@/common/services/media-service';
-import { listProjects } from '@/common/services/project-service';
 import { MediaScreen, MEDIA_FACET } from '@/modules/media';
 
 type PageProps = {
@@ -37,16 +35,11 @@ export default async function MediaPage({ params, searchParams }: PageProps) {
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   if (!isLocale(locale)) notFound();
 
-  const [entries, projects, filters] = await Promise.all([
-    listMedia(locale),
-    listProjects(locale),
-    getMediaFilters(locale),
-  ]);
+  const [entries, filters] = await Promise.all([listMedia(locale), getMediaFilters(locale)]);
 
   return (
     <MediaScreen
       entries={entries}
-      projects={projects}
       kinds={filters.types}
       type={parseFacet(rawSearchParams, MEDIA_FACET)}
       basePath={localeHref(locale, '/media')}

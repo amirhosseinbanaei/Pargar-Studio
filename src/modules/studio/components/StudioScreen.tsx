@@ -21,9 +21,22 @@
  * Persian copy — the manifesto, the biographies, the chapters, every name — comes out of
  * the database verbatim. The NUMBERS are shaped at render by `num()`, because the columns
  * store Latin digits on purpose (AGENTS.md).
+ *
+ * ─── THE HERO BAND IS A PHOTOGRAPH NOW; THE PORTRAITS ARE STILL DRAWN ────────────
+ * Prompt 14 removed the generated fallback for RECORD images, and the band was one: an
+ * `elevation` at a fixed seed, a picture of no particular building. It takes the first
+ * image of this page's new gallery instead, and shows an empty frame when there is none.
+ *
+ * THE PORTRAITS ARE DELIBERATELY EXEMPT, and this is the one place that rule is bounded.
+ * `studio.team` is twenty-two NAMES — a `string[]` column with nowhere to put a photograph
+ * — so removing `portrait()` there would leave twenty-two permanently empty boxes that no
+ * editor could ever fill, which is not "an absent picture" but a broken section. The two
+ * founders keep theirs for consistency with the twenty-two beside them; a founder who has
+ * a real portrait uploaded already shows it. Recorded in AGENTS.md.
  */
 import Image from 'next/image';
-import { draw, portrait } from '@/common/lib/art';
+import { GalleryBand } from '@/common/components/collection';
+import { portrait } from '@/common/lib/art';
 import { mediaUrl } from '@/common/constants/uploads';
 import type { Dictionary } from '@/common/i18n';
 import type { MessageKey } from '@/common/i18n';
@@ -44,17 +57,16 @@ const SECTIONS: ReadonlyArray<{ id: string; key: MessageKey }> = [
   { id: 'previously', key: 'studio.previously' },
 ];
 
-/** The band drawing and the two portrait ratios — `legacy/js/ui/panel.js:367`, `:396`, `:432`. */
-const BAND_RATIO = 0.42;
+/** The two portrait ratios — `legacy/js/ui/panel.js:396` and `:432`. */
 const FOUNDER_RATIO = 0.82;
 const TEAM_RATIO = 1.12;
+
 /**
- * The band is an ELEVATION at a fixed seed — `legacy/js/ui/panel.js:367` — not a portrait
- * and not derived from any record. It is the studio's own house, so nothing an editor
- * saves should redraw it.
+ * `.band` is `aspect-ratio: 21 / 8` at the full content width — `100vw` less `.stage`'s
+ * `clamp(1.25rem, 4.5vw, 5rem)` on each side, so about 92vw at every width. One term, no
+ * breakpoint: `panel.css:772` changes the RATIO below 860px, never the width.
  */
-const BAND_KIND = 'elevation';
-const BAND_SEED = 'kavan-studio-house';
+const BAND_SIZES = '92vw';
 
 export interface StudioScreenProps {
   studio: Studio;
@@ -65,6 +77,10 @@ export interface StudioScreenProps {
 
 export function StudioScreen({ studio, seeds, dictionary }: StudioScreenProps) {
   const { t, num } = dictionary;
+
+  // The page's own gallery: the first image is the hero band, the rest are the band below
+  // it. One list, split once, so no photograph is shown twice or dropped between them.
+  const [bandImage, ...restOfGallery] = studio.gallery;
 
   return (
     <div className="route" id="main">
@@ -81,11 +97,30 @@ export function StudioScreen({ studio, seeds, dictionary }: StudioScreenProps) {
 
       <div className="route__main">
         <div className="sheet">
+          {/*
+            THE BAND HOLDS A PHOTOGRAPH NOW, OR NOTHING (prompt 14).
+            It used to draw `elevation` at the fixed seed `kavan-studio-house` — a picture
+            of no particular building, seeded from a CONSTANT rather than from this record,
+            so nothing an editor saved could ever change it. Prompt 14 gave this page a real
+            gallery, which makes its first image the honest occupant of this slot. With no
+            gallery the band is an empty frame: it keeps its ratio, its ground and its
+            hairline from `panel.css`, so the page's rhythm survives an empty one.
+
+            `.band__cap` and the `::after` scrim are untouched and sit over either state —
+            the caption is what keeps the studio's name legible over a photograph.
+          */}
           <section className="band" id="s-practice">
-            <div
-              className="band__art"
-              dangerouslySetInnerHTML={{ __html: draw(BAND_KIND, BAND_SEED, BAND_RATIO) }}
-            />
+            <div className="band__art">
+              {bandImage && (
+                <Image
+                  src={mediaUrl(bandImage.path)}
+                  alt={bandImage.alt}
+                  fill
+                  sizes={BAND_SIZES}
+                  className="band__photo"
+                />
+              )}
+            </div>
             <div className="band__cap">
               <span className="band__k">{t('ui.tehran')}</span>
               <span className="band__v">{t('brand.name')}</span>
@@ -226,6 +261,10 @@ export function StudioScreen({ studio, seeds, dictionary }: StudioScreenProps) {
               <li key={name}>{name}</li>
             ))}
           </ul>
+
+          {/* Everything past the hero band. Renders nothing when the gallery is empty or
+              holds one image, which is its state until somebody uploads. */}
+          <GalleryBand images={restOfGallery} heading={t('ui.photographs')} />
         </div>
       </div>
     </div>
