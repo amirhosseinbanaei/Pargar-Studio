@@ -16,7 +16,14 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
-import { embeddedImageAlt, embeddedImagePath, imagePathWrite } from './image';
+import {
+  embeddedImageAlt,
+  embeddedImagePath,
+  galleryColumn,
+  galleryItemWriteSchema,
+  imagePathWrite,
+  toLocaleGallery,
+} from './image';
 
 /** The id every read and write pins to. Exported so the repository never spells it twice. */
 export const STUDIO_ID = 1;
@@ -113,6 +120,18 @@ export const studioRowSchema = z.object({
   chaptersEn: jsonArray(chapterSchema),
   chaptersFa: jsonArray(chapterSchema),
 
+  /**
+   * THE PAGE'S GALLERY (prompt 14). The first image fills the hero band, which was a
+   * drawing at a fixed seed until this prompt; the rest render in a band below it.
+   *
+   * `galleryColumn` degrades NULL — the value the `ALTER TABLE` left on the one existing
+   * row — and unparseable JSON alike to `[]`. That matters more here than anywhere: this
+   * is the table whose sections have silently vanished twice (`awards` in prompt 5,
+   * `founders` in prompt 10), and both were the same shape of failure.
+   */
+  galleryEn: galleryColumn,
+  galleryFa: galleryColumn,
+
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -130,6 +149,7 @@ export function toLocaleStudio(row: StudioRow, locale: Locale) {
     alumni: pickLocale(locale, row.alumniEn, row.alumniFa),
     awards: pickLocale(locale, row.awardsEn, row.awardsFa),
     chapters: pickLocale(locale, row.chaptersEn, row.chaptersFa),
+    gallery: toLocaleGallery(locale, row.galleryEn, row.galleryFa),
   };
 }
 
@@ -178,6 +198,9 @@ export const studioUpdateSchema = z
     awardsFa: z.array(awardWriteSchema),
     chaptersEn: z.array(chapterWriteSchema),
     chaptersFa: z.array(chapterWriteSchema),
+    /** The page's own gallery — see the read schema. Index-aligned, like every other pair. */
+    galleryEn: z.array(galleryItemWriteSchema),
+    galleryFa: z.array(galleryItemWriteSchema),
   })
   .partial();
 

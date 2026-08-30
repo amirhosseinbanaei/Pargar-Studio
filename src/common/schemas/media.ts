@@ -10,11 +10,25 @@
  * while other entries render the outlet's name in Persian. Both columns therefore exist
  * even though many pairs hold identical strings; which ones differ is an editorial
  * decision per record, not a rule that could be applied at render time.
+ *
+ * ─── A GALLERY, AS OF PROMPT 14 ───────────────────────────────────────────────────
+ * The line this file used to carry — "a media entry carries one image at most" — is gone.
+ * An exhibition or a lecture is photographed like anything else, and the columns are the
+ * ones `projects` already has. What survives unchanged is the fallback SEED: an entry with
+ * no cover still takes the related PROJECT's slug, so a cutting about a building is still
+ * tied to the building rather than to the magazine.
  */
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
-import { imagePath, imagePathWrite, toLocaleImage } from './image';
+import {
+  galleryColumn,
+  galleryItemWriteSchema,
+  imagePath,
+  imagePathWrite,
+  toLocaleGallery,
+  toLocaleImage,
+} from './image';
 import { factSchema, factWriteSchema } from './fact';
 
 /* ── READ ─────────────────────────────────────────────────────────────────────── */
@@ -53,16 +67,19 @@ export const mediaRowSchema = z.object({
   factsFa: jsonArray(factSchema),
 
   /**
-   * A COVER ONLY (prompt 10), and usually absent.
+   * A COVER AND A GALLERY (prompt 14 widened prompt 10's cover-only), usually absent.
    *
-   * With no cover of its own the card and the detail page keep the drawing seeded from the
-   * RELATED PROJECT rather than from the entry, so a press cutting about a building carries
-   * the building's picture — the rule `legacy/js/ui/panel.js:263` established and AGENTS.md
-   * records. Uploading a cover here overrides that for this entry and nothing else.
+   * `null` / `[]` is the state of every seeded row. `galleryColumn` degrades a NULL column
+   * — which is what an `ALTER TABLE ADD COLUMN` leaves on every existing row — and
+   * unparseable JSON alike to `[]`, so adding these two columns cannot blank the media
+   * page. That is the ban at the foot of AGENTS.md, and
+   * `__tests__/image.test.ts` pins it for this table by name.
    */
   coverImage: imagePath,
   coverAltEn: looseString,
   coverAltFa: looseString,
+  galleryEn: galleryColumn,
+  galleryFa: galleryColumn,
 
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -88,6 +105,7 @@ export function toLocaleMedia(row: MediaRow, locale: Locale) {
     context: pickLocale(locale, row.contextEn, row.contextFa),
     facts: pickLocale(locale, row.factsEn, row.factsFa),
     cover: toLocaleImage(locale, row.coverImage, row.coverAltEn, row.coverAltFa),
+    gallery: toLocaleGallery(locale, row.galleryEn, row.galleryFa),
   };
 }
 
@@ -133,10 +151,13 @@ export const mediaCreateSchema = z.strictObject({
   factsEn: z.array(factWriteSchema),
   factsFa: z.array(factWriteSchema),
 
-  /** See `projectCreateSchema`. No gallery: a media entry carries one image at most. */
+  /** See `projectCreateSchema` — the same five columns, since prompt 14 gave this table a
+   *  gallery too. The alt rule is cross-field and lives on the dashboard's schemas. */
   coverImage: imagePathWrite,
   coverAltEn: z.string().nullable(),
   coverAltFa: z.string().nullable(),
+  galleryEn: z.array(galleryItemWriteSchema),
+  galleryFa: z.array(galleryItemWriteSchema),
 });
 
 export type MediaCreate = z.infer<typeof mediaCreateSchema>;

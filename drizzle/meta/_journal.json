@@ -29,6 +29,13 @@
       "when": 1788076419985,
       "tag": "0003_bitter_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788081347368,
+      "tag": "0004_spotty_nightmare",
+      "breakpoints": true
     }
   ]
 }

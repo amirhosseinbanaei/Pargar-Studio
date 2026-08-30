@@ -16,7 +16,7 @@ import {
 
 type MediaInsert = typeof media.$inferInsert;
 
-const JSON_FIELDS = ['factsEn', 'factsFa'] as const;
+const JSON_FIELDS = ['factsEn', 'factsFa', 'galleryEn', 'galleryFa'] as const;
 
 function toRow<T extends MediaCreate | MediaUpdate>(input: T) {
   const out: Record<string, unknown> = { ...input };

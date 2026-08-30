@@ -104,6 +104,8 @@ async function main() {
     coverImage: null,
     coverAltEn: null,
     coverAltFa: null,
+    galleryEn: [],
+    galleryFa: [],
   });
 
   console.log('CI fixture rows written: 1 project, 1 design work, 1 media entry');

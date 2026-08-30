@@ -21,6 +21,8 @@
  * assert that for the two the image layer added.
  */
 import { describe, expect, it } from 'vitest';
+import { contactRowSchema } from '../contact';
+import { mediaRowSchema } from '../media';
 import { studioRowSchema } from '../studio';
 import { galleryColumn, toLocaleGallery, toLocaleImage } from '../image';
 
@@ -79,6 +81,62 @@ describe('a gallery column', () => {
     // one of those blanks a route while the other shows a drawing.
     const parsed = galleryColumn.parse(JSON.stringify([{ path: '../../etc/passwd', alt: 'nope' }]));
     expect(toLocaleGallery('en', parsed, parsed)).toEqual([]);
+  });
+});
+
+/**
+ * PROMPT 14 ADDED `gallery_en` / `gallery_fa` TO THREE MORE TABLES, and every row in all
+ * three predates them. An `ALTER TABLE ... ADD COLUMN` with no default leaves NULL, so the
+ * first read of every existing media entry, of the studio row and of the contact row hands
+ * these schemas a NULL where a JSON string is declared.
+ *
+ * That is exactly the ban at the foot of AGENTS.md, and the reason it is a ban is that the
+ * failure is SILENT: `jsonArray` degrades a payload it cannot read to `[]` so one bad row
+ * cannot blank a page, which also means a schema that never matched looks like a record
+ * with no pictures. It has cost this project two vanished page sections already.
+ *
+ * `galleryColumn` was built to tolerate it and the block above proves that in the abstract.
+ * These three assert it through each table's own row schema, by name, because a column
+ * declared with the wrong leaf is the mistake this catches and it is per-table.
+ */
+describe('the three columns prompt 14 added to rows that predate them', () => {
+  it('media: a NULL gallery column reads as an empty gallery, not a failed row', () => {
+    expect(mediaRowSchema.shape.galleryEn.parse(null)).toEqual([]);
+    expect(mediaRowSchema.shape.galleryFa.parse(null)).toEqual([]);
+  });
+
+  it('studio: same — and this is the table that has silently blanked twice', () => {
+    expect(studioRowSchema.shape.galleryEn.parse(null)).toEqual([]);
+    expect(studioRowSchema.shape.galleryFa.parse(null)).toEqual([]);
+  });
+
+  it('contact: the gallery AND the cover trio it never had before', () => {
+    expect(contactRowSchema.shape.galleryEn.parse(null)).toEqual([]);
+    expect(contactRowSchema.shape.galleryFa.parse(null)).toEqual([]);
+    // `imagePath` catches to `null` and `looseString` normalizes to `''`, so a row written
+    // before these five columns existed reads as "no picture" rather than throwing.
+    expect(contactRowSchema.shape.coverImage.parse(null)).toBeNull();
+    expect(contactRowSchema.shape.coverAltEn.parse(null)).toBe('');
+    expect(contactRowSchema.shape.coverAltFa.parse(null)).toBe('');
+  });
+
+  it('reads a real stored gallery back on all three, in order', () => {
+    // The other half of the same check: tolerating NULL is worthless if the column cannot
+    // also read a gallery an editor actually saved.
+    const stored = JSON.stringify([
+      { path: '2026/08/0123456789abcdef0123456789abcdef.jpg', alt: 'The street' },
+      { path: '2026/08/11111111111111111111111111111111.png', alt: 'The stair' },
+    ]);
+
+    for (const shape of [
+      mediaRowSchema.shape.galleryEn,
+      studioRowSchema.shape.galleryEn,
+      contactRowSchema.shape.galleryEn,
+    ]) {
+      const parsed = shape.parse(stored);
+      expect(parsed).toHaveLength(2);
+      expect(parsed.map(item => item.alt)).toEqual(['The street', 'The stair']);
+    }
   });
 });
 

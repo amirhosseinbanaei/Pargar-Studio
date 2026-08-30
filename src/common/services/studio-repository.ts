@@ -39,6 +39,8 @@ const JSON_FIELDS = [
   'awardsFa',
   'chaptersEn',
   'chaptersFa',
+  'galleryEn',
+  'galleryFa',
 ] as const;
 
 function toRow<T extends StudioCreate | StudioUpdate>(input: T) {

@@ -51,6 +51,17 @@
  * A GALLERY is a per-locale pair of JSON columns, per the rule immediately below. See
  * `projects.gallery_en`.
  *
+ * ─── AND SINCE PROMPT 14, EVERY CONTENT TABLE HAS BOTH ────────────────────────────
+ * `media`, `studio` and `contact` gained `gallery_en` / `gallery_fa`, and `contact` gained
+ * the `cover_image` / `cover_alt_*` trio it never had. Six of the seven content tables now
+ * carry the same image shape; the exception is `index_cards`, which takes a cover and no
+ * gallery because a column of the front page shows exactly one picture.
+ *
+ * The paragraph above about a record with no image keeping its drawing is NO LONGER TRUE
+ * FOR RECORDS. Prompt 14 reversed it: an empty image column renders an empty slot, and the
+ * generated art survives only on the five index columns and the studio's portraits. See
+ * AGENTS.md, "Galleries and required fields (prompt 14)".
+ *
  * ─── TIMESTAMPS ───────────────────────────────────────────────────────────────────
  * Stored as INTEGER unix-epoch seconds (`mode: 'timestamp'`), which sorts correctly as a
  * number and needs no string-format agreement between writer and reader.
@@ -227,14 +238,26 @@ export const media = sqliteTable(
     factsFa: text('facts_fa').notNull(),
 
     /**
-     * A COVER ONLY, and no gallery. A media entry is a press cutting or an award notice —
-     * one image at most, and often none: with no cover of its own the card and the detail
-     * page keep the drawing seeded from the RELATED PROJECT rather than from the entry, so
-     * a cutting about a building carries the building's picture (AGENTS.md).
+     * A COVER AND A GALLERY — the same five columns `projects` and `design_works` carry.
+     *
+     * ─── THIS REVERSES "A MEDIA ENTRY CARRIES ONE IMAGE AT MOST" (prompt 14) ──────────
+     * Prompt 10 gave this table a cover and no gallery, on the argument that a press
+     * cutting or an award notice is one picture. That was too narrow: an exhibition or a
+     * lecture is photographed like anything else, and the plumbing is identical to the two
+     * tables that already have it. What is UNCHANGED is the fallback seed — with no cover
+     * of its own the card still takes the drawing from the RELATED PROJECT rather than from
+     * the entry, so a cutting about a building still carries the building.
+     *
+     * Both gallery columns are NULLABLE and every existing row holds NULL. `galleryColumn`
+     * in `@/common/schemas/image` degrades NULL and unparseable JSON alike to `[]`, which
+     * is what keeps the ban at the foot of AGENTS.md satisfied for a column added to rows
+     * that predate it; `common/schemas/__tests__/image.test.ts` pins that for this table.
      */
     coverImage: text('cover_image'),
     coverAltEn: text('cover_alt_en'),
     coverAltFa: text('cover_alt_fa'),
+    galleryEn: text('gallery_en'),
+    galleryFa: text('gallery_fa'),
 
     ...timestamps,
   },
@@ -289,6 +312,21 @@ export const studio = sqliteTable(
     /** JSON `{ year, text }[]`. */
     chaptersEn: text('chapters_en').notNull(),
     chaptersFa: text('chapters_fa').notNull(),
+
+    /**
+     * THE PAGE'S OWN GALLERY (prompt 14) — one list for the whole record, not one per
+     * section, and not per founder.
+     *
+     * A founder's portrait stays inside `founders_*` where prompt 10 put it, because a
+     * portrait belongs to a person and this belongs to the page. The first image fills the
+     * hero band at the top of `/studio`, which until prompt 14 was a drawing at a fixed
+     * seed; the rest render in the gallery band below it.
+     *
+     * NULLABLE, and the one existing row holds NULL — see `media.gallery_en` for why that
+     * is safe and where it is pinned.
+     */
+    galleryEn: text('gallery_en'),
+    galleryFa: text('gallery_fa'),
 
     ...timestamps,
   },
@@ -346,6 +384,24 @@ export const contact = sqliteTable(
     /** JSON `{ name, handle }[]`. */
     socialsEn: text('socials_en').notNull(),
     socialsFa: text('socials_fa').notNull(),
+
+    /**
+     * PICTURES, WHICH THIS TABLE HAD NONE OF (prompt 14).
+     *
+     * The contact page had two drawings seeded from CONSTANTS — a street elevation across
+     * the top and a courtyard plan beside the address — so neither was ever a fact about
+     * the record. Both slots take a photograph now: the cover fills the hero band, the
+     * first gallery image fills the plan slot, and the rest render in a band below.
+     *
+     * The trio matches `projects.cover_image` exactly, columns and rules alike, so the
+     * uploader, the stored-path pattern, the alt rule and `/api/media` all apply with
+     * nothing added. Every column is NULLABLE and the one existing row holds NULL.
+     */
+    coverImage: text('cover_image'),
+    coverAltEn: text('cover_alt_en'),
+    coverAltFa: text('cover_alt_fa'),
+    galleryEn: text('gallery_en'),
+    galleryFa: text('gallery_fa'),
 
     ...timestamps,
   },

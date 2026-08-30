@@ -20,7 +20,7 @@ import {
 
 type ContactInsert = typeof contact.$inferInsert;
 
-const JSON_FIELDS = ['socialsEn', 'socialsFa'] as const;
+const JSON_FIELDS = ['socialsEn', 'socialsFa', 'galleryEn', 'galleryFa'] as const;
 
 function toRow<T extends ContactCreate | ContactUpdate>(input: T) {
   const out: Record<string, unknown> = { ...input };

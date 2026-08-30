@@ -20,6 +20,14 @@
 import { z } from 'zod';
 import { jsonArray, looseString } from './helpers';
 import { pickLocale, type Locale } from './locale';
+import {
+  galleryColumn,
+  galleryItemWriteSchema,
+  imagePath,
+  imagePathWrite,
+  toLocaleGallery,
+  toLocaleImage,
+} from './image';
 
 export const CONTACT_ID = 1;
 
@@ -62,6 +70,21 @@ export const contactRowSchema = z.object({
   socialsEn: jsonArray(socialSchema),
   socialsFa: jsonArray(socialSchema),
 
+  /**
+   * PICTURES (prompt 14), which this table had none of.
+   *
+   * The cover fills the hero band and the first gallery image fills the site-plan slot —
+   * two boxes that until this prompt held drawings seeded from CONSTANTS rather than from
+   * this record. Every one of these five columns is NULL on the one existing row, and both
+   * `imagePath` and `galleryColumn` treat NULL as "no picture" rather than as a parse
+   * failure, so the page cannot blank on the migration.
+   */
+  coverImage: imagePath,
+  coverAltEn: looseString,
+  coverAltFa: looseString,
+  galleryEn: galleryColumn,
+  galleryFa: galleryColumn,
+
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -86,6 +109,8 @@ export function toLocaleContact(row: ContactRow, locale: Locale) {
     hours: pickLocale(locale, row.hoursEn, row.hoursFa),
     careers: pickLocale(locale, row.careersEn, row.careersFa),
     socials: pickLocale(locale, row.socialsEn, row.socialsFa),
+    cover: toLocaleImage(locale, row.coverImage, row.coverAltEn, row.coverAltFa),
+    gallery: toLocaleGallery(locale, row.galleryEn, row.galleryFa),
   };
 }
 
@@ -123,6 +148,13 @@ export const contactUpdateSchema = z
     careersFa: z.string(),
     socialsEn: z.array(socialWriteSchema),
     socialsFa: z.array(socialWriteSchema),
+
+    /** The same five columns every other content table carries — see `projectCreateSchema`. */
+    coverImage: imagePathWrite,
+    coverAltEn: z.string().nullable(),
+    coverAltFa: z.string().nullable(),
+    galleryEn: z.array(galleryItemWriteSchema),
+    galleryFa: z.array(galleryItemWriteSchema),
   })
   .partial();
 

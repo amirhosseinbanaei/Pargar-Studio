@@ -46,6 +46,9 @@ describe('studioSeeds', () => {
     alumni: [],
     awards: [],
     chapters: [],
+    // The page's own gallery (prompt 14). Empty here: this suite is about PORTRAIT seeds,
+    // which come from the founders array and have nothing to do with the band.
+    gallery: [],
   } satisfies Studio;
 
   it('derives one distinct seed per person, in record order', () => {
