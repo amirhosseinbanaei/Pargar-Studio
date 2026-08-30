@@ -82,11 +82,15 @@ All four pass, or the change is not done.
   render. A Server Component puts the shell and its artwork in the HTML, so the preloader is
   now a flourish over a finished page, and a long one costs the very thing it used to buy.
   Restoring the original feel is one edit to that block.
-- **~~The site ships zero image files.~~ QUALIFIED IN PROMPT 10 — the dashboard uploads
-  photographs now; the generated art is the FALLBACK.** Every record that has no photograph
-  — which is all 76 projects, 9 design works and 14 media entries today — renders exactly the
-  drawing it always did, on the card and on its page. What changed is that a record CAN have
-  one. See "Image uploads (prompt 10)" below.
+- **~~The site ships zero image files.~~ ~~QUALIFIED IN PROMPT 10 — the generated art is the
+  FALLBACK.~~ REVERSED IN PROMPT 14 — a record with no photograph shows NO photograph.**
+  Prompt 10 made the drawing the fallback for a record with no picture; prompt 14 removed
+  that fallback for records entirely. An empty image column renders an empty slot.
+  **The consequence, stated plainly: until photographs are uploaded, the projects, design
+  and media grids and detail pages are largely empty of imagery** — 76 projects, 9 design
+  works and 14 media entries have none today. The generated art survives in exactly two
+  places, both deliberate: the five index columns (prompt 13's decision, chrome rather than
+  records) and the studio's portraits. See "Galleries and required fields (prompt 14)".
 - **The art layer is PURE — confirmed, not assumed.** _(The assumption with the most leverage
   in the migration.)_ `rng`, `palette` and `draw` touch no `document`, `window`, `Date` or
   `Math.random`; the only matches for "window" in the legacy source are the word in prose
@@ -97,7 +101,9 @@ All four pass, or the change is not done.
   generators run on the server, no generator JavaScript reaches the browser, and the drawings
   are part of the cached HTML with no hydration cost and no layout shift. **Never add
   `'use client'` under `src/common/lib/art/`** — that one directive puts ~47KB of generator
-  back in the bundle, silently.
+  back in the bundle, silently. _(Prompt 14 stopped CALLING it for records; the layer itself
+  is untouched, still pure, still tested, and still drawing the five index columns and the
+  studio's portraits.)_
 - **~~The project filter taxonomy is DERIVED from the rows that exist.~~ HALF-REVERSED IN
   PROMPT 9 — the CANON is a table now; presence still gates.** The option list comes from
   `taxonomy_terms`, which an editor owns; what survives unchanged is the rule that an option
@@ -855,14 +861,26 @@ never is.
 
 ### The two open decisions, resolved
 
-- **Persian fields are OPTIONAL on save.** Only `titleEn` is required. `withPersianFallback`
-  in `modules/dashboard/schemas/project-form.ts` writes the English value into an empty `_fa`
-  column before the write — exactly what `scripts/seed.ts` already does for a missing
-  translation, and what `legacy/js/core/i18n.js:154` did before it. Requiring both would
-  block the studio from publishing until somebody had translated it. Because the fallback is
-  applied at AUTHOR time, the read path still needs no fallback branch: `pickLocale` stays two
-  lines and `/fa/projects/<slug>` never renders a hole. Whitespace-only counts as empty; the
-  stored value is never trimmed, because several Persian values carry meaningful ZWNJs.
+- **~~Persian fields are OPTIONAL on save.~~ REVERSED IN PROMPT 14 — a required field is
+  required in BOTH languages, and nothing is copied between them.** `withPersianFallback` is
+  gone from every submission schema in this module. The original decision, and the half of it
+  that survived:
+
+  > Only `titleEn` is required. `withPersianFallback` writes the English value into an empty
+  > `_fa` column before the write — exactly what `scripts/seed.ts` already does for a missing
+  > translation, and what `legacy/js/core/i18n.js:154` did before it. Requiring both would
+  > block the studio from publishing until somebody had translated it.
+
+  That cost was real and is answered by REFUSING THE SAVE rather than by writing English into
+  a Persian column: the editor is told at the field, before anything is stored, and nothing
+  is published half-translated either way. What the fallback also did — and this is what
+  overturned it — is make a filled-in column indistinguishable from a translated one, forever.
+
+  What is unchanged: the read path still needs no fallback branch (`pickLocale` stays two
+  lines), because a required column can no longer be empty; whitespace-only still counts as
+  empty; and the stored value is still never trimmed, because several Persian values carry
+  meaningful ZWNJs. See "Galleries and required fields (prompt 14)".
+
 - **Deleting a project deletes the row outright.** No `deleted_at`, no undo window — that
   would be a schema change. The confirmation dialog is the only safety net, which is why it
   NAMES the record.
@@ -980,16 +998,25 @@ instead of the newly appended one. Re-run with a locator scoped to the "Awards �
 there — `useFieldArray.append` behaves exactly as documented. Recorded here because the
 same placeholder-collision would trip up the next person who tries to script this form.
 
-### Persian is optional here too, generalized to lists
+### ~~Persian is optional here too, generalized to lists~~ REVERSED IN PROMPT 14
 
-Same resolved decision as projects (prompt 6): only `titleEn` is required, everywhere.
-`withPersianFallback` in each area's form schema fills an empty Persian TEXT column with its
-English counterpart (`fallbackText`, `modules/dashboard/schemas/shared.ts`) and — new in this
-prompt — fills an empty Persian LIST wholesale from the English one (`fallbackList`), rather
-than trying to merge per item. A studio publishing a new object should not be blocked on
-translating its team or its facts table before the record can save at all. Per-ITEM content is
-not filled in: an editor who adds a row and leaves it blank gets the blank row back, exactly as
-a lone Persian text field left blank would.
+**Both halves of this are gone.** `fallbackText` and `fallbackList` are deleted from
+`modules/dashboard/schemas/shared.ts`, and every area's `withPersianFallback` is renamed to
+`to<Resource>Columns` because it no longer falls back. What was decided here, for the record:
+
+> Same resolved decision as projects (prompt 6): only `titleEn` is required, everywhere.
+> `withPersianFallback` fills an empty Persian TEXT column with its English counterpart
+> (`fallbackText`) and — new in this prompt — fills an empty Persian LIST wholesale from the
+> English one (`fallbackList`), rather than trying to merge per item. A studio publishing a
+> new object should not be blocked on translating its team or its facts table before the
+> record can save at all. Per-ITEM content is not filled in.
+
+The TEXT half is overturned by the argument under prompt 6 above. The LIST half needed its own
+answer, because removing `fallbackList` without one would have been a NEW way to blank a page
+section silently — the failure this project has produced twice already. That answer is
+`requireTranslatedList` in `modules/dashboard/schemas/image.ts`: an English list beside an
+empty Persian one is REFUSED, at the Persian control, before anything is stored. Per-item
+content is still not filled in, and that part never needed to change.
 
 The dashboard's OWN submission schemas (`design-work-form.ts`, `media-form.ts`,
 `studio-form.ts`, `contact-form.ts`) are deliberately more lenient than
@@ -1841,9 +1868,10 @@ editor is told before they submit, on the field itself) and the submission schem
 hand-written POST is refused). An uploader that can save a picture with no alt text is an
 accessibility regression on a site that until now had no images to get wrong.
 
-**And Persian alt text is the ONE translated field that does NOT fall back to English.** This
-is a deliberate exception to the decision recorded for prompts 6 and 7, and it is written
-down here because the next person to touch `withPersianFallback` will otherwise "fix" it:
+**~~And Persian alt text is the ONE translated field that does NOT fall back to English.~~
+PROMPT 14 MADE IT THE RULE — nothing falls back now.** The argument below is unchanged and is
+the argument that generalized; it is kept because its second half is what overturned the
+fallback everywhere:
 
 - Falling back is right for PROSE. A Persian page showing an untranslated English paragraph
   is imperfect but readable, and blocking publication on translation was the worse trade.
@@ -1854,29 +1882,34 @@ down here because the next person to touch `withPersianFallback` will otherwise 
 
 Not auto-filled from the filename either — a filename describes a camera's numbering scheme.
 
-### A record with no image keeps its generated drawing
+### ~~A record with no image keeps its generated drawing~~ REVERSED IN PROMPT 14
 
-`CardPlate` owns that choice for all three grids and `DetailPlates` owns it per slot. `null`
-is the NORMAL case, not a gap: 76 projects, 9 design works and 14 media entries have no
-photograph and most never will. **An empty image column must never render an empty box** — a
-grid where a third of the cards are grey rectangles reads as broken, and the generated art
-exists precisely so a page with no photography still looks finished. Verified: 76 cards, one
-photograph, 75 drawings, zero empty frames.
+**A record with no image now shows no image.** The argument this section made is preserved
+below, because it is what to weigh if the decision is ever taken back — and its prediction
+about what an empty grid looks like is exactly the cost prompt 14 accepted:
 
-Per-SLOT rather than all-or-nothing on a detail page: a record with a cover and no gallery
-shows its photograph beside two drawings. **The seed arithmetic is untouched** — `drawingSet`
-is still called with the bare seed and the kinds still taken in order, so slot 0's drawing is
-still `kindFor(seed, types)` for every record without a cover. Computing drawings only for
-the slots that need them would have made slot 2's kind depend on how many photographs a
-record happens to have.
+> `CardPlate` owns that choice for all three grids and `DetailPlates` owns it per slot. `null`
+> is the NORMAL case, not a gap: 76 projects, 9 design works and 14 media entries have no
+> photograph and most never will. **An empty image column must never render an empty box** — a
+> grid where a third of the cards are grey rectangles reads as broken, and the generated art
+> exists precisely so a page with no photography still looks finished.
+>
+> Per-SLOT rather than all-or-nothing on a detail page: a record with a cover and no gallery
+> shows its photograph beside two drawings. **The seed arithmetic is untouched** — `drawingSet`
+> is still called with the bare seed and the kinds still taken in order, so slot 0's drawing is
+> still `kindFor(seed, types)` for every record without a cover.
+>
+> **A media entry with no cover of its own still seeds from the PROJECT**, so a press cutting
+> carries the building's picture — the rule `legacy/js/ui/panel.js:263` established.
 
-**A media entry with no cover of its own still seeds from the PROJECT**, so a press cutting
-carries the building's picture — the rule `legacy/js/ui/panel.js:263` established, unchanged.
+**THE ONE PLACE TO REVERSE IT BACK is `CardPlate`'s `!image` branch, plus `DetailPlates`'
+early return.** Two branches, both in `common/components/collection/`.
 
-**A photograph with no alt text for the rendered locale counts as NO image** and falls back to
-the drawing. The write schemas make that state unreachable through the application, so
-reaching it needs a row edited elsewhere — and the honest answer is the drawing rather than a
-published image no screen reader can describe.
+What SURVIVES this reversal, unchanged: **a photograph with no alt text for the rendered
+locale still counts as NO image** (`toLocaleImage` answers `null`). The write schemas make
+that state unreachable through the application, so reaching it needs a row edited elsewhere —
+and the honest answer is now an empty slot rather than a published image no screen reader can
+describe.
 
 ### `fill`, not intrinsic dimensions — and what that buys
 
@@ -2657,7 +2690,9 @@ already gives — that one is about being heard, and applies everywhere.
 - **5.1 — a column with no picture KEEPS its drawing.** Taken as recommended, and
   deliberately the opposite of what prompt 14 does for records: these five are chrome rather
   than records, the seed is a constant rather than a slug, and five empty frames is an empty
-  front page. It is one branch in `ColumnShell` if that is ever reversed.
+  front page. It is one branch in `ColumnShell` if that is ever reversed. **Prompt 14 shipped
+  and left this exactly as it is** — it is now one of the two places the art layer still
+  draws, the other being the studio's portraits.
 - **5.2 — the new area is FIRST, above Projects.** Taken as recommended. The navigation
   reads top to bottom as "what is this site made of", and the answer starts with the page
   every visitor sees before any of the others.
@@ -2697,6 +2732,361 @@ to its drawing. An unknown section id answers a real 404.
   `@kavanstudio` twice (Instagram, Telegram) and `kavan-studio` twice (LinkedIn, Divisare).
   Pre-existing, untouched by this branch, and out of scope — noted because it is the only
   console output on the public site.
+
+## Galleries and required fields (prompt 14)
+
+Five things: the dashboard rail stays in view, three more tables got galleries, a gallery
+longer than two stopped being truncated, the generated drawing behind a missing photograph is
+gone, and a required field is required in both languages. **Two of those reverse decisions
+this file defended at length; both are amended in place above rather than only recorded here,
+so the file does not argue with itself.**
+
+```
+  src/modules/dashboard/components/DashboardShell.tsx   the sticky rail — a class list, nothing more
+  src/common/services/schema.ts                          9 new columns on media / studio / contact
+  drizzle/0004_spotty_nightmare.sql                      nine nullable ADD COLUMNs
+  src/common/components/collection/GalleryBand.tsx       THE new component — the truncation lifted
+  src/common/components/collection/CardPlate.tsx         the `!image` branch — reversal #1 lives here
+  src/common/components/collection/DetailPlates.tsx      no seeds, no captions, no drawings
+  src/common/components/collection/__tests__/plates.test.tsx   replaces drawing-identity.test.ts
+  src/modules/dashboard/schemas/image.ts                 requireGalleryAlt + requireTranslatedList
+  src/modules/dashboard/schemas/shared.ts                fallbackText/fallbackList DELETED; requiredText
+  src/common/styles/route.css                            the band's geometry + the head's own height
+```
+
+### 4.1 — the rail sticks at `md`, and nothing else moved
+
+`DashboardShell`'s nav gained `md:sticky md:top-0 md:h-screen md:overflow-y-auto`. On a
+76-row projects table the navigation used to scroll away with the content, so reaching
+another area meant scrolling back to the top first.
+
+**Sticky rather than fixed**, as specified, and the reason is worth keeping: `fixed` takes
+the element out of flow, so the content column would need a matching inset — a second number
+to keep in sync with `md:w-64` forever. Sticky stays in flow, so the content column's width
+is still computed from the rail's.
+
+`md:h-screen` and `md:overflow-y-auto` are not decoration. Without a height the sticky box is
+only as tall as its content and `top-0` has nothing to pin; without its own scroller a
+navigation longer than the viewport would have entries no one could reach.
+
+**Below `md` nothing sticks** — every utility is breakpoint-prefixed, so the narrow layout is
+byte-identical. Verified in a browser: at 1440px `position: sticky`, height 900px, and the
+nav's `getBoundingClientRect().top` is 0 both before and after scrolling 2000px down a
+5414px document. At 375px `position: static`, and the same measurement reads -2000.
+
+`DashboardShell` is and stays a Server Component.
+
+### 4.2 — `media`, `studio` and `contact` got galleries; `contact` got pictures at all
+
+| Table     | Added                                                                             |
+| --------- | --------------------------------------------------------------------------------- |
+| `media`   | `gallery_en` / `gallery_fa` — reversing "a media entry carries one image at most" |
+| `studio`  | `gallery_en` / `gallery_fa` — the PAGE's gallery, not a founder's portrait        |
+| `contact` | `cover_image` + `cover_alt_en` / `_fa`, AND `gallery_en` / `gallery_fa`           |
+
+Six of the seven content tables now carry the same image shape. The exception is
+`index_cards`, which takes a cover and no gallery because a column of the front page shows
+exactly one picture.
+
+Each follows the path `projects` already walked, copied rather than invented: `galleryColumn`
+on the row schema, `toLocaleGallery` in the locale mapper, `z.array(galleryItemWriteSchema)`
+on the create schema, `galleryField` + `toGalleryColumns` / `toGalleryFormItems` in the form
+and submission schemas, and a `GalleryField` in each form. **No new cache tag** — a gallery is
+a column of an existing record, so the actions purge exactly what they already purged.
+
+**THE BAN AT THE FOOT OF THIS FILE WAS THE FIRST THING CHECKED, NOT THE LAST.** Every row in
+all three tables predates these columns and `ALTER TABLE ... ADD COLUMN` leaves NULL, so the
+first read hands each schema a NULL where a JSON string is declared — and `jsonArray` degrades
+what it cannot read to `[]`, which is precisely how a section of a page disappears with all
+four gate commands green. `galleryColumn` was already built to tolerate it
+(`common/schemas/image.ts`), and that tolerance is now pinned PER TABLE, by name, in
+`common/schemas/__tests__/image.test.ts` — a column declared with the wrong leaf is a
+per-table mistake, so an abstract test of `galleryColumn` would not catch it. The same block
+also asserts each column reads a real stored gallery back, because tolerating NULL is
+worthless if the column cannot do its job.
+
+**Studio and contact take ONE gallery each, at the page level**, as the prompt assumed.
+Per-founder portraits stay inside the founders JSON where prompt 10 put them: a portrait
+belongs to a person, this belongs to the page.
+
+**`MediaScreen` stopped reading the project archive**, and that is a consequence rather than a
+tidy-up. It read all 76 projects to render 14 cards, purely to seed each card's drawing from
+the related building's types (`legacy/js/ui/panel.js:264`). With the drawings gone nothing
+needs the seed, so `media/page.tsx` makes one cached call instead of two and `MediaCard` lost
+its `projectTypes` prop. **The RULE that rail served is genuinely lost, not relocated**: an
+entry with no cover of its own no longer borrows the building's picture, because there is no
+picture to borrow. An editor who wants the building on a cutting uploads it.
+
+### 4.3 — the generated drawing behind a missing photograph is gone
+
+**This reverses a decision this file defended at length, and the consequence is exactly the
+one that decision predicted.** `CardPlate`'s header argued that "a grid where a third of the
+cards are grey rectangles reads as broken"; it is right, and it is what the site looks like
+until photographs are uploaded. Stated plainly, as owed:
+
+> **Until photographs are uploaded, the projects, design and media grids and detail pages
+> are largely empty of imagery.** 76 projects, 9 design works and 14 media entries have none
+> today. Measured after this shipped: 77 project cards, 2 photographs, 75 empty frames.
+
+**The one place to reverse it back** is `CardPlate`'s `!image` branch plus `DetailPlates`'
+early return — two branches, both in `common/components/collection/`.
+
+What each slot does now:
+
+| Slot                                | Was                                     | Is                          |
+| ----------------------------------- | --------------------------------------- | --------------------------- |
+| `CardPlate` (three grids)           | drawing seeded from the slug            | empty `.card__frame`        |
+| `DetailPlates` (three detail heads) | three drawings, per slot                | as many plates as pictures  |
+| `MediaDetail`'s related thumbnail   | drawing seeded from the project's slug  | the project's own cover     |
+| `StudioScreen`'s hero band          | `elevation` at `kavan-studio-house`     | the studio gallery's first  |
+| `ContactScreen`'s hero band         | `elevation` at `kavan-dezashib-street`  | the contact record's cover  |
+| `ContactScreen`'s site plan         | `court` at `kavan-dezashib-site`, + pin | the contact gallery's first |
+
+**The three constant-seeded band drawings are gone with it**, as are their fixed seeds. Those
+three depicted no particular building — that was the point of a fixed seed, and prompt 5's
+reasoning that seeding from the address would "silently redraw the plan the first time an
+editor fixes a typo" was correct for exactly as long as the alternative was another generated
+picture. **The site plan's PIN went with the drawing**: a pin marks a point on a plan, and
+over a photograph it would assert the studio is at the centre of whatever was photographed,
+which nothing in the record says. The coordinates stay — they were always the caption, and
+they are the fact the pin stood for. There is still no embedded map, and that half of prompt
+5's decision is untouched.
+
+**`src/common/lib/art/` is NOT deleted** and is not even edited. It is pure, tested, and still
+called in two places, both deliberate: the five index columns (prompt 13's 5.1, chrome rather
+than records) and the studio's portraits.
+
+**THE STUDIO'S PORTRAITS ARE A DELIBERATE EXEMPTION, and it is bounded here.** `studio.team`
+is twenty-two NAMES — a `string[]` column with nowhere to put a photograph — so removing
+`portrait()` there would leave twenty-two permanently empty boxes no editor could ever fill.
+That is not "an absent picture", it is a broken section. The two founders keep theirs for
+consistency with the twenty-two beside them, and a founder who has a real portrait already
+shows it. Section 4.3's own list did not name these, and this states why they were left.
+
+**`.detail__plate` HAS NO HEIGHT OF ITS OWN, AND NEVER DID** — the second half of this change,
+and the one that nearly shipped broken. That element has no `aspect-ratio` and no `height` in
+`panel.css`; its box was sized by its CHILD, because the generated `<svg>` carried an intrinsic
+ratio from its `viewBox`. `next/image`'s `fill` is `position: absolute` and contributes nothing
+to layout, so with the drawings gone the plates collapsed. Measured in a browser at 1440px
+before the fix: **853×20 and 426×2** — a page that renders, passes every gate command, and
+shows slivers where three photographs are. `route.css` now gives every plate an explicit
+`4 / 3`, matching `PLATE_RATIO` (0.75), so a three-plate head keeps the proportions the ported
+layout produced. Nothing in the four-command gate would have caught this.
+
+### 4.4 — a gallery longer than two is no longer truncated
+
+`GalleryBand`, new in `common/components/collection/` and promoted on arrival exactly as
+`CardPlate` was: projects, design and media render it, and studio and contact render it too.
+`DetailPlates`' header had recorded the limit honestly and named the fix — "a second band
+below the specs with its own geometry, which is a design decision this prompt had no mandate
+to make". This is that band.
+
+The defect it closes is not cosmetic: an editor could upload eight photographs, watch the save
+succeed, and find five of them on no page at all.
+
+- **`HEAD_PLATE_COUNT` is exported and shared.** The head takes the first three, the band
+  takes `images.slice(HEAD_PLATE_COUNT)`. Two copies of that number is one page rendering its
+  third photograph twice.
+- **No lightbox, no carousel, no client JavaScript.** A carousel hides photographs behind an
+  interaction on a page whose purpose is showing them; a lightbox is a focus trap, a keyboard
+  protocol and a history entry to get right for a bigger version of an image the browser can
+  already open. Embla is not warranted and was not added.
+- **Its geometry is in `route.css`**, not `panel.css`, which stays a byte-identical port.
+  `repeat(auto-fill, minmax(18rem, 1fr))`, one column below 700px, and `sizes` derived from
+  exactly those two numbers with the arithmetic written into the component header the way
+  `CardPlate` does it.
+- **A `<section>` with `aria-labelledby`** pointing at its own visible heading, so it is a
+  real landmark and one string does both jobs.
+
+### 4.5 — required means required, in both languages
+
+**(a) The Persian half of a required pair is required, and NOTHING is copied between locales.**
+`withPersianFallback` is gone from all six editors and is renamed `to<Resource>Columns`,
+because a function called `withPersianFallback` that applies no fallback is a name that
+survives three prompts and misleads every reader of them.
+
+> **The consequence, stated rather than discovered: an editor can no longer save an
+> English-only record.** The next edit of any record requires real Persian in every required
+> field — which today means the title, on projects, design works, media entries and index
+> cards, and nothing at all on studio or contact.
+
+**Existing rows are safe, and that was VERIFIED AGAINST THE DATABASE rather than assumed** —
+one query per table, as the prompt asked. Every required Persian text column is populated in
+all 77 projects, 9 design works, 15 media entries and both singletons. Two exceptions turned
+up and neither is a problem:
+
+- **`media.author_fa` is empty on five rows.** Those are the five AWARD records, and
+  `author_en` is `NULL` on the same five: an award has no byline. It is the one nullable text
+  pair in the content model, it is not required in either language, and it stays that way.
+- **`index_cards.title_fa` and `caption_fa` are empty on all five rows.** Those are the rows
+  the migration seeded; nobody has edited a card. They render `nav.<id>` / `cap.<id>` from the
+  message catalog, which is real authored Persian — prompt 13's whole design — and the new
+  `.min` is reached only by an editor SAVING a card, never by rendering one.
+
+`requiredText` in `schemas/shared.ts` is how "required" is spelled, not `.min(1)`: `.min(1)`
+counts characters, so three spaces pass it. It refines on a trimmed COPY and never trims the
+stored value, because several stored Persian values carry meaningful ZWNJs.
+
+**`fallbackList` went too (decision 5.4), and `requireTranslatedList` is what makes that
+safe.** Removing it alone would have been a NEW way to blank a page section in silence. Now an
+English list beside an empty Persian one is REFUSED, at the Persian control. It is
+one-directional on purpose — a Persian list beside an empty English one is fine, because
+English is what every remaining fallback leans on and an editor working Persian-first is doing
+nothing wrong — and it is not a length check, because translating three names as two is
+legitimate.
+
+**(b) Conditionally-required fields now say so.** `requireAltWithImage` has refused a save
+whenever an image had no description since prompt 10, and nothing on screen said so: the
+editor was told at save time about a rule the form never showed them.
+
+- `LocaleFieldPair` gained `requiredWithImage`, which `useWatch`es one path and marks BOTH
+  sides required exactly while that path holds an image.
+- `GalleryField`'s row descriptions do the same on the row's OWN path, and their labels became
+  VISIBLE — a required marker inside an `sr-only` label is invisible, which is the whole
+  defect. That also fixed something the hidden label was papering over: the two boxes were
+  told apart only by a placeholder, which disappears the moment either is typed into.
+- `RepeatableGroupField` gained `imageAltKey`, for the founders.
+- Every marker is associated with `htmlFor`/`id`, never by nesting. `ds/Label` renders a
+  `<label>` itself, so wrapping it in another one is invalid markup with no unambiguous
+  control — caught in a browser during this prompt's own verification, after being written
+  that way first.
+
+**The label-versus-schema sweep, and everything it found:**
+
+| Where                                | Mismatch                                                                   | Fixed |
+| ------------------------------------ | -------------------------------------------------------------------------- | ----- |
+| `ContactForm` — `phoneHref`          | schema `regex(/^\+?\d+$/)` refuses `''`; label unmarked                    | ✓     |
+| `ContactForm` — `email`              | `z.email()` refuses `''`; label unmarked                                   | ✓     |
+| `ContactForm` — `press`              | `z.email()` refuses `''`; label unmarked                                   | ✓     |
+| `ContactForm` — `lat`                | decimal pattern refuses `''`; label unmarked                               | ✓     |
+| `ContactForm` — `lng`                | decimal pattern refuses `''`; label unmarked                               | ✓     |
+| Every cover-description pair (5)     | conditionally required by `requireAltWithImage`; nothing marked            | ✓     |
+| Every gallery row's descriptions     | same rule, per row; nothing marked                                         | ✓     |
+| Every gallery row's uploader         | `galleryFormItemSchema.path` refuses `''` outright; label unmarked         | ✓     |
+| **`StudioForm` — founder portraits** | **the reverse: the SCHEMA never required the alt text at all** — see below | ✓     |
+
+The last one is the interesting one, and the sweep is what surfaced it. Prompt 10 made alt text
+required wherever there is an image and wired the rule into four editors — but not this one,
+because a founder's picture is a key inside a repeatable row rather than a `coverImage` field.
+So a portrait could be saved with no description, in either language, with nothing refusing it,
+and `StudioScreen` then fell back to the GENERATED portrait (it requires `imageAlt.trim()`
+before rendering the photograph). **The symptom was an uploaded photograph that simply never
+appeared on the page.** `requireStudioImages` in `schemas/studio-form.ts` refuses it now, per
+founder and per language.
+
+No field was found marked required that the schema would accept empty.
+
+**`schema-agreement.test.ts` was NOT extended to pin the label markers**, and that is a
+decision rather than an omission: those markers are computed at render time from `useWatch`,
+so pinning them means rendering each of the six forms with react-hook-form and a resolver —
+a component test, not a schema test, and it belongs beside the components if it is written.
+The condition itself has exactly one implementation per control (`LocaleFieldPair`,
+`GalleryField`, `RepeatableGroupField`), which is what the sweep was really protecting. The
+markers were verified in a browser instead; see below.
+
+`TaxonomyEditor` needed no change — both its labels were already required — but its comment
+explaining why it could not use `LocaleFieldPair` ("that component never marks the Persian
+side required") had expired, and is rewritten. Its schema header made the same argument and
+is now the general one rather than a local exception.
+
+### The decisions
+
+- **5.1 — contact DOES get a cover and a gallery.** Taken as recommended. It had no image
+  column of any kind, but it had two picture-shaped boxes already: the hero band and the site
+  plan. Both take a real photograph now, so the plumbing landed on slots that existed rather
+  than inventing a place to put a column nothing renders.
+- **5.2 — an empty card frame keeps its hairline, its `--s-1` ground and its aspect ratio.**
+  Taken as recommended. Verified at 1440px and 375px: every frame is exactly 4:3 whether it
+  holds a photograph or nothing, photographed and empty cards measure identically, and there
+  is no horizontal overflow. An absent picture, not a broken one — and nothing reflows the
+  first time somebody uploads.
+- **5.3 — the detail head renders as many plates as there are photographs, up to three, and
+  none at all when there are none.** Taken as recommended. Keeping three empty boxes at the
+  top of all 76 project pages is the "grey rectangles" failure `CardPlate`'s header warns
+  about, arriving through a different door. `data-count` on the container carries the number
+  and `route.css` styles the one- and two-plate cases; the component states the fact rather
+  than a `:has()` selector inferring it, so the rule is findable from either file.
+- **5.4 — `fallbackList` goes too**, with `requireTranslatedList` in its place. See 4.5(a).
+- **`drawing-identity.test.ts` is REPLACED, not deleted**, by
+  `common/components/collection/__tests__/plates.test.tsx`. The prompt offered "keep it
+  pinning `drawingSet` for the index columns" as the alternative, and that option rests on a
+  false premise worth correcting: the index columns call `draw()` with constants from
+  `site.ts` and have never touched `drawingSet` or `kindFor`. Nothing in the application
+  performs that arithmetic any more, so the new file pins the rule that took its place —
+  including the two halves that were argued over, the card keeping its frame and the head
+  keeping nothing — and it moved to `common/`, beside the components that own the rule,
+  rather than staying in `projects`.
+
+### The copy that changed
+
+Per the content-fidelity policy, every string this prompt touched:
+
+| Where                                   | Was                                                               | Is                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `ui.photographs` (en / fa)              | **new key** — the only one added                                  | "Photographs" / «تصاویر»                                             |
+| Every gallery field's help text         | "Use the arrows to reorder"                                       | names the DRAG and its keyboard path — prompt 11 replaced the arrows |
+| Gallery empty state                     | "The detail page shows its generated drawings."                   | "The page shows no pictures until one is added."                     |
+| Gallery row description labels          | `sr-only` "Image 3 description · English"                         | visible "Description · English"                                      |
+| Every "Content" section blurb (5 forms) | "A Persian field left empty is stored as its English counterpart" | names the asterisk and the refusal                                   |
+| Every "Photographs" blurb               | "keeps the drawing generated from its slug"                       | "empty is a normal state — it simply shows none"                     |
+| `ProjectForm`'s slug help (create)      | "Also the seed for this project's generated drawings."            | describes the URL, which is what it still is                         |
+| New required messages                   | —                                                                 | name the field AND the language, and say it is no longer copied      |
+| `requireTranslatedList`'s message       | —                                                                 | names the list and why an empty one is refused                       |
+
+**`ui.photographs`' Persian is AUTHORED, not ported**, and joins the list this file already
+keeps for a native reader: `ui.sections`, `ui.retry`, `error.title`, `error.notFound` and the
+fifteen `form.*` keys. **No public copy was removed** — the five `nav.*` and `cap.*` fallbacks
+prompt 13 depends on are untouched.
+
+### Verified in a browser, and what could not be
+
+Driven over CDP against `npm run dev` in real Chrome — **with no dependency added**: Node 24
+ships a `WebSocket` global, so a ~40-line CDP client speaks the protocol directly. The four
+gate commands pass.
+
+- **The rail.** Measurements above. Sticky at 1440px, static at 375px.
+- **A full editor round trip on a project**: a cover and four gallery images uploaded through
+  the real `<input type="file">`, each preview swapping to its STORED `/api/media/<path>`,
+  saved through the real Server Action. The database holds four index-aligned items — same
+  paths, same order, distinct per-locale alt text.
+- **`/en` and `/fa` for that project**: the cover and gallery 1–2 in the head
+  (`data-count="3"`), gallery 3–4 in the band under "Photographs" / «تصاویر», in the order the
+  editor set, none dropped, zero drawings, zero broken images.
+- **A project with no images at all**: no plates, no band, no drawings; the page starts at its
+  title. The grid at 1440px and 375px: 77 cards, 2 photographs, 75 empty frames, every frame
+  exactly 4:3, no horizontal overflow.
+- **A design work and a media entry**, both the same round trip, both languages. The media
+  entry's gallery field saves.
+- **`/en/studio` and `/en/contact`** with and without a gallery: the hero bands take the
+  record's picture and are empty without one, the site-plan slot takes the contact gallery's
+  first image, the 24 studio portraits still draw.
+- **Plate geometry** at `data-count` 1, 2 and 3, at 1440px and 375px — the collapse described
+  in 4.3 was found here and fixed here.
+- **The Persian refusal**: clearing a required Persian title puts `aria-invalid="true"` on
+  that input, binds the message to it through `aria-describedby`, and the message names the
+  language. Nothing at the top of the form.
+- **The asterisks**: absent with no cover, present on BOTH descriptions the moment one is
+  uploaded, on every gallery row that holds a path, and on all five contact fields the sweep
+  found — with `postcode` and `phone`, which are genuinely optional, correctly unmarked. Every
+  new label's `htmlFor` resolves to its own control and there are zero nested labels.
+
+**What could NOT be verified, and why:**
+
+- **No screen reader was available in this environment.** The markup was checked instead —
+  every asterisk is `aria-hidden` beside a real `sr-only " (required)"` from `ds/Label`, every
+  label resolves to its control, and no field announces required that the schema will accept
+  empty. How a given screen reader voices it is unconfirmed.
+- **Seven `<label for>` attributes on the dashboard resolve to no element** — "Types",
+  "Cover image", "Gallery" and the four "Image N file" labels. These are `FormLabel`s on
+  COMPOSITE controls (a checkbox group, an uploader, a list), where `FormItem`'s generated id
+  has no single control to land on. **Pre-existing** — `FormCheckboxGroup` is prompt 6's,
+  `ImageUploadField` and `GalleryField` are prompt 10's, and this prompt only added more
+  instances of the same components. Out of scope here; owed, and it belongs in the `form/`
+  tier's `FormLabel` wiring rather than in any one editor.
+- **Prompt 13's `RecordForm` / `FormButton` finding still stands**, unchanged and untouched:
+  in the state right after an upload, Save is disabled while `mode: 'onChange'` has surfaced
+  an error only for the field that changed. It is not reachable in the Persian-title case
+  above, because clearing a field touches it.
 
 ## Deviations from the architecture playbook
 
@@ -2774,3 +3164,10 @@ Each is deliberate. Re-enable conditions are stated so the next agent does not "
   disappearing with all four gate commands green. It has now happened twice — `studio.awards`
   in prompt 5, `studio.founders` in prompt 10. Use `embeddedImagePath` /`embeddedImageAlt` in
   `common/schemas/image.ts` as the pattern.
+
+  **The same applies to a whole COLUMN added to a table that already has rows.** An
+  `ALTER TABLE ... ADD COLUMN` with no default leaves NULL on every existing row, so a JSON
+  column declared with a leaf that rejects NULL blanks its section on the very first read.
+  Prompt 14 added `gallery_en` / `gallery_fa` to three more tables and pinned the tolerance
+  per table, by name, in `common/schemas/__tests__/image.test.ts` — an abstract test of
+  `galleryColumn` would not have caught a single column declared wrong.
