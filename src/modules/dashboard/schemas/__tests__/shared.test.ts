@@ -1,45 +1,18 @@
 // @vitest-environment node
 /**
- * `shared.ts` is the one place the year bounds and the Persian-fallback rule are
- * implemented; every resource this prompt adds (design works, media, studio, contact)
- * imports these functions rather than re-deriving them. Testing them once here is what
- * makes it safe to trust every resource's schema test to cover only what is specific to
- * that resource.
+ * `shared.ts` is the one place the year bounds are implemented; design works and media both
+ * import them rather than re-deriving them. Testing them once here is what makes it safe to
+ * trust every resource's schema test to cover only what is specific to that resource.
+ *
+ * ─── THE `fallbackText` / `fallbackList` SUITES WENT WITH THE FUNCTIONS (prompt 14) ─
+ * Both helpers implemented "duplicate English into an empty Persian column on save", the
+ * decision prompt 14 reverses, and both are deleted. What replaced them is tested where it
+ * lives rather than here: `./image.test.ts` pins that a Persian value is never copied and
+ * that an empty required one is refused, and `requireTranslatedList` — the rule that makes
+ * removing `fallbackList` safe — is pinned there too.
  */
 import { describe, expect, it } from 'vitest';
-import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from '../shared';
-
-describe('fallbackText', () => {
-  it('fills an empty Persian value with the English one', () => {
-    expect(fallbackText('', 'Kavan Studio')).toBe('Kavan Studio');
-  });
-
-  it('leaves a real Persian value alone, including zero-width characters', () => {
-    const withZwnj = 'خانه‌ها';
-    expect(fallbackText(withZwnj, 'Houses')).toBe(withZwnj);
-  });
-
-  it('treats whitespace-only as empty', () => {
-    expect(fallbackText('   \n ', 'English')).toBe('English');
-  });
-});
-
-describe('fallbackList', () => {
-  it('duplicates the English array wholesale when the Persian one is empty', () => {
-    expect(fallbackList([], ['a', 'b'])).toEqual(['a', 'b']);
-  });
-
-  it('leaves a non-empty Persian array alone, even if shorter than the English one', () => {
-    expect(fallbackList(['یک'], ['one', 'two'])).toEqual(['یک']);
-  });
-
-  it('returns a new array, never the caller’s own reference', () => {
-    const en = ['a'];
-    const result = fallbackList([], en);
-    expect(result).toEqual(en);
-    expect(result).not.toBe(en);
-  });
-});
+import { yearFieldAsNumber, yearFieldAsString } from '../shared';
 
 describe('yearFieldAsString / yearFieldAsNumber agree with each other', () => {
   const string = yearFieldAsString(1900, 2200);

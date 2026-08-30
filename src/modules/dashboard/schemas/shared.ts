@@ -2,11 +2,20 @@
 /**
  * Pieces shared by more than one of this module's write schemas.
  *
- * Design works and media both carry a year field with identical bounds, and every area
- * prompt 7 adds inherits `project-form.ts`'s "duplicate English into an empty Persian
- * column" fallback (AGENTS.md, prompt 6's resolved decision). Promoted here on the SECOND
- * consumer (`references/01-layering-and-boundaries.md`) — into a file inside `dashboard`,
- * not into `common/`, because nothing outside this module's write side needs any of it.
+ * Design works and media both carry a year field with identical bounds. Promoted here on
+ * the SECOND consumer (`references/01-layering-and-boundaries.md`) — into a file inside
+ * `dashboard`, not into `common/`, because nothing outside this module's write side needs
+ * any of it.
+ *
+ * ─── `fallbackText` AND `fallbackList` USED TO LIVE HERE. PROMPT 14 DELETED THEM ───
+ * They implemented "duplicate English into an empty Persian column on save", the decision
+ * AGENTS.md recorded for prompts 6 and 7 and which prompt 14 reverses. A required field is
+ * required in both languages now: the Persian half of a required pair carries `.min(1)` in
+ * its own form schema, and a Persian LIST left empty beside a non-empty English one is
+ * refused by `requireTranslatedList` in `./image` rather than silently duplicated.
+ *
+ * The reasoning for both, and the consequence — an editor can no longer save an
+ * English-only record — is in `./image`'s header and in AGENTS.md.
  */
 import { z } from 'zod';
 
@@ -35,20 +44,22 @@ export function yearFieldAsNumber(min: number, max: number) {
 }
 
 /**
- * Fill an empty Persian TEXT column with its English counterpart. `.trim()` on the test
- * only, never on the stored value — see `project-form.ts`'s `withPersianFallback` for why
- * (several seeded Persian values carry meaningful zero-width non-joiners).
+ * A required TEXT field — non-empty once whitespace is discounted, and never trimmed.
+ *
+ * ─── WHY NOT `.min(1)` ────────────────────────────────────────────────────────────
+ * `.min(1)` counts characters, so `'   '` passes it. That was harmless while an empty
+ * Persian column was filled from the English one on save — `fallbackText` did the trimming,
+ * in its emptiness TEST — but prompt 14 removed the fallback, and a `.min(1)` required
+ * field would accept three spaces and store them. A Persian page would then render a
+ * whitespace title with nothing anywhere reporting it, which is exactly the silent failure
+ * that whole change exists to prevent.
+ *
+ * ─── AND WHY IT DOES NOT TRIM ─────────────────────────────────────────────────────
+ * `.refine`, deliberately not `.trim()`. Several stored Persian values carry meaningful
+ * zero-width non-joiners (AGENTS.md), and a transform that trimmed on the way in would
+ * damage them silently on every save. The test is on a trimmed COPY; the value that reaches
+ * the column is whatever the editor typed.
  */
-export function fallbackText(fa: string, en: string): string {
-  return fa.trim() === '' ? en : fa;
-}
-
-/**
- * The same idea one level up, for a translated LIST column (`team`, `facts`, `founders`…):
- * an untouched Persian array duplicates the English one wholesale rather than being saved
- * empty. Per-item content is not filled in — an editor who adds a row and leaves it blank
- * gets the blank row back, exactly as a lone Persian text field left blank would.
- */
-export function fallbackList<T>(fa: readonly T[], en: readonly T[]): T[] {
-  return fa.length === 0 ? [...en] : [...fa];
+export function requiredText(message: string) {
+  return z.string().refine(value => value.trim() !== '', message);
 }

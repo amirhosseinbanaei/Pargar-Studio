@@ -33,7 +33,7 @@ import {
   PROJECT_LOCALE_FIELDS,
   projectFormSchema,
   projectSubmissionSchema,
-  withPersianFallback,
+  toProjectColumns,
 } from '../schemas/project-form';
 
 /**
@@ -49,6 +49,8 @@ const VALID = {
   status: 'Completed',
   scale: 'Medium',
   titleEn: 'Qeytarieh 08 Residence',
+  // REQUIRED IN BOTH LANGUAGES since prompt 14, so a valid payload carries both halves.
+  titleFa: 'خانه قیطریه ۰۸',
   year: '2021',
 };
 
@@ -67,8 +69,11 @@ describe('the two schemas agree', () => {
     ['a slug with a trailing hyphen', { ...VALID, slug: 'qeytarieh-' }],
     ['a slug with a double hyphen', { ...VALID, slug: 'a--b' }],
     ['an empty English title', { ...VALID, titleEn: '' }],
+    // Both REFUSE these two since prompt 14 — the agreement is what is asserted, and the
+    // verdict itself is pinned by `schemas/__tests__/image.test.ts`.
     ['an empty PERSIAN title', { ...VALID, titleFa: '' }],
-    ['every Persian field empty', { ...VALID, titleFa: '', blurbFa: '', descriptionFa: '' }],
+    ['a whitespace-only Persian title', { ...VALID, titleFa: '   ' }],
+    ['every OPTIONAL Persian field empty', { ...VALID, blurbFa: '', descriptionFa: '' }],
     ['no types at all', { ...VALID, types: [] }],
     // Prompt 9: these three are ACCEPTED by both schemas now, and the agreement is still the
     // thing being asserted. The taxonomy stopped being a `z.enum` when it became editable
@@ -167,36 +172,41 @@ describe('the year, the one deliberate difference', () => {
   });
 });
 
-describe('withPersianFallback', () => {
-  const parsed = () => projectSubmissionSchema.parse({ ...VALID, titleFa: '', blurbEn: 'Blurb.' });
+/**
+ * ~~`withPersianFallback`~~ `toProjectColumns` — RENAMED WITH THE BEHAVIOUR (prompt 14).
+ *
+ * These four cases used to assert the opposite of three of them: that an empty Persian
+ * column was filled with its English counterpart on the way to the database. That decision
+ * is reversed, so they assert the reversal rather than being deleted — a test that quietly
+ * disappears with a behaviour leaves nothing pinning what replaced it.
+ */
+describe('toProjectColumns', () => {
+  const parsed = () => projectSubmissionSchema.parse({ ...VALID, blurbEn: 'Blurb.' });
 
-  it('fills an empty Persian column with its English counterpart', () => {
-    const payload = withPersianFallback(parsed());
-    // The read path has NO fallback (`pickLocale`), so a blank Persian column renders a hole
-    // on the Persian page. The degradation belongs at author time, exactly as the seed does it.
-    expect(payload.titleFa).toBe(VALID.titleEn);
-    expect(payload.blurbFa).toBe('Blurb.');
+  it('leaves an empty OPTIONAL Persian column empty rather than copying the English one', () => {
+    const payload = toProjectColumns(parsed());
+    expect(payload.blurbFa).toBe('');
+    expect(payload.blurbEn).toBe('Blurb.');
   });
 
   it('leaves a real Persian value alone, including its zero-width characters', () => {
     // Several seeded Persian values carry meaningful zero-width non-joiners, and trimming
-    // stored content is how those get quietly damaged. The trim is on the emptiness TEST only.
+    // stored content is how those get quietly damaged. Nothing here trims a stored value.
     const withZwnj = 'خانه‌ها';
-    const payload = withPersianFallback(
+    const payload = toProjectColumns(
       projectSubmissionSchema.parse({ ...VALID, titleFa: withZwnj }),
     );
     expect(payload.titleFa).toBe(withZwnj);
   });
 
-  it('treats a whitespace-only Persian value as empty', () => {
-    const payload = withPersianFallback(
-      projectSubmissionSchema.parse({ ...VALID, titleFa: '   \n ' }),
-    );
-    expect(payload.titleFa).toBe(VALID.titleEn);
+  it('cannot be reached at all with an empty required Persian value', () => {
+    // The schema refuses first, which is what makes the mapper's job "copy the values" and
+    // not "decide what an empty one means".
+    expect(projectSubmissionSchema.safeParse({ ...VALID, titleFa: '' }).success).toBe(false);
   });
 
   it('never emits sortOrder — position is not the form’s to set', () => {
-    expect(withPersianFallback(parsed())).not.toHaveProperty('sortOrder');
+    expect(toProjectColumns(parsed())).not.toHaveProperty('sortOrder');
   });
 });
 

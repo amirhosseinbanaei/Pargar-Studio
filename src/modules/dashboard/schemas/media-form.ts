@@ -19,8 +19,17 @@
  */
 import { z } from 'zod';
 import type { MediaCreate, MediaRow } from '@/common/schemas/media';
-import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
-import { imagePathField, requireAltWithImage, toNullableAlt, toNullablePath } from './image';
+import { requiredText, yearFieldAsNumber, yearFieldAsString } from './shared';
+import {
+  galleryField,
+  imagePathField,
+  requireAltWithImage,
+  requireTranslatedList,
+  toGalleryColumns,
+  toGalleryFormItems,
+  toNullableAlt,
+  toNullablePath,
+} from './image';
 
 /**
  * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
@@ -54,8 +63,10 @@ export const mediaFormSchema = z
     /** `''` = no related project, matching `NO_RELATED_PROJECT`. */
     projectSlug: z.string(),
 
-    titleEn: z.string().min(1, 'An English title is required.'),
-    titleFa: z.string(),
+    titleEn: requiredText('An English title is required.'),
+    titleFa: requiredText(
+      'A Persian title is required — it is no longer copied from the English one on save.',
+    ),
     outletEn: z.string(),
     outletFa: z.string(),
     blurbEn: z.string(),
@@ -71,15 +82,19 @@ export const mediaFormSchema = z
     factsFa: z.array(factFormSchema),
 
     /**
-     * A COVER ONLY — no gallery. With none, the card and the detail page keep the drawing
-     * seeded from the RELATED PROJECT rather than from the entry, so a cutting about a
-     * building carries the building's picture (AGENTS.md).
+     * A COVER AND A GALLERY, since prompt 14. What is unchanged is the FALLBACK SEED: an
+     * entry with no cover still takes the related PROJECT's drawing rather than its own, so
+     * a cutting about a building is still tied to the building (AGENTS.md).
      */
     coverImage: imagePathField,
     coverAltEn: z.string(),
     coverAltFa: z.string(),
+    gallery: galleryField,
   })
-  .superRefine(requireAltWithImage);
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.factsEn, values.factsFa, ctx, 'factsFa', 'facts');
+  });
 
 export type MediaFormValues = z.infer<typeof mediaFormSchema>;
 
@@ -105,6 +120,7 @@ export const MEDIA_FORM_FIELDS = [
   'coverImage',
   'coverAltEn',
   'coverAltFa',
+  'gallery',
 ] as const satisfies ReadonlyArray<keyof MediaFormValues>;
 
 export const EMPTY_MEDIA_FORM: MediaFormValues = {
@@ -130,6 +146,7 @@ export const EMPTY_MEDIA_FORM: MediaFormValues = {
   coverImage: '',
   coverAltEn: '',
   coverAltFa: '',
+  gallery: [],
 };
 
 export function toMediaFormValues(row: MediaRow): MediaFormValues {
@@ -157,6 +174,7 @@ export function toMediaFormValues(row: MediaRow): MediaFormValues {
     coverImage: row.coverImage ?? '',
     coverAltEn: row.coverAltEn,
     coverAltFa: row.coverAltFa,
+    gallery: toGalleryFormItems(row.galleryEn, row.galleryFa),
   };
 }
 
@@ -171,8 +189,8 @@ export const mediaSubmissionSchema = z
     year: yearFieldAsNumber(MEDIA_YEAR_MIN, MEDIA_YEAR_MAX),
     projectSlug: z.string().transform(value => (value === NO_RELATED_PROJECT ? null : value)),
 
-    titleEn: z.string().min(1),
-    titleFa: z.string(),
+    titleEn: requiredText('required'),
+    titleFa: requiredText('required'),
     outletEn: z.string(),
     outletFa: z.string(),
     blurbEn: z.string(),
@@ -187,45 +205,47 @@ export const mediaSubmissionSchema = z
     factsEn: z.array(factFormSchema),
     factsFa: z.array(factFormSchema),
 
-    /**
-     * A COVER ONLY — no gallery. With none, the card and the detail page keep the drawing
-     * seeded from the RELATED PROJECT rather than from the entry, so a cutting about a
-     * building carries the building's picture (AGENTS.md).
-     */
+    /** Same three plus the list — see the form schema. */
     coverImage: imagePathField,
     coverAltEn: z.string(),
     coverAltFa: z.string(),
+    gallery: galleryField,
   })
-  .superRefine(requireAltWithImage);
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.factsEn, values.factsFa, ctx, 'factsFa', 'facts');
+  });
 
 export type MediaSubmission = z.output<typeof mediaSubmissionSchema>;
 
-export function withPersianFallback(input: MediaSubmission): Omit<MediaCreate, 'sortOrder'> {
+/** The parsed submission -> the write payload. Nothing is copied between locales; see
+ *  `project-form.ts`'s `toProjectColumns`. */
+export function toMediaColumns(input: MediaSubmission): Omit<MediaCreate, 'sortOrder'> {
   return {
     slug: input.slug,
     type: input.type,
     year: input.year,
     projectSlug: input.projectSlug,
     titleEn: input.titleEn,
-    titleFa: fallbackText(input.titleFa, input.titleEn),
+    titleFa: input.titleFa,
     outletEn: input.outletEn,
-    outletFa: fallbackText(input.outletFa, input.outletEn),
+    outletFa: input.outletFa,
     blurbEn: input.blurbEn,
-    blurbFa: fallbackText(input.blurbFa, input.blurbEn),
+    blurbFa: input.blurbFa,
     authorEn: input.authorEn,
-    authorFa: fallbackText(input.authorFa, input.authorEn),
+    authorFa: input.authorFa,
     excerptEn: input.excerptEn,
-    excerptFa: fallbackText(input.excerptFa, input.excerptEn),
+    excerptFa: input.excerptFa,
     contextEn: input.contextEn,
-    contextFa: fallbackText(input.contextFa, input.contextEn),
+    contextFa: input.contextFa,
     factsEn: input.factsEn,
-    factsFa: fallbackList(input.factsFa, input.factsEn),
+    factsFa: input.factsFa,
 
-    /** ALT TEXT IS NOT FALLEN BACK — see `./image`'s header for why this one translated
-     *  field is the exception. */
+    /** Alt text was the one field that never fell back; since prompt 14 nothing does. */
     coverImage: toNullablePath(input.coverImage),
     coverAltEn: toNullableAlt(input.coverAltEn),
     coverAltFa: toNullableAlt(input.coverAltFa),
+    ...toGalleryColumns(input.gallery),
   };
 }
 

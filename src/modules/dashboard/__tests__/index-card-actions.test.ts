@@ -40,8 +40,12 @@ const PATH = '2026/08/0123456789abcdef0123456789abcdef.jpg';
 const VALID = {
   sectionId: 'projects',
   titleEn: 'Work',
-  titleFa: '',
+  // REQUIRED IN BOTH LANGUAGES since prompt 14 — `persianField` became `requiredPersian`,
+  // the one-line change prompt 13 left this file's header pointing at.
+  titleFa: 'کارها',
   captionEn: 'The archive',
+  // The CAPTION stays optional on both sides, so its Persian half stays optional too: a
+  // pair's two halves follow each other, which is the whole point of the required sweep.
   captionFa: '',
   coverImage: '',
   coverAltEn: '',
@@ -133,16 +137,19 @@ describe('the action', () => {
 describe('toIndexCardColumns', () => {
   it('does NOT fill an empty Persian column from the English one', () => {
     /**
-     * The deliberate divergence from every other editor in this module. `withPersianFallback`
-     * exists because a blank Persian page is worse than an untranslated one — but here an
-     * empty column is not blank, it renders `nav.<id>` from the message catalog, which is
-     * authored Persian. Copying "Work" in would replace good Persian with English AND
-     * populate the column, so nothing afterwards could tell the translation was never done.
+     * This was the deliberate DIVERGENCE from every other editor in this module when prompt
+     * 13 wrote it; prompt 14 removed the fallback everywhere, so it is now simply the rule.
+     * The local argument still stands and is why these five would not have wanted the
+     * fallback even if it had survived: an empty column here is not blank, it renders
+     * `nav.<id>` / `cap.<id>` from the message catalog, which is authored Persian. Copying
+     * "The archive" in would replace good Persian with English AND populate the column, so
+     * nothing afterwards could tell the translation was never done.
      */
     const columns = toIndexCardColumns(indexCardSubmissionSchema.parse(VALID));
 
-    expect(columns.titleFa).toBe('');
     expect(columns.captionFa).toBe('');
+    // And a real Persian value reaches the column untouched.
+    expect(columns.titleFa).toBe(VALID.titleFa);
   });
 
   it('normalizes an empty picture and alt to null, never to an empty string', () => {

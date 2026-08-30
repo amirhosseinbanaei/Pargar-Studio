@@ -11,7 +11,7 @@ import { CACHE_TAGS } from '@/common/services/cache-tags';
 import { toActionResult, type ActionResult } from '@/common/services/action-result';
 import { updateStudio } from '@/common/services/studio-service';
 import { readSession } from '@/common/services/session';
-import { studioSubmissionSchema, withPersianFallback } from '../schemas/studio-form';
+import { studioSubmissionSchema, toStudioColumns } from '../schemas/studio-form';
 
 export async function updateStudioAction(input: unknown): Promise<ActionResult> {
   const session = await readSession();
@@ -22,7 +22,7 @@ export async function updateStudioAction(input: unknown): Promise<ActionResult> 
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
-  const result = await toActionResult(() => updateStudio(withPersianFallback(parsed.data)));
+  const result = await toActionResult(() => updateStudio(toStudioColumns(parsed.data)));
   if (!result.ok) return result;
 
   // `null` — the database has not been seeded, so there is no row 1 to update. Reported as

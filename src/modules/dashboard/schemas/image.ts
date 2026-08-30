@@ -18,24 +18,31 @@
  * 76 existing projects unsaveable until somebody wrote a sentence about an image that does
  * not exist.
  *
- * ═══ AND PERSIAN ALT TEXT DOES *NOT* FALL BACK TO ENGLISH ═════════════════════════
- * This is the ONE deliberate exception to the "Persian is optional, filled from English on
- * save" decision that AGENTS.md records for prompts 6 and 7, and it is worth stating plainly
- * because the next person to touch `withPersianFallback` will otherwise "fix" it:
+ * ═══ PERSIAN IS NEVER FILLED IN FROM ENGLISH — THE RULE, NOT AN EXCEPTION ═════════
+ * This section used to open "this is the ONE deliberate exception to the Persian-is-
+ * optional decision". PROMPT 14 MADE IT THE RULE. `withPersianFallback` is gone from every
+ * submission schema in this module: an empty Persian value is a refusal now, not a silent
+ * copy of the English one.
  *
- *   Falling back is right for PROSE. A Persian page showing an untranslated English
- *   paragraph is imperfect but readable, and blocking publication on translation was the
- *   worse trade.
+ * The argument that made alt text special was always the general argument, and prompts 6
+ * and 7 simply weighed it differently for prose:
  *
- *   Falling back is wrong for ALT TEXT. Alt text is not read, it is HEARD — by a Persian
- *   screen reader, which will pronounce an English sentence with Persian phonetics and
- *   produce noise. There is no partial credit: the listener gets nothing either way, and
- *   the copied sentence additionally hides the omission from anyone auditing the page,
- *   because the column is populated.
+ *   The case FOR falling back was that a blank Persian page is worse than an untranslated
+ *   one, and that blocking publication on translation turns a content decision into a
+ *   deployment blocker. Both are true, and both are answered by refusing the SAVE rather
+ *   than by writing English into a Persian column: the editor is told, at the field, before
+ *   anything is stored, and nothing is published half-translated either way.
  *
- * So both alt fields are required together, and neither is auto-filled — not from the other
- * locale, and not from the filename, which describes a camera's numbering scheme rather than
- * a building.
+ *   The case AGAINST was always decisive for anything HEARD. A Persian screen reader
+ *   pronounces an English sentence with Persian phonetics and produces noise — and the
+ *   copied sentence additionally HIDES the omission from anyone auditing the page, because
+ *   the column is populated. That second half is what generalizes: a filled-in Persian
+ *   column is indistinguishable from a translated one, in every field, forever.
+ *
+ * So both alt fields are required together, neither is auto-filled — not from the other
+ * locale, and not from the filename, which describes a camera's numbering scheme rather
+ * than a building — and so is every other required pair in this module. See AGENTS.md,
+ * "Galleries and required fields (prompt 14)".
  */
 import { z } from 'zod';
 import { galleryItemWriteSchema, type GalleryItemWrite } from '@/common/schemas/image';
@@ -97,6 +104,74 @@ export interface ImageBearingValues {
 }
 
 /**
+ * THE GALLERY HALF OF THE RULE, ON ITS OWN.
+ *
+ * Extracted in prompt 14 because `studio` gained a gallery and has no COVER: its pictures
+ * are the page's band and each founder's portrait, neither of which is a `coverImage`
+ * field. Composing the two halves beats widening `ImageBearingValues` with three optional
+ * keys — a rule whose inputs are all optional is a rule that silently checks nothing.
+ *
+ * `basePath` names the list, so the issue lands on `['gallery', 2, 'altFa']` for a record
+ * form and on whatever a caller with a differently-named list passes.
+ */
+export function requireGalleryAlt(
+  gallery: readonly GalleryFormItem[] | undefined,
+  ctx: z.RefinementCtx,
+  basePath = 'gallery',
+): void {
+  gallery?.forEach((item, index) => {
+    if (item.altEn.trim() === '') {
+      ctx.addIssue({
+        code: 'custom',
+        path: [basePath, index, 'altEn'],
+        message: `Image ${index + 1} needs an English description.`,
+      });
+    }
+    if (item.altFa.trim() === '') {
+      ctx.addIssue({
+        code: 'custom',
+        path: [basePath, index, 'altFa'],
+        message: `Image ${index + 1} needs a Persian description.`,
+      });
+    }
+  });
+}
+
+/**
+ * "A LIST TRANSLATED IN ONE LANGUAGE MUST BE TRANSLATED IN BOTH."
+ *
+ * The list-column counterpart of the required-in-both-languages rule, and the reason
+ * removing `fallbackList` (prompt 14) is safe rather than a new way to blank a page.
+ *
+ * `fallbackList` used to duplicate an empty Persian list from the English one on save. With
+ * it gone, an editor who fills the English team and leaves the Persian one empty would get
+ * a Persian page with no team at all and nothing anywhere reporting it — which is the exact
+ * silent-blank failure this codebase has been bitten by twice. So the empty Persian list is
+ * REFUSED instead: the message lands on the Persian list's own control, before anything is
+ * stored, and the editor can act on it.
+ *
+ * It is one-directional on purpose. An English list left empty beside a Persian one is not
+ * flagged, because the English side is the one every fallback in the site already leans on
+ * and an editor working Persian-first is not doing anything wrong.
+ */
+export function requireTranslatedList(
+  en: readonly unknown[],
+  fa: readonly unknown[],
+  ctx: z.RefinementCtx,
+  faPath: string,
+  /** Names the list in the message: "team", "facts", "awards". */
+  subject: string,
+): void {
+  if (en.length > 0 && fa.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [faPath],
+      message: `Add the ${subject} in Persian too. It is no longer copied from the English list on save, so leaving this empty publishes a Persian page without it.`,
+    });
+  }
+}
+
+/**
  * "An image must be described, in both languages."
  *
  * Applied with `.superRefine`, so each message lands on the FIELD that is empty — `path:
@@ -134,22 +209,7 @@ export function requireAltWithImage(
     }
   }
 
-  values.gallery?.forEach((item, index) => {
-    if (item.altEn.trim() === '') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['gallery', index, 'altEn'],
-        message: `Image ${index + 1} needs an English description.`,
-      });
-    }
-    if (item.altFa.trim() === '') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['gallery', index, 'altFa'],
-        message: `Image ${index + 1} needs a Persian description.`,
-      });
-    }
-  });
+  requireGalleryAlt(values.gallery, ctx);
 }
 
 /* ────────────────────────────────────────────────────────────────────────────────

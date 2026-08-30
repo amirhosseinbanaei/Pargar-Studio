@@ -22,8 +22,16 @@
  */
 import { z } from 'zod';
 import type { StudioRow, StudioUpdate } from '@/common/schemas/studio';
-import { fallbackList, fallbackText } from './shared';
-import { imagePathField, toNullableAlt, toNullablePath } from './image';
+import {
+  galleryField,
+  imagePathField,
+  requireGalleryAlt,
+  requireTranslatedList,
+  toGalleryColumns,
+  toGalleryFormItems,
+  toNullableAlt,
+  toNullablePath,
+} from './image';
 
 /**
  * A founder, with their portrait.
@@ -52,27 +60,95 @@ const awardFormSchema = z.object({
 });
 const chapterFormSchema = z.object({ year: z.string(), text: z.string() });
 
+/**
+ * EVERY PICTURE ON THIS PAGE MUST BE DESCRIBED, AND EVERY LIST MUST EXIST IN BOTH.
+ *
+ * ─── THE FOUNDER-PORTRAIT HOLE PROMPT 14's SWEEP FOUND ────────────────────────────
+ * Prompt 10 made alt text required wherever there is an image and applied
+ * `requireAltWithImage` to four editors. This one was not among them, because its picture
+ * is not a `coverImage` — it is `foundersEn[i].image`, a key inside a repeatable row — so a
+ * founder could be saved with a portrait and no description, in either language, with
+ * nothing refusing it. `StudioScreen` then quietly falls back to the GENERATED portrait
+ * (it requires `founder.imageAlt.trim()` before rendering the photograph), so the symptom
+ * was an uploaded picture that simply never appeared. Refused here now, per founder and
+ * per language, on the same terms as every other image in the dashboard.
+ *
+ * ─── AND THE LISTS ────────────────────────────────────────────────────────────────
+ * `fallbackList` used to fill an empty Persian list from the English one on save; prompt 14
+ * deletes it, and this refuses the save instead. It matters most on this record: six of its
+ * seven fields are lists, and an empty Persian one is a whole missing SECTION of
+ * `/fa/studio` rather than a blank line — which is the failure this table has already
+ * produced twice by other means (`awards`, `founders`).
+ */
+function requireStudioImages(
+  values: Pick<
+    StudioFormValues,
+    | 'foundersEn'
+    | 'foundersFa'
+    | 'statsEn'
+    | 'statsFa'
+    | 'teamEn'
+    | 'teamFa'
+    | 'alumniEn'
+    | 'alumniFa'
+    | 'awardsEn'
+    | 'awardsFa'
+    | 'chaptersEn'
+    | 'chaptersFa'
+    | 'gallery'
+  >,
+  ctx: z.RefinementCtx,
+): void {
+  requireGalleryAlt(values.gallery, ctx);
+
+  // Both sides, because `imageAlt` is a genuine per-locale column and the path is copied
+  // across by index on save — so a Persian founder row carries the same photograph and
+  // needs its own sentence for it.
+  for (const side of ['foundersEn', 'foundersFa'] as const) {
+    values[side].forEach((founder, index) => {
+      if (founder.image.trim() !== '' && founder.imageAlt.trim() === '') {
+        ctx.addIssue({
+          code: 'custom',
+          path: [side, index, 'imageAlt'],
+          message: `Describe ${founder.name.trim() || `founder ${index + 1}`}'s portrait — an undescribed photograph is not rendered at all.`,
+        });
+      }
+    });
+  }
+
+  requireTranslatedList(values.foundersEn, values.foundersFa, ctx, 'foundersFa', 'founders');
+  requireTranslatedList(values.statsEn, values.statsFa, ctx, 'statsFa', 'stats');
+  requireTranslatedList(values.teamEn, values.teamFa, ctx, 'teamFa', 'team');
+  requireTranslatedList(values.alumniEn, values.alumniFa, ctx, 'alumniFa', 'alumni');
+  requireTranslatedList(values.awardsEn, values.awardsFa, ctx, 'awardsFa', 'awards');
+  requireTranslatedList(values.chaptersEn, values.chaptersFa, ctx, 'chaptersFa', 'chapters');
+}
+
 /* ────────────────────────────────────────────────────────────────────────────────
    The form schema — carries copy. Every field lenient: this is a whole-record save
    of an already-published page, not a gate on publishing a new one.
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const studioFormSchema = z.object({
-  manifestoEn: z.string(),
-  manifestoFa: z.string(),
-  foundersEn: z.array(founderFormSchema),
-  foundersFa: z.array(founderFormSchema),
-  statsEn: z.array(statFormSchema),
-  statsFa: z.array(statFormSchema),
-  teamEn: z.array(z.string()),
-  teamFa: z.array(z.string()),
-  alumniEn: z.array(z.string()),
-  alumniFa: z.array(z.string()),
-  awardsEn: z.array(awardFormSchema),
-  awardsFa: z.array(awardFormSchema),
-  chaptersEn: z.array(chapterFormSchema),
-  chaptersFa: z.array(chapterFormSchema),
-});
+export const studioFormSchema = z
+  .object({
+    manifestoEn: z.string(),
+    manifestoFa: z.string(),
+    foundersEn: z.array(founderFormSchema),
+    foundersFa: z.array(founderFormSchema),
+    statsEn: z.array(statFormSchema),
+    statsFa: z.array(statFormSchema),
+    teamEn: z.array(z.string()),
+    teamFa: z.array(z.string()),
+    alumniEn: z.array(z.string()),
+    alumniFa: z.array(z.string()),
+    awardsEn: z.array(awardFormSchema),
+    awardsFa: z.array(awardFormSchema),
+    chaptersEn: z.array(chapterFormSchema),
+    chaptersFa: z.array(chapterFormSchema),
+    /** The page's own gallery (prompt 14) — the hero band plus the band below it. */
+    gallery: galleryField,
+  })
+  .superRefine(requireStudioImages);
 
 export type StudioFormValues = z.infer<typeof studioFormSchema>;
 
@@ -91,6 +167,7 @@ export const STUDIO_FORM_FIELDS = [
   'awardsFa',
   'chaptersEn',
   'chaptersFa',
+  'gallery',
 ] as const satisfies ReadonlyArray<keyof StudioFormValues>;
 
 function toFounderFormValue(founder: StudioRow['foundersEn'][number]) {
@@ -115,6 +192,7 @@ export function toStudioFormValues(row: StudioRow): StudioFormValues {
     awardsFa: row.awardsFa,
     chaptersEn: row.chaptersEn,
     chaptersFa: row.chaptersFa,
+    gallery: toGalleryFormItems(row.galleryEn, row.galleryFa),
   };
 }
 
@@ -122,64 +200,64 @@ export function toStudioFormValues(row: StudioRow): StudioFormValues {
    The submission schema — carries no copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const studioSubmissionSchema = z.strictObject({
-  manifestoEn: z.string(),
-  manifestoFa: z.string(),
-  foundersEn: z.array(founderFormSchema),
-  foundersFa: z.array(founderFormSchema),
-  statsEn: z.array(statFormSchema),
-  statsFa: z.array(statFormSchema),
-  teamEn: z.array(z.string()),
-  teamFa: z.array(z.string()),
-  alumniEn: z.array(z.string()),
-  alumniFa: z.array(z.string()),
-  awardsEn: z.array(awardFormSchema),
-  awardsFa: z.array(awardFormSchema),
-  chaptersEn: z.array(chapterFormSchema),
-  chaptersFa: z.array(chapterFormSchema),
-});
+export const studioSubmissionSchema = z
+  .strictObject({
+    manifestoEn: z.string(),
+    manifestoFa: z.string(),
+    foundersEn: z.array(founderFormSchema),
+    foundersFa: z.array(founderFormSchema),
+    statsEn: z.array(statFormSchema),
+    statsFa: z.array(statFormSchema),
+    teamEn: z.array(z.string()),
+    teamFa: z.array(z.string()),
+    alumniEn: z.array(z.string()),
+    alumniFa: z.array(z.string()),
+    awardsEn: z.array(awardFormSchema),
+    awardsFa: z.array(awardFormSchema),
+    chaptersEn: z.array(chapterFormSchema),
+    chaptersFa: z.array(chapterFormSchema),
+    gallery: galleryField,
+  })
+  .superRefine(requireStudioImages);
 
 export type StudioSubmission = z.output<typeof studioSubmissionSchema>;
 
-export function withPersianFallback(input: StudioSubmission): StudioUpdate {
+/** The parsed submission -> the write payload. Nothing is copied between locales; see
+ *  `project-form.ts`'s `toProjectColumns`. */
+export function toStudioColumns(input: StudioSubmission): StudioUpdate {
   /**
-   * THE PORTRAIT PATH IS COPIED ACROSS, THE DESCRIPTION IS NOT.
+   * THE PORTRAIT PATH IS STILL COPIED ACROSS, AND IT IS THE ONLY THING THAT IS.
    *
    * `image` has one author — the English founders editor, which is where the uploader is —
-   * so it is written into the Persian array by INDEX here rather than being edited twice.
-   * That is what stops the two arrays disagreeing about which photograph a founder has,
-   * which is a bug with no symptom in English.
+   * so it is written into the Persian array by INDEX rather than edited twice. That is not
+   * a Persian fallback and did not go with them: it stops the two arrays disagreeing about
+   * WHICH PHOTOGRAPH a founder has, which is a bug with no symptom in English. What is
+   * per-locale is the sentence describing it, and that is never copied.
    *
-   * `imageAlt` is deliberately NOT copied and deliberately not run through `fallbackList`'s
-   * per-item logic: it is alt text, and the one translated field in this codebase that must
-   * not fall back to English. `../schemas/image`'s header carries that argument in full —
-   * alt text is heard rather than read, and an English sentence spoken by a Persian screen
-   * reader is noise that also hides the omission from an audit.
-   *
-   * `fallbackList` still applies to the founders list AS A WHOLE, unchanged: a Persian
-   * array left entirely empty is filled from the English one, which is what stops an
-   * untranslated studio page rendering with no founders at all.
+   * The `fallbackList` that used to fill an empty Persian founders array from the English
+   * one is gone. `requireStudioImages` refuses that save instead — see its header.
    */
-  const foundersFa = fallbackList(input.foundersFa, input.foundersEn).map((founder, index) => ({
+  const foundersFa = input.foundersFa.map((founder, index) => ({
     ...founder,
     image: input.foundersEn[index]?.image ?? founder.image,
   }));
 
   return {
     manifestoEn: input.manifestoEn,
-    manifestoFa: fallbackText(input.manifestoFa, input.manifestoEn),
+    manifestoFa: input.manifestoFa,
     foundersEn: input.foundersEn.map(toFounderColumn),
     foundersFa: foundersFa.map(toFounderColumn),
     statsEn: input.statsEn,
-    statsFa: fallbackList(input.statsFa, input.statsEn),
+    statsFa: input.statsFa,
     teamEn: input.teamEn,
-    teamFa: fallbackList(input.teamFa, input.teamEn),
+    teamFa: input.teamFa,
     alumniEn: input.alumniEn,
-    alumniFa: fallbackList(input.alumniFa, input.alumniEn),
+    alumniFa: input.alumniFa,
     awardsEn: input.awardsEn,
-    awardsFa: fallbackList(input.awardsFa, input.awardsEn),
+    awardsFa: input.awardsFa,
     chaptersEn: input.chaptersEn,
-    chaptersFa: fallbackList(input.chaptersFa, input.chaptersEn),
+    chaptersFa: input.chaptersFa,
+    ...toGalleryColumns(input.gallery),
   };
 }
 

@@ -303,22 +303,48 @@ describe('updateProjectAction', () => {
     expect(payload.year).toBe(2021);
   });
 
-  it('fills an empty Persian field with its English counterpart', async () => {
+  /**
+   * ~~fills an empty Persian field with its English counterpart~~ REVERSED IN PROMPT 14.
+   *
+   * These two cases asserted the fallback. They assert its absence instead of being
+   * deleted: a behaviour whose test disappears with it has nothing left that would notice
+   * it coming back, and `withPersianFallback` is exactly the kind of helper somebody
+   * re-adds for consistency.
+   */
+  it('writes every Persian value exactly as it arrived, copying NOTHING', async () => {
     await updateProjectAction(7, VALID);
     const [, payload] = updateProject.mock.calls[0] as [number, Record<string, string>];
 
-    // Persian is optional in the form. The fallback is applied HERE, at author time, which
-    // is what lets `pickLocale` have no fallback branch and the Persian page never render
-    // a hole. `blurbFa` was empty; `titleFa` was not and must be left alone.
-    expect(payload.blurbFa).toBe(VALID.blurbEn);
-    expect(payload.locationFa).toBe(VALID.locationEn);
+    // `blurbFa` and `locationFa` are empty in VALID and stay empty. They are OPTIONAL
+    // fields, so an empty one is a legitimate save — it is the REQUIRED pairs the schema
+    // refuses, before the action ever reaches this mapper.
+    expect(payload.blurbFa).toBe('');
+    expect(payload.locationFa).toBe('');
     expect(payload.titleFa).toBe(VALID.titleFa);
   });
 
-  it('treats a whitespace-only Persian field as empty', async () => {
-    await updateProjectAction(7, { ...VALID, blurbFa: '   ' });
+  it('REFUSES an empty Persian title rather than filling it in', async () => {
+    // The consequence stated in AGENTS.md, at the boundary that enforces it: an action is a
+    // public endpoint, so the refusal has to live here and not only in the form.
+    const result = await updateProjectAction(7, { ...VALID, titleFa: '' });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 422,
+      body: expect.objectContaining({ titleFa: expect.any(Array) }),
+    });
+    expect(updateProject).not.toHaveBeenCalled();
+  });
+
+  it('treats a whitespace-only Persian title as empty, and stores nothing trimmed', async () => {
+    // `.refine` on a trimmed COPY, never `.trim()` on the value — several stored Persian
+    // values carry meaningful zero-width non-joiners. See `schemas/shared.ts`.
+    expect((await updateProjectAction(7, { ...VALID, titleFa: '   ' })).ok).toBe(false);
+
+    const padded = ' خانه\u200cها ';
+    await updateProjectAction(7, { ...VALID, titleFa: padded });
     const [, payload] = updateProject.mock.calls[0] as [number, Record<string, string>];
-    expect(payload.blurbFa).toBe(VALID.blurbEn);
+    expect(payload.titleFa).toBe(padded);
   });
 
   it('PURGES THE OLD SLUG TOO when the slug changes', async () => {

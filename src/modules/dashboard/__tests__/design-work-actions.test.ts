@@ -60,7 +60,8 @@ const VALID = {
   status: 'Completed',
   year: '2021',
   titleEn: 'Kavan Identity',
-  titleFa: '',
+  // REQUIRED IN BOTH LANGUAGES since prompt 14, so a valid payload carries both halves.
+  titleFa: 'هویت کاوان',
   blurbEn: '',
   blurbFa: '',
   clientEn: '',
@@ -75,8 +76,8 @@ const VALID = {
   teamFa: [],
   factsEn: [],
   factsFa: [],
-  // No photograph — the state of every seeded record, and the one the generated-drawing
-  // fallback has to keep working in. `strictObject` requires the keys to be present.
+  // No photograph — the state of every seeded record, and since prompt 14 the state that
+  // renders an empty frame rather than a drawing. `strictObject` requires the keys present.
   coverImage: '',
   coverAltEn: '',
   coverAltFa: '',
@@ -188,23 +189,57 @@ describe('validation', () => {
 });
 
 describe('the write path', () => {
-  it('fills an empty Persian title with the English one', async () => {
-    await createDesignWorkAction(VALID);
-    const [payload] = createDesignWork.mock.calls[0] as [Record<string, unknown>];
-    expect(payload.titleFa).toBe(VALID.titleEn);
+  /**
+   * ~~fills an empty Persian title / duplicates an empty Persian list~~ REVERSED IN PROMPT
+   * 14. Both cases assert the reversal rather than being deleted — see
+   * `project-actions.test.ts` for why a removed behaviour keeps its test.
+   */
+  it('REFUSES an empty Persian title rather than filling it from the English one', async () => {
+    const result = await createDesignWorkAction({ ...VALID, titleFa: '' });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 422,
+      body: expect.objectContaining({ titleFa: expect.any(Array) }),
+    });
+    expect(createDesignWork).not.toHaveBeenCalled();
   });
 
-  it('duplicates an empty Persian team/facts list from the English one', async () => {
-    await createDesignWorkAction({
+  it('REFUSES an English team/facts list beside an empty Persian one', async () => {
+    // `fallbackList` used to duplicate them. Removing it without this would be a new way to
+    // blank a section of `/fa/design/<slug>` in silence, which is the failure this project
+    // has already produced twice — so the save is refused at the Persian field instead.
+    const result = await createDesignWorkAction({
       ...VALID,
       teamEn: ['Ada'],
       teamFa: [],
       factsEn: [{ k: 'Edition', v: 'One-off' }],
       factsFa: [],
     });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 422,
+      body: expect.objectContaining({
+        teamFa: expect.any(Array),
+        factsFa: expect.any(Array),
+      }),
+    });
+    expect(createDesignWork).not.toHaveBeenCalled();
+  });
+
+  it('writes both lists unchanged once the Persian side has rows', async () => {
+    await createDesignWorkAction({
+      ...VALID,
+      teamEn: ['Ada'],
+      teamFa: ['آدا'],
+      factsEn: [{ k: 'Edition', v: 'One-off' }],
+      factsFa: [{ k: 'نسخه', v: 'تک‌نسخه' }],
+    });
     const [payload] = createDesignWork.mock.calls[0] as [Record<string, unknown>];
-    expect(payload.teamFa).toEqual(['Ada']);
-    expect(payload.factsFa).toEqual([{ k: 'Edition', v: 'One-off' }]);
+
+    expect(payload.teamFa).toEqual(['آدا']);
+    expect(payload.factsFa).toEqual([{ k: 'نسخه', v: 'تک‌نسخه' }]);
   });
 
   it('creates and purges the collection and the new instance tag', async () => {

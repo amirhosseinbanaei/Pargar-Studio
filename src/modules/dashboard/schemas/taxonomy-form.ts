@@ -14,14 +14,16 @@
  * So the update schema below is labels only, and the absence of `value` from it is the
  * enforcement, not a comment.
  *
- * ─── WHY BOTH LABELS ARE REQUIRED HERE, UNLIKE EVERY OTHER PERSIAN FIELD ──────────
- * Persian is optional on every content form: an empty `_fa` column is filled with its
- * English counterpart before the write (`withPersianFallback`), so a studio is never blocked
- * from publishing by a missing translation. A term is one word, entered once, and it is the
- * thing every Persian rail on the site renders — so the same fallback would quietly put an
- * English word on the Persian page for as long as nobody noticed. `.min(1)` on both makes
- * that a decision rather than an accident. It is two words, at the moment the term is
- * created, and never again.
+ * ─── BOTH LABELS ARE REQUIRED — ONCE THE EXCEPTION, NOW THE RULE ─────────────────
+ * This was the only place in the dashboard where a Persian field was required. The argument
+ * was that Persian was optional on every content form because an empty `_fa` column was
+ * filled with its English counterpart before the write, and that the same fallback would
+ * quietly put an English word on every Persian rail on the site for as long as nobody
+ * noticed.
+ *
+ * PROMPT 14 GENERALIZED EXACTLY THAT ARGUMENT and removed the fallback everywhere: a
+ * populated column is indistinguishable from a translated one, in every field. Nothing here
+ * changed — `.min(1)` on both labels was right and stays — but it is no longer an exception.
  */
 import { z } from 'zod';
 import {

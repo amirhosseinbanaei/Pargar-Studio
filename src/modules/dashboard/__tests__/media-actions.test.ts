@@ -50,7 +50,8 @@ const VALID = {
   year: '2021',
   projectSlug: '',
   titleEn: 'Qeytarieh 08 on ArchDaily',
-  titleFa: '',
+  // REQUIRED IN BOTH LANGUAGES since prompt 14.
+  titleFa: 'قیطریه ۰۸ در آرک‌دیلی',
   outletEn: 'ArchDaily',
   outletFa: '',
   blurbEn: '',
@@ -63,10 +64,13 @@ const VALID = {
   contextFa: '',
   factsEn: [],
   factsFa: [],
-  // No photograph — the state of every seeded record. `strictObject` requires the keys.
+  // No photograph — the state of every seeded record, and since prompt 14 the state that
+  // renders an empty frame rather than the related project's drawing. `strictObject`
+  // requires the keys, `gallery` included: this table gained one in prompt 14.
   coverImage: '',
   coverAltEn: '',
   coverAltFa: '',
+  gallery: [],
 };
 
 const row = (overrides: Partial<MediaRow> = {}): MediaRow =>

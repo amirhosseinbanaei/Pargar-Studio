@@ -37,7 +37,14 @@ const VALID = {
   careersEn: '',
   careersFa: '',
   socialsEn: [{ name: 'Instagram', handle: '@kavan' }],
-  socialsFa: [],
+  // Populated on both sides since prompt 14: `requireTranslatedList` refuses an English
+  // list beside an empty Persian one, where `fallbackList` used to copy it across.
+  socialsFa: [{ name: 'اینستاگرام', handle: '@kavan' }],
+  // The cover and the gallery this table gained in prompt 14. `strictObject` requires them.
+  coverImage: '',
+  coverAltEn: '',
+  coverAltFa: '',
+  gallery: [],
 };
 
 const row = (overrides: Partial<ContactRow> = {}): ContactRow =>
@@ -101,11 +108,29 @@ it('rejects a non-decimal latitude', async () => {
   expect(result.ok).toBe(false);
 });
 
-it('duplicates an empty Persian address from the English one', async () => {
+/**
+ * ~~duplicates an empty Persian address from the English one~~ REVERSED IN PROMPT 14.
+ * Inverted rather than deleted, for the reason `project-actions.test.ts` gives.
+ */
+it('stores an empty Persian address EMPTY rather than filling it from the English', async () => {
   await updateContactAction(VALID);
   const [payload] = updateContact.mock.calls[0] as [Record<string, unknown>];
-  expect(payload.addressFa).toBe(VALID.addressEn);
-  expect(payload.socialsFa).toEqual(VALID.socialsEn);
+
+  // Every locale pair on this record is OPTIONAL on both sides, so an empty one is a valid
+  // save — what changed is that it is now stored empty rather than silently copied.
+  expect(payload.addressFa).toBe('');
+  expect(payload.socialsFa).toEqual(VALID.socialsFa);
+});
+
+it('REFUSES an English socials list beside an empty Persian one', async () => {
+  const result = await updateContactAction({ ...VALID, socialsFa: [] });
+
+  expect(result).toEqual({
+    ok: false,
+    status: 422,
+    body: expect.objectContaining({ socialsFa: expect.any(Array) }),
+  });
+  expect(updateContact).not.toHaveBeenCalled();
 });
 
 it('saves and purges only the contact tag', async () => {

@@ -16,7 +16,16 @@
  */
 import { z } from 'zod';
 import type { ContactRow, ContactUpdate } from '@/common/schemas/contact';
-import { fallbackList, fallbackText } from './shared';
+import {
+  galleryField,
+  imagePathField,
+  requireAltWithImage,
+  requireTranslatedList,
+  toGalleryColumns,
+  toGalleryFormItems,
+  toNullableAlt,
+  toNullablePath,
+} from './image';
 
 const PHONE_HREF_PATTERN = /^\+?\d+$/;
 const DECIMAL_PATTERN = /^-?\d+(\.\d+)?$/;
@@ -27,31 +36,47 @@ const socialFormSchema = z.object({ name: z.string(), handle: z.string() });
    The form schema — carries copy
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const contactFormSchema = z.object({
-  postcode: z.string(),
-  phone: z.string(),
-  phoneHref: z.string().regex(PHONE_HREF_PATTERN, 'Digits only, optionally a leading +.'),
-  email: z.email('Enter a valid email address.'),
-  press: z.email('Enter a valid email address.'),
-  lat: z.string().regex(DECIMAL_PATTERN, 'Enter a decimal, e.g. 35.8112.'),
-  lng: z.string().regex(DECIMAL_PATTERN, 'Enter a decimal, e.g. 51.4383.'),
+export const contactFormSchema = z
+  .object({
+    postcode: z.string(),
+    phone: z.string(),
+    phoneHref: z.string().regex(PHONE_HREF_PATTERN, 'Digits only, optionally a leading +.'),
+    email: z.email('Enter a valid email address.'),
+    press: z.email('Enter a valid email address.'),
+    lat: z.string().regex(DECIMAL_PATTERN, 'Enter a decimal, e.g. 35.8112.'),
+    lng: z.string().regex(DECIMAL_PATTERN, 'Enter a decimal, e.g. 51.4383.'),
 
-  addressEn: z.string(),
-  addressFa: z.string(),
-  districtEn: z.string(),
-  districtFa: z.string(),
-  cityEn: z.string(),
-  cityFa: z.string(),
-  countryEn: z.string(),
-  countryFa: z.string(),
-  hoursEn: z.string(),
-  hoursFa: z.string(),
-  careersEn: z.string(),
-  careersFa: z.string(),
+    addressEn: z.string(),
+    addressFa: z.string(),
+    districtEn: z.string(),
+    districtFa: z.string(),
+    cityEn: z.string(),
+    cityFa: z.string(),
+    countryEn: z.string(),
+    countryFa: z.string(),
+    hoursEn: z.string(),
+    hoursFa: z.string(),
+    careersEn: z.string(),
+    careersFa: z.string(),
 
-  socialsEn: z.array(socialFormSchema),
-  socialsFa: z.array(socialFormSchema),
-});
+    socialsEn: z.array(socialFormSchema),
+    socialsFa: z.array(socialFormSchema),
+
+    /**
+     * PICTURES (prompt 14). The cover fills the hero band at the top of `/contact` and the
+     * first gallery image fills the site-plan slot beside the address — two boxes that held
+     * drawings seeded from constants until this prompt, and therefore said nothing about
+     * this studio in particular.
+     */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.socialsEn, values.socialsFa, ctx, 'socialsFa', 'socials');
+  });
 
 export type ContactFormValues = z.infer<typeof contactFormSchema>;
 
@@ -77,6 +102,10 @@ export const CONTACT_FORM_FIELDS = [
   'careersFa',
   'socialsEn',
   'socialsFa',
+  'coverImage',
+  'coverAltEn',
+  'coverAltFa',
+  'gallery',
 ] as const satisfies ReadonlyArray<keyof ContactFormValues>;
 
 export function toContactFormValues(row: ContactRow): ContactFormValues {
@@ -102,6 +131,11 @@ export function toContactFormValues(row: ContactRow): ContactFormValues {
     careersFa: row.careersFa,
     socialsEn: row.socialsEn,
     socialsFa: row.socialsFa,
+    // `?? ''` — nullable columns, and a controlled input handed `null` mounts uncontrolled.
+    coverImage: row.coverImage ?? '',
+    coverAltEn: row.coverAltEn,
+    coverAltFa: row.coverAltFa,
+    gallery: toGalleryFormItems(row.galleryEn, row.galleryFa),
   };
 }
 
@@ -109,35 +143,48 @@ export function toContactFormValues(row: ContactRow): ContactFormValues {
    The submission schema — carries no copy, same bounds as the form
    ──────────────────────────────────────────────────────────────────────────────── */
 
-export const contactSubmissionSchema = z.strictObject({
-  postcode: z.string(),
-  phone: z.string(),
-  phoneHref: z.string().regex(PHONE_HREF_PATTERN),
-  email: z.email(),
-  press: z.email(),
-  lat: z.string().regex(DECIMAL_PATTERN),
-  lng: z.string().regex(DECIMAL_PATTERN),
+export const contactSubmissionSchema = z
+  .strictObject({
+    postcode: z.string(),
+    phone: z.string(),
+    phoneHref: z.string().regex(PHONE_HREF_PATTERN),
+    email: z.email(),
+    press: z.email(),
+    lat: z.string().regex(DECIMAL_PATTERN),
+    lng: z.string().regex(DECIMAL_PATTERN),
 
-  addressEn: z.string(),
-  addressFa: z.string(),
-  districtEn: z.string(),
-  districtFa: z.string(),
-  cityEn: z.string(),
-  cityFa: z.string(),
-  countryEn: z.string(),
-  countryFa: z.string(),
-  hoursEn: z.string(),
-  hoursFa: z.string(),
-  careersEn: z.string(),
-  careersFa: z.string(),
+    addressEn: z.string(),
+    addressFa: z.string(),
+    districtEn: z.string(),
+    districtFa: z.string(),
+    cityEn: z.string(),
+    cityFa: z.string(),
+    countryEn: z.string(),
+    countryFa: z.string(),
+    hoursEn: z.string(),
+    hoursFa: z.string(),
+    careersEn: z.string(),
+    careersFa: z.string(),
 
-  socialsEn: z.array(socialFormSchema),
-  socialsFa: z.array(socialFormSchema),
-});
+    socialsEn: z.array(socialFormSchema),
+    socialsFa: z.array(socialFormSchema),
+
+    /** Same three plus the list — see the form schema. */
+    coverImage: imagePathField,
+    coverAltEn: z.string(),
+    coverAltFa: z.string(),
+    gallery: galleryField,
+  })
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.socialsEn, values.socialsFa, ctx, 'socialsFa', 'socials');
+  });
 
 export type ContactSubmission = z.output<typeof contactSubmissionSchema>;
 
-export function withPersianFallback(input: ContactSubmission): ContactUpdate {
+/** The parsed submission -> the write payload. Nothing is copied between locales; see
+ *  `project-form.ts`'s `toProjectColumns`. */
+export function toContactColumns(input: ContactSubmission): ContactUpdate {
   return {
     postcode: input.postcode,
     phone: input.phone,
@@ -147,19 +194,25 @@ export function withPersianFallback(input: ContactSubmission): ContactUpdate {
     lat: input.lat,
     lng: input.lng,
     addressEn: input.addressEn,
-    addressFa: fallbackText(input.addressFa, input.addressEn),
+    addressFa: input.addressFa,
     districtEn: input.districtEn,
-    districtFa: fallbackText(input.districtFa, input.districtEn),
+    districtFa: input.districtFa,
     cityEn: input.cityEn,
-    cityFa: fallbackText(input.cityFa, input.cityEn),
+    cityFa: input.cityFa,
     countryEn: input.countryEn,
-    countryFa: fallbackText(input.countryFa, input.countryEn),
+    countryFa: input.countryFa,
     hoursEn: input.hoursEn,
-    hoursFa: fallbackText(input.hoursFa, input.hoursEn),
+    hoursFa: input.hoursFa,
     careersEn: input.careersEn,
-    careersFa: fallbackText(input.careersFa, input.careersEn),
+    careersFa: input.careersFa,
     socialsEn: input.socialsEn,
-    socialsFa: fallbackList(input.socialsFa, input.socialsEn),
+    socialsFa: input.socialsFa,
+
+    /** ALT TEXT IS NOT FALLEN BACK — see `./image`'s header. */
+    coverImage: toNullablePath(input.coverImage),
+    coverAltEn: toNullableAlt(input.coverAltEn),
+    coverAltFa: toNullableAlt(input.coverAltFa),
+    ...toGalleryColumns(input.gallery),
   };
 }
 

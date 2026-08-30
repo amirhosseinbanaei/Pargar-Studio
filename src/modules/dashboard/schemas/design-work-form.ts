@@ -5,21 +5,25 @@
  * validates a keystroke ago with a localized schema, and that proves nothing to an action
  * reachable directly over HTTP.
  *
- * ─── PERSIAN IS OPTIONAL, GENERALIZED TO ARRAYS ───────────────────────────────────
- * Only `titleEn` is required, exactly as prompt 6 decided for projects (AGENTS.md). Every
- * other English field and every Persian field may be left empty; `withPersianFallback`
- * fills an empty Persian TEXT column with its English counterpart, and — new here — an
- * empty Persian LIST (`teamFa`, `factsFa`) with the English list wholesale. A studio
- * publishing a new object should not be blocked on translating its team or its fact table
- * before the record can be saved at all.
+ * ─── ~~PERSIAN IS OPTIONAL~~ REVERSED IN PROMPT 14, LISTS INCLUDED ────────────────
+ * The title is required in both languages, and nothing is copied between them any more —
+ * see `project-form.ts`'s header for the argument, which is identical here.
+ *
+ * The LIST half is the part specific to this file. `fallbackList` used to duplicate an
+ * empty Persian `teamFa` / `factsFa` from the English one on save; it is deleted, and
+ * `requireTranslatedList` refuses the save instead when one side has rows and the Persian
+ * side has none. That keeps the property the fallback was protecting — a Persian page never
+ * silently loses a section — and drops the property it was not: a Persian column that looks
+ * translated and is not.
  */
 import { z } from 'zod';
 import type { DesignWorkCreate, DesignWorkRow } from '@/common/schemas/design-work';
-import { fallbackList, fallbackText, yearFieldAsNumber, yearFieldAsString } from './shared';
+import { requiredText, yearFieldAsNumber, yearFieldAsString } from './shared';
 import {
   galleryField,
   imagePathField,
   requireAltWithImage,
+  requireTranslatedList,
   toGalleryColumns,
   toGalleryFormItems,
   toNullableAlt,
@@ -54,8 +58,10 @@ export const designWorkFormSchema = z
     status: z.string().min(1, 'Choose a status.'),
     year: yearFieldAsString(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
-    titleEn: z.string().min(1, 'An English title is required.'),
-    titleFa: z.string(),
+    titleEn: requiredText('An English title is required.'),
+    titleFa: requiredText(
+      'A Persian title is required — it is no longer copied from the English one on save.',
+    ),
     blurbEn: z.string(),
     blurbFa: z.string(),
     clientEn: z.string(),
@@ -79,7 +85,11 @@ export const designWorkFormSchema = z
     coverAltFa: z.string(),
     gallery: galleryField,
   })
-  .superRefine(requireAltWithImage);
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.teamEn, values.teamFa, ctx, 'teamFa', 'team');
+    requireTranslatedList(values.factsEn, values.factsFa, ctx, 'factsFa', 'facts');
+  });
 
 export type DesignWorkFormValues = z.infer<typeof designWorkFormSchema>;
 
@@ -183,8 +193,8 @@ export const designWorkSubmissionSchema = z
     status: z.string().min(1),
     year: yearFieldAsNumber(DESIGN_WORK_YEAR_MIN, DESIGN_WORK_YEAR_MAX),
 
-    titleEn: z.string().min(1),
-    titleFa: z.string(),
+    titleEn: requiredText('required'),
+    titleFa: requiredText('required'),
     blurbEn: z.string(),
     blurbFa: z.string(),
     clientEn: z.string(),
@@ -208,11 +218,17 @@ export const designWorkSubmissionSchema = z
     coverAltFa: z.string(),
     gallery: galleryField,
   })
-  .superRefine(requireAltWithImage);
+  .superRefine((values, ctx) => {
+    requireAltWithImage(values, ctx);
+    requireTranslatedList(values.teamEn, values.teamFa, ctx, 'teamFa', 'team');
+    requireTranslatedList(values.factsEn, values.factsFa, ctx, 'factsFa', 'facts');
+  });
 
 export type DesignWorkSubmission = z.output<typeof designWorkSubmissionSchema>;
 
-export function withPersianFallback(
+/** The parsed submission -> the write payload. Nothing is copied between locales; see
+ *  `project-form.ts`'s `toProjectColumns` for why this stopped being `withPersianFallback`. */
+export function toDesignWorkColumns(
   input: DesignWorkSubmission,
 ): Omit<DesignWorkCreate, 'sortOrder'> {
   return {
@@ -221,27 +237,23 @@ export function withPersianFallback(
     status: input.status,
     year: input.year,
     titleEn: input.titleEn,
-    titleFa: fallbackText(input.titleFa, input.titleEn),
+    titleFa: input.titleFa,
     blurbEn: input.blurbEn,
-    blurbFa: fallbackText(input.blurbFa, input.blurbEn),
+    blurbFa: input.blurbFa,
     clientEn: input.clientEn,
-    clientFa: fallbackText(input.clientFa, input.clientEn),
+    clientFa: input.clientFa,
     scopeEn: input.scopeEn,
-    scopeFa: fallbackText(input.scopeFa, input.scopeEn),
+    scopeFa: input.scopeFa,
     materialsEn: input.materialsEn,
-    materialsFa: fallbackText(input.materialsFa, input.materialsEn),
+    materialsFa: input.materialsFa,
     descriptionEn: input.descriptionEn,
-    descriptionFa: fallbackText(input.descriptionFa, input.descriptionEn),
+    descriptionFa: input.descriptionFa,
     teamEn: input.teamEn,
-    teamFa: fallbackList(input.teamFa, input.teamEn),
+    teamFa: input.teamFa,
     factsEn: input.factsEn,
-    factsFa: fallbackList(input.factsFa, input.factsEn),
+    factsFa: input.factsFa,
 
-    /**
-     * ALT TEXT IS NOT FALLEN BACK — the one translated field here that is not. `./image`'s
-     * header carries the argument: prose degrades usefully to English, alt text does not,
-     * because it is heard rather than read. Both are required together instead.
-     */
+    /** Alt text was the one field that never fell back; since prompt 14 nothing does. */
     coverImage: toNullablePath(input.coverImage),
     coverAltEn: toNullableAlt(input.coverAltEn),
     coverAltFa: toNullableAlt(input.coverAltFa),

@@ -15,17 +15,22 @@
  * (a `min(10)` form in front of a `min(1)` action) and it cost a message the form had
  * already refused.
  *
- * ─── THE OPEN DECISION, RESOLVED: PERSIAN IS OPTIONAL ─────────────────────────────
- * Only `titleEn` is required. Every `*Fa` field may be left empty and every English field
- * other than the title may too. The action fills an empty Persian field with its English
- * counterpart before writing, which is exactly what `scripts/seed.ts` already does for a
- * missing translation and what `legacy/js/core/i18n.js:154` did before it.
+ * ─── ~~PERSIAN IS OPTIONAL~~ REVERSED IN PROMPT 14: REQUIRED MEANS BOTH ───────────
+ * The title is required, and it is required in ENGLISH AND IN PERSIAN. Every other field
+ * on this form is optional on both sides, exactly as before.
  *
- * The alternative — requiring both — would block the studio from publishing a new project
- * until someone had translated it, which turns a content decision into a deployment
- * blocker. And because the fallback is written IN, at author time, the read path still
- * needs no fallback branch: `pickLocale` stays a two-line function and `/fa/projects/x`
- * never renders blank. Recorded in AGENTS.md.
+ * What is gone is `withPersianFallback`, which used to write the English value into an
+ * empty `_fa` column on the way to the database. Prompt 6 took that trade because
+ * requiring both would "block the studio from publishing until somebody had translated
+ * it" — a real cost, and the wrong answer to it. Refusing the SAVE achieves the same
+ * protection without the damage: the editor is told at the field, before anything is
+ * stored, instead of ending up with a Persian column holding English that nothing
+ * afterwards can distinguish from a translation.
+ *
+ * The read path is unaffected and still needs no fallback branch — `pickLocale` stays two
+ * lines — because a required column can no longer be empty. Every row already in the
+ * database was written by the old path and therefore has both columns populated
+ * (verified per table before this shipped; see AGENTS.md).
  *
  * ─── THE TAXONOMY FIELDS ARE NOT ENUMS ANY MORE (prompt 9) ────────────────────────
  * `types`, `status` and `scale` were `z.enum(...)` on both schemas below, which is what made
@@ -60,6 +65,7 @@ import {
   toNullableAlt,
   toNullablePath,
 } from './image';
+import { requiredText } from './shared';
 
 /* ────────────────────────────────────────────────────────────────────────────────
    The year field
@@ -123,9 +129,12 @@ export const projectFormSchema = z
     year: yearAsString,
     area: z.string(),
 
-    // English title is the only required piece of content — see the header.
-    titleEn: z.string().min(1, 'An English title is required.'),
-    titleFa: z.string(),
+    // The title is the only required piece of content — and since prompt 14 it is
+    // required in BOTH languages. See the header.
+    titleEn: requiredText('An English title is required.'),
+    titleFa: requiredText(
+      'A Persian title is required — it is no longer copied from the English one on save.',
+    ),
     blurbEn: z.string(),
     blurbFa: z.string(),
     descriptionEn: z.string(),
@@ -278,8 +287,8 @@ export const projectSubmissionSchema = z
     year: yearAsNumber,
     area: z.string(),
 
-    titleEn: z.string().min(1),
-    titleFa: z.string(),
+    titleEn: requiredText('required'),
+    titleFa: requiredText('required'),
     blurbEn: z.string(),
     blurbFa: z.string(),
     descriptionEn: z.string(),
@@ -300,26 +309,24 @@ export const projectSubmissionSchema = z
 export type ProjectSubmission = z.output<typeof projectSubmissionSchema>;
 
 /**
- * Fill an empty Persian column with its English counterpart, and return the exact write
- * payload the service takes.
+ * The parsed submission -> the exact write payload the service takes.
  *
- * THIS IS WHERE THE "PERSIAN IS OPTIONAL" DECISION IS ACTUALLY IMPLEMENTED. The form lets
- * the field be blank; this function makes sure a blank one never reaches the database,
- * because the read path deliberately has no fallback (`pickLocale`) and a null Persian
- * column would render `/fa/projects/<slug>` with holes in it.
+ * ─── IT WAS `withPersianFallback`, AND IT NO LONGER FALLS BACK ────────────────────
+ * Renamed in prompt 14 along with the behaviour: a function called `withPersianFallback`
+ * that applies no fallback is the kind of name that survives three prompts and misleads
+ * every reader of them. Every value now goes to its own column unchanged, and NOTHING is
+ * copied between locales — the schema above refuses an empty required Persian field
+ * instead, at the field, before anything is stored.
  *
- * `.trim()` on the test, not on the stored value: a field holding only whitespace is
- * "empty" as far as this decision is concerned, but a Persian string's own leading and
- * trailing characters are the editor's business — several of the seeded values carry
- * meaningful zero-width non-joiners (AGENTS.md), and trimming stored content is how those
- * get quietly damaged.
+ * Values are still never trimmed on the way to the database. Several seeded Persian values
+ * carry meaningful zero-width non-joiners (AGENTS.md); the `.trim()` that survives lives in
+ * the emptiness TESTS in `./image`, never on a stored value.
  *
  * The return type is checked by the compiler against the exact write schema's inferred
  * type, so a field added to `projectCreateSchema` and forgotten here is a build error
  * rather than a column that silently stays at its default.
  */
-export function withPersianFallback(input: ProjectSubmission): Omit<ProjectCreate, 'sortOrder'> {
-  const fallback = (fa: string, en: string) => (fa.trim() === '' ? en : fa);
+export function toProjectColumns(input: ProjectSubmission): Omit<ProjectCreate, 'sortOrder'> {
   return {
     slug: input.slug,
     types: input.types,
@@ -328,22 +335,20 @@ export function withPersianFallback(input: ProjectSubmission): Omit<ProjectCreat
     year: input.year,
     area: input.area,
     titleEn: input.titleEn,
-    titleFa: fallback(input.titleFa, input.titleEn),
+    titleFa: input.titleFa,
     blurbEn: input.blurbEn,
-    blurbFa: fallback(input.blurbFa, input.blurbEn),
+    blurbFa: input.blurbFa,
     descriptionEn: input.descriptionEn,
-    descriptionFa: fallback(input.descriptionFa, input.descriptionEn),
+    descriptionFa: input.descriptionFa,
     locationEn: input.locationEn,
-    locationFa: fallback(input.locationFa, input.locationEn),
+    locationFa: input.locationFa,
     clientEn: input.clientEn,
-    clientFa: fallback(input.clientFa, input.clientEn),
+    clientFa: input.clientFa,
 
     /**
-     * ALT TEXT IS NOT FALLEN BACK, and it is the only translated field here that is not.
-     * `./image`'s header carries the argument in full: prose degrades usefully to English,
-     * alt text does not — it is heard rather than read, and an English sentence spoken by a
-     * Persian screen reader is noise that additionally hides the omission from anyone
-     * auditing the page. The schema above requires both instead.
+     * Alt text was the ONE field that never fell back; since prompt 14 nothing does. The
+     * argument that made it special — a populated column is indistinguishable from a
+     * translated one — turned out to be the general argument. See `./image`'s header.
      */
     coverImage: toNullablePath(input.coverImage),
     coverAltEn: toNullableAlt(input.coverAltEn),

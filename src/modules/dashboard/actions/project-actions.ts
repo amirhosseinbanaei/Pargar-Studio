@@ -65,7 +65,7 @@ import {
 } from '@/common/services/project-service';
 import { readSession } from '@/common/services/session';
 import { checkTaxonomy } from '../lib/taxonomy-guard';
-import { projectSubmissionSchema, withPersianFallback } from '../schemas/project-form';
+import { projectSubmissionSchema, toProjectColumns } from '../schemas/project-form';
 import { reorderSubmissionSchema } from '../schemas/reorder';
 
 /* ────────────────────────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult<
   ]);
   if (invalid) return invalid;
 
-  const result = await toActionResult(() => createProject(withPersianFallback(parsed.data)));
+  const result = await toActionResult(() => createProject(toProjectColumns(parsed.data)));
   // Inside `if (result.ok)`: purging on a failed write throws away a valid cache and makes
   // every reader pay for a refetch that changes nothing.
   if (result.ok) purgeProject(result.data.slug);
@@ -201,7 +201,7 @@ export async function updateProjectAction(
   const result = await toActionResult(async () => {
     const before = await getProjectRowById(id);
     if (!before) return null;
-    const after = await updateProject(id, withPersianFallback(parsed.data));
+    const after = await updateProject(id, toProjectColumns(parsed.data));
     return after ? { after, previousSlug: before.slug } : null;
   });
   if (!result.ok) return result;

@@ -19,7 +19,7 @@ import {
 } from '@/common/services/design-work-service';
 import { readSession } from '@/common/services/session';
 import { checkTaxonomy } from '../lib/taxonomy-guard';
-import { designWorkSubmissionSchema, withPersianFallback } from '../schemas/design-work-form';
+import { designWorkSubmissionSchema, toDesignWorkColumns } from '../schemas/design-work-form';
 import { reorderSubmissionSchema } from '../schemas/reorder';
 
 async function requireSession(): Promise<{ ok: false; status: number } | null> {
@@ -57,7 +57,7 @@ export async function createDesignWorkAction(
   ]);
   if (invalid) return invalid;
 
-  const result = await toActionResult(() => createDesignWork(withPersianFallback(parsed.data)));
+  const result = await toActionResult(() => createDesignWork(toDesignWorkColumns(parsed.data)));
   if (result.ok) purgeDesignWork(result.data.slug);
 
   return result.ok ? { ok: true, data: { slug: result.data.slug } } : result;
@@ -91,7 +91,7 @@ export async function updateDesignWorkAction(
   const result = await toActionResult(async () => {
     const before = await getDesignWorkRowById(id);
     if (!before) return null;
-    const after = await updateDesignWork(id, withPersianFallback(parsed.data));
+    const after = await updateDesignWork(id, toDesignWorkColumns(parsed.data));
     return after ? { after, previousSlug: before.slug } : null;
   });
   if (!result.ok) return result;

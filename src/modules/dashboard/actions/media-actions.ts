@@ -16,7 +16,7 @@ import {
 } from '@/common/services/media-service';
 import { readSession } from '@/common/services/session';
 import { checkTaxonomy } from '../lib/taxonomy-guard';
-import { mediaSubmissionSchema, withPersianFallback } from '../schemas/media-form';
+import { mediaSubmissionSchema, toMediaColumns } from '../schemas/media-form';
 import { reorderSubmissionSchema } from '../schemas/reorder';
 
 async function requireSession(): Promise<{ ok: false; status: number } | null> {
@@ -50,7 +50,7 @@ export async function createMediaAction(input: unknown): Promise<ActionResult<{ 
   ]);
   if (invalid) return invalid;
 
-  const result = await toActionResult(() => createMediaEntry(withPersianFallback(parsed.data)));
+  const result = await toActionResult(() => createMediaEntry(toMediaColumns(parsed.data)));
   if (result.ok) purgeMedia(result.data.slug);
 
   return result.ok ? { ok: true, data: { slug: result.data.slug } } : result;
@@ -82,7 +82,7 @@ export async function updateMediaAction(
   const result = await toActionResult(async () => {
     const before = await getMediaRowById(id);
     if (!before) return null;
-    const after = await updateMediaEntry(id, withPersianFallback(parsed.data));
+    const after = await updateMediaEntry(id, toMediaColumns(parsed.data));
     return after ? { after, previousSlug: before.slug } : null;
   });
   if (!result.ok) return result;

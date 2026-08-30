@@ -21,22 +21,32 @@ vi.mock('@/common/services/session', () => ({ readSession: () => readSession() }
 
 const { updateStudioAction } = await import('../actions/studio-actions');
 
+/**
+ * Every list is populated on BOTH sides, which it did not have to be before prompt 14:
+ * `fallbackList` used to fill an empty Persian list from the English one on save, and
+ * `requireTranslatedList` refuses that save now. `manifestoFa` is a prose field and stays
+ * empty here on purpose — prose is still optional in both languages, and the assertion
+ * below is that it is stored empty rather than filled in.
+ */
 const VALID = {
   manifestoEn: 'We build for climate and craft.',
   manifestoFa: '',
-  // No portrait — the founders keep the generated one, drawn from the English name.
+  // No portrait — the founders keep the generated one, drawn from the English name. That is
+  // the one place prompt 14 left the art layer rendering for a record; see `StudioScreen`.
   foundersEn: [{ name: 'A', role: 'Founder', born: '1980', bio: '', image: '', imageAlt: '' }],
-  foundersFa: [],
+  foundersFa: [{ name: 'الف', role: '', born: '', bio: '', image: '', imageAlt: '' }],
   statsEn: [{ label: 'Projects', value: '76' }],
-  statsFa: [],
+  statsFa: [{ label: 'پروژه‌ها', value: '۷۶' }],
   teamEn: ['Ada'],
-  teamFa: [],
+  teamFa: ['آدا'],
   alumniEn: [],
   alumniFa: [],
   awardsEn: [],
   awardsFa: [],
   chaptersEn: [],
   chaptersFa: [],
+  // The page's own gallery, new in prompt 14. `strictObject` requires the key.
+  gallery: [],
 };
 
 const row = (overrides: Partial<StudioRow> = {}): StudioRow =>
@@ -56,6 +66,8 @@ const row = (overrides: Partial<StudioRow> = {}): StudioRow =>
     awardsFa: [],
     chaptersEn: [],
     chaptersFa: [],
+    galleryEn: [],
+    galleryFa: [],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,
@@ -83,21 +95,65 @@ it('rejects an unknown key', async () => {
   expect(updateStudio).not.toHaveBeenCalled();
 });
 
-it('duplicates an empty Persian manifesto and list from the English side', async () => {
+/**
+ * ~~duplicates an empty Persian manifesto and list from the English side~~ REVERSED IN
+ * PROMPT 14. Kept and inverted rather than deleted: `fallbackText` / `fallbackList` are
+ * exactly the kind of helper somebody re-adds for consistency, and this is what would fail.
+ */
+it('stores an empty Persian manifesto EMPTY rather than filling it from the English', async () => {
   await updateStudioAction(VALID);
   const [payload] = updateStudio.mock.calls[0] as [Record<string, unknown>];
-  expect(payload.manifestoFa).toBe(VALID.manifestoEn);
-  expect(payload.teamFa).toEqual(VALID.teamEn);
+  expect(payload.manifestoFa).toBe('');
+
   /**
    * The founders list is compared against the COLUMN form rather than against `VALID`,
    * because the two image fields are normalized on the way in: `''` means "no portrait" in
    * a form and `null` means it in a column, and a column whose meaning is "a path" must not
-   * hold an empty string. The fallback itself — an empty Persian list filled wholesale from
-   * the English one — is unchanged.
+   * hold an empty string.
    */
   expect(payload.foundersFa).toEqual([
-    { name: 'A', role: 'Founder', born: '1980', bio: '', image: null, imageAlt: null },
+    { name: 'الف', role: '', born: '', bio: '', image: null, imageAlt: null },
   ]);
+});
+
+it('REFUSES an English list beside an empty Persian one, on this record most of all', async () => {
+  // Six of this record's seven fields are lists, and an empty Persian one is a whole
+  // missing SECTION of `/fa/studio` rather than a blank line — the failure this table has
+  // already produced twice by other means (`awards`, `founders`).
+  const result = await updateStudioAction({ ...VALID, teamFa: [], statsFa: [] });
+
+  expect(result).toEqual({
+    ok: false,
+    status: 422,
+    body: expect.objectContaining({ teamFa: expect.any(Array), statsFa: expect.any(Array) }),
+  });
+  expect(updateStudio).not.toHaveBeenCalled();
+});
+
+it('REFUSES a founder portrait nobody described — the gap prompt 14 closed', async () => {
+  // Prompt 10 made alt text required wherever there is an image but never wired the rule
+  // into this editor, so an undescribed portrait saved cleanly and `StudioScreen` then fell
+  // back to the GENERATED one — an uploaded photograph that simply never appeared.
+  const result = await updateStudioAction({
+    ...VALID,
+    foundersEn: [
+      {
+        name: 'A',
+        role: 'Founder',
+        born: '1980',
+        bio: '',
+        image: '2026/08/0123456789abcdef0123456789abcdef.jpg',
+        imageAlt: '',
+      },
+    ],
+  });
+
+  expect(result).toEqual({
+    ok: false,
+    status: 422,
+    body: expect.objectContaining({ foundersEn: expect.any(Array) }),
+  });
+  expect(updateStudio).not.toHaveBeenCalled();
 });
 
 it('copies each founder’s PORTRAIT across by index, and never their description', async () => {
@@ -107,9 +163,8 @@ it('copies each founder’s PORTRAIT across by index, and never their descriptio
    * stops the two index-aligned arrays disagreeing about which photograph a founder has, a
    * bug with no symptom in English.
    *
-   * The alt text is the opposite and is the one translated field in this codebase that must
-   * NOT fall back: it is heard rather than read, so an English sentence in the Persian
-   * column is noise that also hides the omission from an audit. See
+   * The alt text is the opposite and is never copied — once the ONE translated field in
+   * this codebase that did not fall back, and since prompt 14 simply ordinary. See
    * `../schemas/image.ts`'s header.
    */
   const path = '2026/08/0123456789abcdef0123456789abcdef.jpg';

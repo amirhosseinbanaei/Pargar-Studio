@@ -10,7 +10,7 @@ import { CACHE_TAGS } from '@/common/services/cache-tags';
 import { toActionResult, type ActionResult } from '@/common/services/action-result';
 import { updateContact } from '@/common/services/contact-service';
 import { readSession } from '@/common/services/session';
-import { contactSubmissionSchema, withPersianFallback } from '../schemas/contact-form';
+import { contactSubmissionSchema, toContactColumns } from '../schemas/contact-form';
 
 export async function updateContactAction(input: unknown): Promise<ActionResult> {
   const session = await readSession();
@@ -21,7 +21,7 @@ export async function updateContactAction(input: unknown): Promise<ActionResult>
     return { ok: false, status: 422, body: z.flattenError(parsed.error).fieldErrors };
   }
 
-  const result = await toActionResult(() => updateContact(withPersianFallback(parsed.data)));
+  const result = await toActionResult(() => updateContact(toContactColumns(parsed.data)));
   if (!result.ok) return result;
   if (result.data === null) return { ok: false, status: 404 };
 

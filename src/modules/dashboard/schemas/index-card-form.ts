@@ -25,16 +25,24 @@ import { z } from 'zod';
 import { isNavSectionId } from '@/common/constants/site';
 import type { IndexCardRow, IndexCardUpdate } from '@/common/schemas/index-card';
 import { imagePathField, requireAltWithImage, toNullableAlt, toNullablePath } from './image';
+import { requiredText } from './shared';
 
 /**
- * THE PERSIAN HALF OF A TRANSLATED PAIR, IN ONE PLACE — deliberately, so that prompt 14's
- * change to what "required" means for Persian is this line and not four of them.
+ * THE PERSIAN HALF OF A TRANSLATED PAIR, IN ONE PLACE — and prompt 14 is the change it was
+ * put here for. It is TWO fields now rather than one, because the two halves of a pair
+ * follow the ENGLISH half: a required pair is required in both languages, an optional pair
+ * is optional in both.
  *
- * Today it accepts anything, including `''`, which is what makes an untranslated card
- * degrade to the message catalog instead of blocking the save. Making Persian required is
- * `z.string().min(1, '…')` here and nowhere else.
+ * Keeping it one — Persian required on the caption, whose English side is optional — would
+ * be the mirror of the defect this prompt is fixing: a marker that does not match what the
+ * schema will accept.
  */
-const persianField = z.string();
+const requiredPersian = requiredText(
+  'A Persian title is required — it is no longer copied from the English one on save.',
+);
+
+/** The Persian half of an OPTIONAL pair. The caption's English side is optional too. */
+const optionalPersian = z.string();
 
 /**
  * The one required field on the whole form.
@@ -50,7 +58,7 @@ const persianField = z.string();
  * has edited. Reverting a card to the catalog wording means retyping it. If that turns out
  * to matter, the fix is dropping `.min(1)` from this one field.
  */
-const requiredTitle = z.string().min(1, 'A title, or leave the whole card unedited.');
+const requiredTitle = requiredText('A title, or leave the whole card unedited.');
 
 /* ────────────────────────────────────────────────────────────────────────────────
    The form schema — carries copy
@@ -59,9 +67,9 @@ const requiredTitle = z.string().min(1, 'A title, or leave the whole card unedit
 export const indexCardFormSchema = z
   .object({
     titleEn: requiredTitle,
-    titleFa: persianField,
+    titleFa: requiredPersian,
     captionEn: z.string(),
-    captionFa: persianField,
+    captionFa: optionalPersian,
     coverImage: imagePathField,
     coverAltEn: z.string(),
     coverAltFa: z.string(),
@@ -125,9 +133,9 @@ export const indexCardSubmissionSchema = z
     /** One of the five NAV ids. See the header for why this is checked here too. */
     sectionId: z.string().refine(isNavSectionId, 'Not one of the five sections.'),
     titleEn: requiredTitle,
-    titleFa: persianField,
+    titleFa: requiredPersian,
     captionEn: z.string(),
-    captionFa: persianField,
+    captionFa: optionalPersian,
     coverImage: imagePathField,
     coverAltEn: z.string(),
     coverAltFa: z.string(),
@@ -139,11 +147,11 @@ export type IndexCardSubmission = z.output<typeof indexCardSubmissionSchema>;
 /**
  * Form values -> columns.
  *
- * ─── THE PERSIAN HALF IS NOT FILLED IN FROM THE ENGLISH, AND THAT IS THE POINT ────
- * Every other editor in this module runs `withPersianFallback` and writes the English
- * value into an empty `_fa` column (AGENTS.md, prompt 6). This one deliberately does not,
- * and it is the only place in the codebase where NOT falling back is the better answer for
- * prose:
+ * ─── THE PERSIAN HALF IS NOT FILLED IN FROM THE ENGLISH ───────────────────────────
+ * True since prompt 13, and NO LONGER THE EXCEPTION: prompt 14 removed the fallback from
+ * every editor in this module, so this file is simply where the rule landed first. The
+ * argument prompt 13 made for these five stands and is kept, because it is a DIFFERENT
+ * argument from the general one — here there is no blank to avoid at all:
  *
  *   The fallback exists because a blank Persian page is worse than an untranslated one.
  *   Here there is no blank to avoid — an empty Persian title renders `nav.<id>` from the
@@ -152,8 +160,9 @@ export type IndexCardSubmission = z.output<typeof indexCardSubmissionSchema>;
  *   tell afterwards that the translation was never written.
  *
  * So the degradation still happens at read time for these five, because for these five a
- * better fallback than English already exists. The alt text is not copied either, for the
- * reason `./image`'s header gives — that one is about being HEARD and applies everywhere.
+ * better fallback than English already exists — and it is unaffected by the new `.min(1)`
+ * on `titleFa`, which is reached only by an editor SAVING a card, never by rendering one
+ * nobody has edited. That is the state of all five today.
  */
 export function toIndexCardColumns(input: IndexCardSubmission): IndexCardUpdate {
   return {
