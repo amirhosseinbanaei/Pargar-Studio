@@ -1,53 +1,60 @@
 // src/common/components/collection/DetailPlates.tsx
 /**
- * The three plates at the head of a detail page.
+ * The plates at the head of a detail page — up to three of the record's photographs, and
+ * nothing at all when it has none.
  *
- * PROMOTED IN PROMPT 5 out of `modules/projects/components/ProjectDetail.tsx`; ported
- * from `legacy/js/ui/panel.js:94`, which every one of the three detail views called.
+ * PROMOTED IN PROMPT 5 out of `modules/projects/components/ProjectDetail.tsx`; ported from
+ * `legacy/js/ui/panel.js:94`, which every one of the three detail views called.
  *
- * THE SEED CONTRACT, and why it must live in exactly one file. `drawingSet(seed, types)`
- * picks three kinds deterministically, and its FIRST kind drawn at the BARE seed is
- * `kindFor(seed, types)` — the same call the card makes. That identity is what makes the
- * card in the grid and the first plate on the page the same picture; it is not preserved
- * by care, it falls out of the generators being pure and the seed being the slug. Plates
- * two and three are seed-offset (`seed:1`, `seed:2`) so one generator does not draw the
- * same geometry twice on one page. Three copies of this arithmetic is three chances to
- * "tidy" the first plate into `seed:0` and silently break the promise on one section
- * only — `modules/projects/components/__tests__/drawing-identity.test.ts` pins it.
+ * ═══ ~~THE SEED CONTRACT~~ THERE ARE NO DRAWINGS HERE ANY MORE (prompt 14) ════════
+ * This file used to own the arithmetic that made the first plate and the card show the same
+ * generated picture — `drawingSet(seed, types)[0]` at the bare seed being `kindFor(seed,
+ * types)` — with plates two and three seed-offset so one generator did not draw the same
+ * geometry twice on one page. That is gone with the drawings themselves: prompt 14 reversed
+ * the "a record with no image keeps its generated drawing" decision, so a slot with no
+ * photograph renders nothing rather than art. `CardPlate`'s header carries the argument
+ * that was overturned and the cost of overturning it.
  *
- * The seed is NOT always the record's own slug: a media entry seeds from the PROJECT it
- * is about, so the plate shows the building rather than the magazine
- * (`legacy/js/ui/panel.js:263`). That is why the seed is a parameter.
+ * Consequences worth naming, because each was a real property of the old file:
  *
- * ═══ PHOTOGRAPHS FILL THE SLOTS FROM THE FRONT (prompt 10) ════════════════════════
- * `images` is the record's cover followed by its gallery, already collapsed to this locale.
- * Slot `i` renders `images[i]` if there is one and THE DRAWING IT WOULD OTHERWISE HAVE
- * SHOWN if there is not — per slot, not all-or-nothing.
+ *  - `seed`, `types` and `dictionary` are no longer props. Nothing here is seeded and
+ *    nothing here is captioned — the figcaption named the GENERATOR ("Elevation"), which is
+ *    meaningless over a photograph and false under one.
+ *  - `modules/projects/components/__tests__/drawing-identity.test.ts` pinned that identity
+ *    and is REPLACED, not deleted, by `__tests__/plates.test.tsx` beside this file, which
+ *    pins the rule that took its place. See AGENTS.md.
  *
- * Two consequences, both deliberate:
+ * ═══ AS MANY PLATES AS THERE ARE PHOTOGRAPHS, UP TO THREE (decision 5.3) ══════════
+ * `.detail__plates` is a `2fr 1fr` grid whose first child spans both rows, which is exactly
+ * three boxes. With fewer photographs the head renders fewer boxes and `data-count` picks
+ * the geometry for one and for two (`route.css`); with none it renders nothing and the page
+ * simply starts at its title.
  *
- *  - A record with a cover and no gallery shows its photograph beside two drawings, which
- *    is the state most records will be in for a long time and has to look composed rather
- *    than half-finished. The plates are the same three boxes either way.
- *  - THE SEED ARITHMETIC IS UNTOUCHED. `drawingSet` is still called with the bare seed and
- *    the kinds are still taken in order, so slot 0's drawing is still `kindFor(seed, types)`
- *    — the card's picture — for every record that has no cover. Computing the drawings only
- *    for the slots that need them would have made the kind of slot 2 depend on how many
- *    photographs the record happens to have, which is exactly the kind of accidental
- *    coupling the test above exists to catch.
+ * The alternative — keeping three boxes and leaving the empty ones empty — is the "grey
+ * rectangles" failure `CardPlate`'s header warns about, arriving through a different door:
+ * three empty boxes at the top of every one of 76 project pages. An empty CARD frame is
+ * different and is kept, because there the frame holds a grid's rhythm; here there is no
+ * rhythm to hold, only a hole.
  *
- * A GALLERY LONGER THAN TWO IS TRUNCATED HERE and that is a known limit rather than an
- * oversight: this component is the three-plate head the legacy layout defines, and
- * `.detail__plates` is a two-column grid with the first plate spanning both rows. A longer
- * gallery needs a second band below the specs with its own geometry, which is a design
- * decision this prompt had no mandate to make.
+ * ═══ THE FOURTH PHOTOGRAPH ONWARD ═════════════════════════════════════════════════
+ * `GalleryBand` renders them, below the specs. Until prompt 14 they were TRUNCATED here and
+ * this header recorded that as a known limit needing "a second band below the specs with
+ * its own geometry, which is a design decision this prompt had no mandate to make". That is
+ * the band; `HEAD_PLATE_COUNT` is the number the two share so the page cannot show one
+ * photograph twice or drop one between them.
  */
 import Image from 'next/image';
-import { draw, drawingSet } from '@/common/lib/art';
-import { PLATE_RATIO } from '@/common/constants/site';
 import { mediaUrl } from '@/common/constants/uploads';
-import type { Dictionary } from '@/common/i18n';
 import type { LocaleImage } from '@/common/schemas/image';
+
+/**
+ * How many photographs the head takes before `GalleryBand` gets the rest.
+ *
+ * Exported because the two components must agree: a detail page slices its own image list
+ * with this and hands the tail to the band. Two copies of the number is one page rendering
+ * its third photograph twice.
+ */
+export const HEAD_PLATE_COUNT = 3;
 
 /**
  * DERIVED FROM `.detail__plates`, NOT GUESSED.
@@ -62,57 +69,42 @@ const COVER_SIZES = '(max-width: 900px) 92vw, 60vw';
 const SIDE_SIZES = '(max-width: 900px) 92vw, 30vw';
 
 export interface DetailPlatesProps {
-  /** What the drawings are seeded from — a slug, or the related project's slug. */
-  seed: string;
-  /** Steers which generators are chosen; a design work passes its single category. */
-  types: readonly string[];
-  dictionary: Dictionary;
   /**
    * The record's photographs for this locale, cover first, then the gallery in its stored
-   * order. Empty for a record with none, which is the normal case.
+   * order. Empty for a record with none, which is the normal case today — and then this
+   * component renders nothing at all.
    */
   images?: readonly LocaleImage[];
 }
 
-export function DetailPlates({ seed, types, dictionary, images = [] }: DetailPlatesProps) {
-  const plates = drawingSet(seed, types);
+export function DetailPlates({ images = [] }: DetailPlatesProps) {
+  const plates = images.slice(0, HEAD_PLATE_COUNT);
+  if (plates.length === 0) return null;
 
   return (
-    <div className="detail__plates">
-      {plates.map((kind, i) => {
-        const image = images[i];
-
-        // The key stays the KIND rather than becoming the index, so a record that gains a
-        // photograph does not renumber the React keys of the plates beside it.
-        return (
-          <figure className="detail__plate" key={kind}>
-            {image ? (
-              <Image
-                src={mediaUrl(image.path)}
-                alt={image.alt}
-                fill
-                sizes={i === 0 ? COVER_SIZES : SIDE_SIZES}
-                className="detail__photo"
-              />
-            ) : (
-              /* Pure, seeded, and nothing user-supplied reaches it: `draw` emits its own
-                 SVG string from numbers, so there is no injection surface here. */
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: draw(kind, i ? `${seed}:${i}` : seed, PLATE_RATIO),
-                }}
-              />
-            )}
-            {/*
-              The caption names the GENERATOR, so it belongs to a drawing and only to a
-              drawing. A photograph gets none: repeating its alt text as visible copy makes
-              a screen reader announce the same sentence twice, and "Elevation" under a
-              photograph of a building would simply be false.
-            */}
-            {!image && <figcaption>{dictionary.term('kindName', kind)}</figcaption>}
-          </figure>
-        );
-      })}
+    /*
+      `data-count` rather than `:has()`: the count is a fact the component already knows, and
+      naming it in the markup makes the two special cases greppable from the stylesheet
+      instead of inferred from a selector. The rules are in `route.css`.
+    */
+    <div className="detail__plates" data-count={plates.length}>
+      {plates.map((image, i) => (
+        /*
+          Keyed on the PATH. A stored path carries 16 random bytes and is generated per
+          upload, so it is unique within a record and stable across a reorder — which an
+          index is not: reordering a gallery would otherwise re-key every plate after the
+          one that moved and remount images that did not change.
+        */
+        <figure className="detail__plate" key={image.path}>
+          <Image
+            src={mediaUrl(image.path)}
+            alt={image.alt}
+            fill
+            sizes={i === 0 ? COVER_SIZES : SIDE_SIZES}
+            className="detail__photo"
+          />
+        </figure>
+      ))}
     </div>
   );
 }

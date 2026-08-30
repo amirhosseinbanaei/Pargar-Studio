@@ -13,7 +13,8 @@
 export { BackLink, type BackLinkProps } from './BackLink';
 export { CardPlate, type CardPlateProps } from './CardPlate';
 export { CardReveal } from './CardReveal';
-export { DetailPlates, type DetailPlatesProps } from './DetailPlates';
+export { DetailPlates, HEAD_PLATE_COUNT, type DetailPlatesProps } from './DetailPlates';
+export { GalleryBand, type GalleryBandProps } from './GalleryBand';
 export { FacetRail, type FacetOption, type FacetRailProps } from './FacetRail';
 export { GridSkeleton, type GridSkeletonProps } from './GridSkeleton';
 export { RailDrawer, type RailDrawerProps } from './RailDrawer';

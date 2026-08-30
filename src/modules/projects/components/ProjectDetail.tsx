@@ -6,17 +6,27 @@
  * into the open panel. It is a route now, statically generated, with a URL that can be
  * sent to a client.
  *
- * THE DRAWINGS live in `common/components/collection/DetailPlates`, promoted there in
- * prompt 5 when Design and Media grew the same three-plate head. The seed contract it
- * carries — first plate at the bare slug, so the card and the page draw the same picture —
- * is documented in that file and pinned by `__tests__/drawing-identity.test.ts` here.
+ * THE PHOTOGRAPHS are `common/components/collection`'s: `DetailPlates` takes the first
+ * three and `GalleryBand` takes every one after them, so a gallery longer than two is no
+ * longer truncated. `HEAD_PLATE_COUNT` is the one number they share — splitting the list
+ * with a literal `3` here is how a page ends up showing its third photograph twice.
+ *
+ * There are no generated drawings on this page any more (prompt 14). A project with no
+ * photographs shows none, and the page starts at its title; `CardPlate`'s header carries
+ * the argument that was reversed and the cost of reversing it.
  *
  * Persian copy — title, blurb, description, location, client — comes out of the database
  * verbatim via `toLocaleProject`. Nothing here reshapes it. The vocabulary around it
  * (`Residential`, `Completed`, `Large`) is canonical English in the column and is
  * translated by `term()`, because it is interface, not content.
  */
-import { BackLink, DetailPlates, SpecRow } from '@/common/components/collection';
+import {
+  BackLink,
+  DetailPlates,
+  GalleryBand,
+  HEAD_PLATE_COUNT,
+  SpecRow,
+} from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { Project } from '@/common/schemas/project';
@@ -29,6 +39,10 @@ export interface ProjectDetailProps {
 export function ProjectDetail({ project, dictionary }: ProjectDetailProps) {
   const { t, num, term, list, locale } = dictionary;
 
+  // Cover first, then the gallery in its stored order — one list, split by the head's own
+  // capacity so nothing is shown twice and nothing falls between the two components.
+  const images = [...(project.cover ? [project.cover] : []), ...project.gallery];
+
   return (
     <div className="route route--solo" id="main">
       <div className="route__main">
@@ -38,14 +52,7 @@ export function ProjectDetail({ project, dictionary }: ProjectDetailProps) {
           <h1 className="detail__title">{project.title}</h1>
           <p className="detail__blurb">{project.blurb}</p>
 
-          {/* Cover first, then the gallery in its stored order. Any slot without a
-              photograph keeps the drawing it always had — see `DetailPlates`. */}
-          <DetailPlates
-            seed={project.slug}
-            types={project.types}
-            dictionary={dictionary}
-            images={[...(project.cover ? [project.cover] : []), ...project.gallery]}
-          />
+          <DetailPlates images={images} />
 
           <div className="detail__cols">
             <div className="spec">
@@ -66,6 +73,10 @@ export function ProjectDetail({ project, dictionary }: ProjectDetailProps) {
               <p>{project.description}</p>
             </div>
           </div>
+
+          {/* Everything past the head, in stored order. Renders nothing when there is
+              nothing left, which is every project today. */}
+          <GalleryBand images={images.slice(HEAD_PLATE_COUNT)} heading={t('ui.photographs')} />
         </article>
       </div>
     </div>

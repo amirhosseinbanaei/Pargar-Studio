@@ -411,6 +411,105 @@ a.detail__back { text-decoration: none; }
 
 .detail__plate > img { object-fit: cover; }
 
+/* --------------------------------------------------------------------------
+   THE DETAIL HEAD NOW SIZES ITSELF (prompt 14)
+   --------------------------------------------------------------------------
+   TWO THINGS CHANGED HERE AND THE SECOND IS EASY TO MISS.
+
+   1. A HEAD CAN HOLD FEWER THAN THREE PLATES. `panel.css` gives `.detail__plates` a
+      `2fr 1fr` grid whose first child spans both rows — geometry drawn for exactly
+      three boxes, which was always exactly what it got, because the head used to fill
+      every empty slot with a generated drawing. A slot with no photograph renders
+      nothing now, so one or two photographs would leave a hole: a lone plate in a
+      two-thirds column beside an empty third, or two plates with the bottom-right
+      corner missing.
+
+   2. `.detail__plate` HAS NO HEIGHT OF ITS OWN, AND NEVER DID. It has no
+      `aspect-ratio` and no `height` in the port; the box was sized by its CHILD. The
+      generated `<svg>` carried an intrinsic ratio from its `viewBox`, so
+      `width: 100%` gave it a real height and the plate grew to fit. `next/image`'s
+      `fill` is `position: absolute` and contributes nothing to layout, so with the
+      drawings gone the plates collapse to a couple of pixels — a page that renders,
+      passes every gate command, and shows four slivers where three photographs are.
+      Measured in a browser at 1440px before this rule existed: 853×20 and 426×2.
+
+   So every plate gets an explicit ratio. `4 / 3` matches `PLATE_RATIO` (0.75) in
+   `common/constants/site.ts` — the ratio the drawings were emitted at — so a
+   three-plate head keeps exactly the proportions the ported layout produced.
+
+   A ONE-PLATE HEAD IS THE EXCEPTION at `3 / 2`: it is the full content width rather
+   than two thirds of it, and a 4:3 box that wide is taller than most viewports.
+
+   `data-count` is written by `DetailPlates`, which already knows the number, rather
+   than being inferred with `:has(> :last-child:nth-child(2))`. The component states the
+   fact and the stylesheet reads it; the selector version makes the rule unfindable from
+   either file.
+
+   These live here and not in `panel.css` for the reason this whole file exists: that one
+   is a byte-identical port and additions go beside it. */
+.detail__plate { aspect-ratio: 4 / 3; }
+
+/* The first plate spans two rows plus the gap between them, so its own ratio must not
+   fight the height the grid gives it. */
+.detail__plates[data-count="3"] .detail__plate:first-child { aspect-ratio: auto; }
+
+.detail__plates[data-count="1"] { grid-template-columns: 1fr; }
+.detail__plates[data-count="1"] .detail__plate:first-child { grid-row: auto; }
+.detail__plates[data-count="1"] .detail__plate { aspect-ratio: 3 / 2; }
+
+.detail__plates[data-count="2"] { grid-template-columns: 1fr 1fr; }
+.detail__plates[data-count="2"] .detail__plate:first-child { grid-row: auto; }
+
+/* Below 900px `panel.css` collapses the grid to one column and un-spans the first plate,
+   so every plate is the full content width and takes the single-plate ratio. */
+@media (max-width: 900px) {
+  .detail__plates .detail__plate,
+  .detail__plates[data-count="3"] .detail__plate:first-child { aspect-ratio: 3 / 2; }
+}
+
+/* --------------------------------------------------------------------------
+   THE GALLERY BAND (prompt 14)
+   --------------------------------------------------------------------------
+   Everything past the three photographs the head takes. Until this prompt a longer
+   gallery was silently truncated — `DetailPlates`' header recorded that as a known
+   limit and said the fix needed "a second band below the specs with its own geometry".
+   This is that geometry, and it is new rather than ported, which is why it is here.
+
+   `auto-fill` with an 18rem minimum, matching how `.grid` is built one file over: the
+   number of columns comes from the width available rather than from a breakpoint, so
+   the band holds two photographs on a laptop and four on a wide screen with no rule per
+   size. `GalleryBand`'s `sizes` string is derived from exactly these two numbers, and
+   its header shows the arithmetic — change one here and that string is wrong.
+
+   Below 700px it is one column, because a 18rem cell in a ~92vw content region on a
+   phone is already the whole width and `auto-fill` would otherwise leave a ragged
+   trailing gap.
+
+   `.gband__f` mirrors `.detail__plate` (`panel.css:281`) rather than restating its
+   colours: positioned for `fill`, clipped, on the same `--s-1` ground with the same
+   hairline. The aspect ratio is 4:3, the ratio every other frame on the site uses. */
+.gband__wrap { margin-top: var(--sp-6); }
+
+.gband {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--sp-4);
+}
+
+.gband__f {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--s-1);
+  border: 1px solid var(--rule);
+}
+
+.gband__photo { object-fit: cover; }
+
+@media (max-width: 700px) {
+  .gband { grid-template-columns: 1fr; }
+}
+
 /* The five index columns took a photograph in prompt 13, into the same `.col__art` box the
    generated drawing has always used. These two rules mirror `shell.css:148` and `:155`
    exactly — the same resting `scale(1.06)`, the same relaxation to `scale(1)` under the
@@ -430,6 +529,26 @@ a.detail__back { text-decoration: none; }
    on the studio page is the whole document. One additive property. */
 .person__plate { position: relative; }
 .person__plate > img { object-fit: cover; }
+
+/* Same two additive properties for the related-project thumbnail on a media page, which
+   took a photograph in prompt 14 where it had a drawing. `.relate__f` is a fixed-width
+   flex item that stretches to the row's height (`panel.css:703`) and is not positioned,
+   so a `fill` image would otherwise escape to the document. The `filter` exposure gesture
+   on `.relate:hover` is on the FRAME, so it applies to a photograph untouched. */
+.relate__f { position: relative; }
+.relate__photo { object-fit: cover; }
+
+/* The editorial bands on `/studio` and `/contact`, and the site-plan slot beside the
+   contact address. All three held drawings seeded from CONSTANTS until prompt 14 and hold
+   a photograph from the record now — see those two screens' headers.
+
+   Only `object-fit` is added. `.band__art` is already `position: absolute; inset: 0`
+   (`panel.css:570`) and `.cmap` is already `position: relative` (`:478`), so both are
+   positioned ancestors a `fill` image resolves against, and the `::after` scrim that keeps
+   `.band__cap` legible sits over whichever child is there. `preserveAspectRatio="slice"`
+   is what the SVGs did; `cover` is the bitmap spelling of it. */
+.band__photo,
+.cmap__photo { object-fit: cover; }
 
 /* --------------------------------------------------------------------------
    No JavaScript

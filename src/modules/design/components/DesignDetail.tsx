@@ -22,7 +22,13 @@
  * taxonomy, not content. `legacy/data/works.fa.js` translates it per record and that value
  * is deliberately not stored (AGENTS.md).
  */
-import { BackLink, DetailPlates, SpecRow } from '@/common/components/collection';
+import {
+  BackLink,
+  DetailPlates,
+  GalleryBand,
+  HEAD_PLATE_COUNT,
+  SpecRow,
+} from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { DesignWork } from '@/common/schemas/design-work';
@@ -35,6 +41,9 @@ export interface DesignDetailProps {
 export function DesignDetail({ work, dictionary }: DesignDetailProps) {
   const { t, num, term, list, locale } = dictionary;
   const paragraphs = work.description.split(/\n+/).filter(Boolean);
+  // Cover first, then the gallery — see `ProjectDetail` for why the split uses the shared
+  // constant rather than a literal.
+  const images = [...(work.cover ? [work.cover] : []), ...work.gallery];
 
   return (
     <div className="route route--solo" id="main">
@@ -45,14 +54,7 @@ export function DesignDetail({ work, dictionary }: DesignDetailProps) {
           <h1 className="detail__title">{work.title}</h1>
           <p className="detail__blurb">{work.blurb}</p>
 
-          {/* Cover first, then the gallery in its stored order. Any slot without a
-              photograph keeps the drawing it always had — see `DetailPlates`. */}
-          <DetailPlates
-            seed={work.slug}
-            types={[work.category]}
-            dictionary={dictionary}
-            images={[...(work.cover ? [work.cover] : []), ...work.gallery]}
-          />
+          <DetailPlates images={images} />
 
           <div className="detail__cols">
             <div className="spec">
@@ -73,6 +75,8 @@ export function DesignDetail({ work, dictionary }: DesignDetailProps) {
               ))}
             </div>
           </div>
+
+          <GalleryBand images={images.slice(HEAD_PLATE_COUNT)} heading={t('ui.photographs')} />
         </article>
       </div>
     </div>

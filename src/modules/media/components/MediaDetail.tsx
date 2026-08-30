@@ -19,18 +19,36 @@
  *
  * `author` is empty for the five award records. `SpecRow` and the quote footer both drop
  * out on an empty value rather than printing a blank byline.
+ *
+ * ─── THE DRAWINGS ARE GONE, AND SO IS THE BORROWED SEED (prompt 14) ──────────────
+ * Both pictures on this page used to be generated: the plates at the head and the
+ * related-project thumbnail, each seeded from the PROJECT's slug so a cutting carried the
+ * building. Prompt 14 removed the generated fallback for records, so both now show a real
+ * photograph or nothing — the entry's own for the head, the project's own for the
+ * thumbnail. An entry with no pictures starts at its eyebrow.
  */
 import Link from 'next/link';
-import { BackLink, DetailPlates, SpecRow } from '@/common/components/collection';
+import {
+  BackLink,
+  DetailPlates,
+  GalleryBand,
+  HEAD_PLATE_COUNT,
+  SpecRow,
+} from '@/common/components/collection';
+import Image from 'next/image';
 import { Lat } from '@/common/components/layout';
-import { draw, kindFor } from '@/common/lib/art';
+import { mediaUrl } from '@/common/constants/uploads';
 import type { Dictionary } from '@/common/i18n';
 import { localeHref } from '@/common/i18n/navigation';
 import type { Media } from '@/common/schemas/media';
 import type { Project } from '@/common/schemas/project';
 
-/** The ratio the related-project thumbnail is drawn at — `legacy/js/ui/panel.js:328`. */
-const RELATE_RATIO = 0.62;
+/**
+ * `.relate__f` is `width: 8.5rem` in `panel.css:705`, dropping to 6rem below 860px. Two
+ * fixed widths and no fluid term at all, so the string is those two numbers and nothing is
+ * derived — this is the one image on the site whose box never depends on the viewport.
+ */
+const RELATE_SIZES = '(max-width: 860px) 6rem, 8.5rem';
 
 export interface MediaDetailProps {
   entry: Media;
@@ -42,11 +60,9 @@ export interface MediaDetailProps {
 export function MediaDetail({ entry, project, dictionary }: MediaDetailProps) {
   const { t, num, term, locale } = dictionary;
 
-  // The plate shows the building the piece is about, which ties the entry to the work
-  // rather than to the publication. No project (or a missing one) falls back to the
-  // entry's own slug, so the head of the page is never empty.
-  const seed = project?.slug ?? entry.slug;
-  const types = project?.types ?? [];
+  // Cover first, then the gallery this table gained in prompt 14 — one list, split by the
+  // head's own capacity so nothing is shown twice. See `ProjectDetail`.
+  const images = [...(entry.cover ? [entry.cover] : []), ...entry.gallery];
 
   return (
     <div className="route route--solo" id="main">
@@ -70,14 +86,7 @@ export function MediaDetail({ entry, project, dictionary }: MediaDetailProps) {
             )}
           </blockquote>
 
-          {/* A cover if this entry has one; otherwise all three plates stay drawings seeded
-              from the RELATED PROJECT, which is what makes a cutting carry the building. */}
-          <DetailPlates
-            seed={seed}
-            types={types}
-            dictionary={dictionary}
-            images={entry.cover ? [entry.cover] : []}
-          />
+          <DetailPlates images={images} />
 
           <div className="detail__cols">
             <div className="spec">
@@ -106,16 +115,24 @@ export function MediaDetail({ entry, project, dictionary }: MediaDetailProps) {
                     href={localeHref(locale, `/projects/${project.slug}`)}
                     data-cursor={t('ui.view')}
                   >
-                    <span
-                      className="relate__f"
-                      dangerouslySetInnerHTML={{
-                        __html: draw(
-                          kindFor(project.slug, project.types),
-                          project.slug,
-                          RELATE_RATIO,
-                        ),
-                      }}
-                    />
+                    {/*
+                      THE PROJECT'S OWN PHOTOGRAPH, OR AN EMPTY FRAME. This was a drawing
+                      seeded from the project's slug until prompt 14 — the same rule the
+                      cards followed, applied to a second slot outside `DetailPlates`. The
+                      frame is kept for the same reason `CardPlate` keeps its own: it holds
+                      the link's proportions, and dropping it would collapse the row.
+                    */}
+                    <span className="relate__f">
+                      {project.cover && (
+                        <Image
+                          src={mediaUrl(project.cover.path)}
+                          alt={project.cover.alt}
+                          fill
+                          sizes={RELATE_SIZES}
+                          className="relate__photo"
+                        />
+                      )}
+                    </span>
                     <span className="relate__b">
                       <span className="relate__t">{project.title}</span>
                       <span className="relate__m">
@@ -127,6 +144,8 @@ export function MediaDetail({ entry, project, dictionary }: MediaDetailProps) {
               )}
             </div>
           </div>
+
+          <GalleryBand images={images.slice(HEAD_PLATE_COUNT)} heading={t('ui.photographs')} />
         </article>
       </div>
     </div>

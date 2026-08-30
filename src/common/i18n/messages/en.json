@@ -43,7 +43,8 @@
     "worksCount": "Works",
     "entriesCount": "Entries",
     "filter": "Filter",
-    "close": "Close"
+    "close": "Close",
+    "photographs": "Photographs"
   },
   "error": {
     "title": "Something went wrong",
