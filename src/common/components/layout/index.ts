@@ -7,8 +7,8 @@
  * the site renders them, and a module that owned them would have to be imported by every
  * other module, which is exactly the inversion the layering rule exists to prevent.
  *
- * NINE of these carry `'use client'`, and each is a leaf with one reason:
- *   `Stage`, `SkipLink`, `SectionHint`, `LanguageSwitch`, `SectionEscape` — read the pathname
+ * EIGHT of these carry `'use client'`, and each is a leaf with one reason:
+ *   `Stage`, `SkipLink`, `LanguageSwitch`, `SectionEscape` — read the pathname
  *   `MarkStepper`  — measures a box
  *   `LiveClock`    — ticks
  *   `SiteMotion`   — owns the cursor and the preloader
@@ -24,7 +24,6 @@ export { LiveClock, type LiveClockProps } from './LiveClock';
 export { MarkStepper, type MarkStepperProps } from './MarkStepper';
 export { Masthead, type MastheadProps } from './Masthead';
 export { SectionEscape, type SectionEscapeProps } from './SectionEscape';
-export { SectionHint, type SectionHintProps } from './SectionHint';
 export { ShellTransition, type ShellStrings, type ShellTransitionProps } from './ShellTransition';
 export { SkipLink, type SkipLinkProps } from './SkipLink';
 export { SiteMotion, useCursor, useSmoothScroll, type SiteMotionProps } from './SiteMotion';

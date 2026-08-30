@@ -106,6 +106,25 @@ details[open] > .fgroup__head .fgroup__caret { transform: rotate(45deg); }
 details > .fgroup__body { grid-template-rows: 1fr; }
 
 /* --------------------------------------------------------------------------
+   The footer bar carries one thing (prompt 12)
+   -------------------------------------------------------------------------- */
+
+/* `shell.css` sets `.footbar { justify-content: space-between }`, which is right for
+   three groups and wrong for one: a lone child lands at the START of the row rather
+   than in the middle of it. The footer holds only the city and the clock now, and the
+   request was for them centred.
+
+   THE OVERRIDE LIVES HERE, NOT IN `shell.css`. That file opens with "PORTED VERBATIM —
+   rules unchanged" and this file exists precisely for geometry the ported files cannot
+   express. `route.css` is imported after `shell.css`, so one rule at equal specificity
+   wins on order with no `!important`.
+
+   `.footbar__set--wide` is now a dead selector in `shell.css:325` — the group it hid
+   below 860px no longer exists. It is left where it is rather than deleted, because
+   deleting it would edit the port for no behavioural gain. */
+.footbar { justify-content: center; }
+
+/* --------------------------------------------------------------------------
    Detail route
    -------------------------------------------------------------------------- */
 

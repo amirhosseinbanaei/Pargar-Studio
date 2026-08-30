@@ -1,5 +1,13 @@
-/* PORTED VERBATIM from `legacy/css/i18n.css` — rules unchanged.
+/* PORTED from `legacy/css/i18n.css` — every ported rule unchanged.
    Persian and RTL. Imported LAST so it overrides the Latin defaults with no !important.
+
+   THE "VERBATIM" CLAIM IS QUALIFIED, and has been since prompt 8. Everything in
+   this file is byte-identical to the legacy source EXCEPT the language-switch
+   block at the end, which prompt 8 WROTE when it deleted the closer and prompt
+   12 then cut down when it emptied the footer. That block is marked
+   `NOT PORTED` where it sits. The two `[dir="rtl"] .closer` mirrors the legacy
+   file carried are gone with the button they mirrored. Nothing else here has
+   been edited, and nothing else here may be.
 
    These files are real CSS, not Tailwind utilities, and are imported once by
    the site layout. They reference the token custom properties in
@@ -143,7 +151,7 @@ html.is-fa .lat {
 .lang__sep { opacity: 0.4; }
 
 /* NOT PORTED — rewritten in prompt 8, when the closer was deleted and the
-   masthead's switch took its slot.
+   masthead's switch took its slot, and simplified again in prompt 12.
 
    `margin-inline-start: auto` in a flex row, not `position: absolute` against a
    physical edge. `.marks` is the masthead's only other child and is itself out
@@ -152,18 +160,14 @@ html.is-fa .lat {
    `[dir="rtl"] .closer { right: auto; left: 0 }` and this needs no RTL rule at
    all: a logical margin has no wrong corner.
 
-   VISIBILITY IS THE CLOSER'S, INHERITED. The footer carries the switch on wide
-   screens, so the masthead's copy appears there only in an open section —
-   exactly when and where the X button used to. Below 860px the footer has no
-   room for it and the masthead's is the only one, at every stage state; the old
-   `.stage.is-open` hide is gone with the closer that displaced it. */
+   THE VISIBILITY RULES ARE GONE (prompt 12), and their absence is the feature.
+   Prompt 8 inherited the closer's contract — hidden by default, shown under
+   `.stage.is-open`, shown unconditionally below 860px — because the FOOTER
+   carried the switch on the wide index. Prompt 12 emptied the footer down to the
+   city and the clock, so that default would have left `/en` and `/fa` at any
+   width above 860px with no language switch anywhere in the document. There is
+   one switch now, in the masthead, at every width and every stage state, and it
+   needs no rule to say so. */
 .masthead .lang {
-  display: none;
   margin-inline-start: auto;
-}
-.stage.is-open .masthead .lang { display: inline-flex; }
-
-@media (max-width: 860px) {
-  .footbar .lang { display: none; }
-  .masthead .lang { display: inline-flex; }
 }

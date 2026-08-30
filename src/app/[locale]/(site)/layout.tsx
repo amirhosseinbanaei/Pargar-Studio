@@ -23,7 +23,6 @@ import {
   Stage,
 } from '@/common/components/layout';
 import { localeHref } from '@/common/i18n/navigation';
-import { listProjects } from '@/common/services/project-service';
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -35,9 +34,6 @@ export default async function SiteLayout({ children, params }: LayoutProps) {
   if (!isLocale(locale)) notFound();
 
   const { t } = getIntl(locale);
-  // A cached read (`cacheLife('max')`, tagged `projects`), so the footer's figure is a
-  // fact rather than a literal that goes stale the first time the dashboard saves.
-  const projects = await listProjects(locale);
 
   return (
     <SiteMotion brand={t('brand.name')} tagline={`${t('brand.tagline')} — ${t('ui.tehran')}`}>
@@ -46,7 +42,7 @@ export default async function SiteLayout({ children, params }: LayoutProps) {
       <Stage>
         <Masthead locale={locale} />
         {children}
-        <Footbar locale={locale} projectCount={projects.length} />
+        <Footbar locale={locale} />
       </Stage>
 
       {/*
