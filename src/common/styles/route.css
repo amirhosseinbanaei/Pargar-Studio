@@ -410,6 +410,21 @@ a.detail__back { text-decoration: none; }
 .card:hover .card__frame > img { transform: scale(1); }
 
 .detail__plate > img { object-fit: cover; }
+
+/* The five index columns took a photograph in prompt 13, into the same `.col__art` box the
+   generated drawing has always used. These two rules mirror `shell.css:148` and `:155`
+   exactly — the same resting `scale(1.06)`, the same relaxation to `scale(1)` under the
+   pointer, the same duration and easing tokens — so a photographed column and a drawn one
+   move identically, and the vignette at `shell.css:158` sits over both. `next/image`'s
+   `fill` supplies the absolute positioning inline; `object-fit: cover` is what reproduces
+   the SVG's `preserveAspectRatio="xMidYMid slice"`. */
+.col__art > .col__photo {
+  object-fit: cover;
+  transform: scale(1.06);
+  transition: transform var(--d-xl) var(--e-expo);
+}
+.col:hover .col__art > .col__photo { transform: scale(1); }
+
 /* `.person__plate` is sized by `aspect-ratio` and is not positioned in the port; a
    `fill` image needs a positioned ancestor or it escapes to the nearest one, which
    on the studio page is the whole document. One additive property. */
