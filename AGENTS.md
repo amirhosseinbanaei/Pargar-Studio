@@ -408,6 +408,9 @@ module-scoped language would leak one visitor's language into another's HTML.
 - The dictionary applies the corrections at `legacy/data/i18n.js:326`, not the values they
   superseded: `ui.est` is `Est.` and `ui.projectsCount` is `Projects`, because the originals
   baked the figure into the string and double-printed once the interface supplied it.
+  `ui.est` has had NO consumer since prompt 12 deleted the footer group that printed it;
+  `ui.projectsCount` is still the filter rails' noun. Neither key was removed — see prompt
+  12's section for why the string stays even though the line is gone.
 
 ### The two open decisions, resolved
 
@@ -498,11 +501,13 @@ owns its screens and its filter logic; `app/` imports the barrel and nothing dee
 ### Client leaves, and why each one is one
 
 Server Components are the default and the layout is one. Everything that carries
-`'use client'` is a leaf with a single reason: `Stage`, `SkipLink`, `SectionHint` and
+`'use client'` is a leaf with a single reason: `Stage`, `SkipLink` and
 `LanguageSwitch` read the pathname (as did `Closer`, deleted in prompt 8, whose Escape
-handler now lives in `SectionEscape`); `MarkStepper` measures a box; `LiveClock` ticks;
+handler now lives in `SectionEscape`, and `SectionHint`, deleted in prompt 12 with the
+footer group that held it); `MarkStepper` measures a box; `LiveClock` ticks;
 `SiteMotion` owns the cursor and the preloader; `ShellTransition` drives the FLIP;
-`CardReveal` adds one class. The clock's first value is computed on the SERVER behind
+`CardReveal` adds one class; `RailDrawer` (prompt 12) owns the narrow-screen filter
+drawer's open state. The clock's first value is computed on the SERVER behind
 `await connection()` and a `<Suspense>`, so it is correct in the HTML with no hydration
 rewrite — the legacy markup shipped a literal `—` and filled it in on boot.
 
@@ -1316,7 +1321,11 @@ included — is byte-identical to the port.
 - **`ui.close` was removed from both catalogs.** Its only consumer was the deleted closer
   (the button's label and `relang()`'s re-label of it). Grepped first, then removed together
   with the `ShellStrings.close` plumbing that fed it. `ui.escToClose` STAYS — `SectionHint`
-  and the shell's `#hint` both still use it.
+  and the shell's `#hint` both still use it. **Both halves of this changed in prompt 12:**
+  `ui.close` is BACK, for the filter drawer's dismiss control, and `ui.escToClose` now has
+  exactly one consumer, `motion/shell.ts`'s write into `#hint` — an element that no longer
+  exists, so the write is a guarded no-op. See "Touch chrome and the filter drawer
+  (prompt 12)".
 
 ### Numbers: two paths, and which call sites take which
 
@@ -2222,6 +2231,203 @@ made `grep -rn "revalidateTag([^,)]*)" src` match three passthrough definitions 
 positive prompt 7's audit had to explain in prose. The spy is renamed `revalidateTagSpy`; the
 mock still forwards the real name, the assertion still proves no action calls it, and that grep
 now returns NOTHING, so a real hit would stand out instead of hiding among known noise.
+
+## Touch chrome and the filter drawer (prompt 12)
+
+Three things a phone or a tablet got wrong, fixed together because they are the same
+mistake: chrome designed against a mouse and a wide viewport. The footer holds one thing
+now, the filter rail collapses to a bar and a drawer below 900px, and the five columns
+show their generated artwork without waiting for a hover that a finger never performs.
+
+```
+  src/common/components/collection/RailDrawer.tsx   THE new component. The one 'use client' leaf
+  src/common/components/layout/SectionHint.tsx      DELETED
+  src/common/styles/route.css                       every new rule in this prompt
+  src/common/styles/i18n.css                        four rules DELETED (see below)
+```
+
+### The footer holds Tehran and the clock, centred
+
+`Footbar` rendered three `.footbar__set` groups. Two are gone and nothing replaced either:
+
+| Was there                        | Now                                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `Est. 2007` + the project count  | **Deleted.** Nothing else in the app rendered either figure, so both are off the site entirely |
+| `LanguageSwitch` + `SectionHint` | The switch **moved to the masthead** (below); `SectionHint` is **deleted outright**            |
+
+- **`projectCount` went with them, and so did a database read.** `(site)/layout.tsx` called
+  `listProjects(locale)` for the sole purpose of feeding that prop. Both the call and the
+  `listProjects` import are gone; nothing else in that layout read the result.
+- **`SectionHint` rendered the element with `id="hint"`, which `motion/shell.ts` writes
+  into** at `:429` and `:488`, having looked it up at `:118` with `getElementById`. Both
+  writes are already guarded by `if (hint)`, so deleting the element is a no-op there.
+  **The guards stay** — they are what makes the absence safe, not dead code.
+  `grep -rn "SectionHint" src/` returns nothing but the prose in `Footbar.tsx` explaining
+  the deletion, so that grep is still a real check.
+- **`ui.selectSection` and `ui.escToClose` are still in both catalogs.** `escToClose` is
+  still written by `motion/shell.ts` into an element that is no longer there; `selectSection`
+  now has no consumer at all. Neither was removed, because `catalog.test.ts` asserts the two
+  catalogs carry the same key set and nothing asserts the reverse — an unused STRING costs
+  nothing, while a removed one is a repo-wide edit if the hint ever comes back. The same
+  reasoning keeps `ui.est`.
+- **`.footbar` is centred from `route.css`**, not by editing `shell.css:264`'s
+  `justify-content: space-between`. `.footbar__set--wide` at `shell.css:325` is now a dead
+  selector and is deliberately left in the port.
+
+### The language switch is the masthead's, at every width and every stage state
+
+Not a preference — a consequence. `i18n.css` hid `.masthead .lang` by default and showed it
+only under `.stage.is-open`, because the FOOTER carried the switch on the wide index. With
+the footer emptied, that default would have left `/en` and `/fa` above 860px with **no
+language switch anywhere in the document**. Four rules were deleted in the same commit:
+`display: none` on `.masthead .lang`, the `.stage.is-open .masthead .lang` show, and both
+halves of the 860px block (`.footbar .lang { display: none }` — an element that no longer
+exists — and `.masthead .lang { display: inline-flex }`, now the default). What is left is
+one declaration, `margin-inline-start: auto`, and no visibility rule at all.
+
+`Masthead.tsx` already rendered it and did not change. Verified in a browser at 1440px and
+375px, in both locales, on the index and on a section route: exactly one visible `.lang`,
+in the masthead, every time.
+
+**`i18n.css`'s "PORTED VERBATIM" header is qualified, and the file now says so itself.**
+The language-switch block at the end was WRITTEN by prompt 8 (when the closer was deleted)
+and cut down by prompt 12; it is marked `NOT PORTED` in place. Everything else in that file
+is still byte-identical to `legacy/css/i18n.css` and still may not be touched.
+
+### Below 900px the rail becomes a bar and a drawer
+
+`route.css` stacked `.route__rail` above the grid at 900px and under, which on
+`/en/projects` is a count plus four accordions — one open — before the first card. On a
+375px phone that is the entire first screen.
+
+**`RailDrawer` is the only component this prompt adds, and both rails use it.**
+`FacetRail` (design, media) and `ProjectFilterRail` (projects) hand their existing contents
+over as `children`; neither is forked, neither knows what a drawer is, and both stay Server
+Components. Two copies of this would be two places to fix the focus return.
+
+- **The width switch is CSS, not `matchMedia`.** Both shapes are rendered and a media query
+  displays one. A JavaScript width branch renders the wrong shape on the server, which has
+  no viewport, and swaps it after hydration — a visible flash on exactly the slow devices
+  this change exists for. **The cost is that `children` appears twice in the DOM**;
+  `display: none` keeps the unused copy out of the tab order and off the accessibility
+  tree, and the duplication is a few dozen links (34 focusable elements on the projects
+  rail, measured).
+- **`inert` while closed, plus `visibility: hidden`** — the attribute takes the panel off
+  the accessibility tree and out of the tab order (the pattern the shell already uses for
+  collapsed columns at `motion/shell.ts:416`), and the visibility rule is what stops a
+  closed panel painting over the grid. Opacity alone would do neither. Verified by tabbing
+  25 stops through the closed page at 375px in both locales: focus never entered the panel.
+- **ESCAPE IS BOUND IN THE CAPTURE PHASE, and that is load-bearing.** `SectionEscape`
+  listens on `window` in the bubble phase and navigates out of the section. It is mounted
+  in the site layout, so it registers BEFORE the drawer's listener, which only attaches on
+  open — a bubble-phase listener in the drawer would run second, after the navigation had
+  started. Capturing on `window` runs first and `stopPropagation()` keeps the event from
+  ever reaching the bubble phase. Verified: the first Escape closes the drawer and stays on
+  `/en/projects`; the second leaves the section for `/en`.
+- **Following any filter link closes it.** One delegated `click` on the panel, `closest('a')`
+  — a filter is a navigation, and a drawer left standing over the newly filtered grid hides
+  the result of the tap that opened it. It covers the conditional "Clear all" for free.
+- **`useId`, not a counter**, for `aria-controls`: a module-level counter advances
+  differently on a server that has served other requests than in a browser that just
+  started, which is a hydration mismatch on every page with a rail.
+- **The active-filter state is a dot AND a description, never a colour alone.** The button
+  carries `data-active` for the champagne, a 4px square marked `aria-hidden`, and
+  `aria-describedby` pointing at the count beside it — so it announces as "Filter, 12
+  Projects" rather than relying on a mark nobody hears.
+- **No scroll lock.** `base.css:41` already gives `body { overflow: hidden }`; the shell
+  never scrolls, `.route__main` does.
+- **`role="group"`, not `role="dialog"`.** The drawer is a region of the page, not a modal:
+  the masthead and the footer stay above it (`--z-panel` against `--z-head`) and reachable,
+  and focus is moved in and returned but not TRAPPED. A `dialog` role without a focus trap
+  promises something the component does not do.
+
+### The column artwork appears with no interaction
+
+`shell.css:137` rests `.col__art` at `opacity: 0` and raises it to `0.62` only under
+`.col.is-hover` / `.col.is-focus`, both of which come from `pointerover` / `focusin`
+handlers in `motion/shell.ts:498`. A touch device fires neither — the first thing a finger
+does is tap, and a tap navigates — so the drawing behind each of the five columns was never
+seen on a phone or a tablet at all.
+
+One rule in `route.css`, under `@media (hover: none), (max-width: 900px)`, rests both the
+art and the caption at their visible values. `(hover: none)` is the precise test and
+`(max-width: 900px)` is the one the request named; both are there so a large tablet and a
+small laptop window each get it. `0.62` is mirrored from `shell.css:146` rather than
+tokenized, because tokenizing it would mean editing the port to read the token.
+
+**Nothing overrides the open state.** `.stage.is-open .col.is-active .col__art` is three
+classes to this rule's one, so the transition out of the index is untouched — verified with
+a mouse at 1440px in both locales: art rests at 0 and reaches 0.62 on hover, exactly as
+before. `.col:hover .col__art > svg` and the vignette were not touched at all.
+
+### The five decisions
+
+- **5.1 — every new rule goes in `route.css`; `shell.css` and `panel.css` are untouched.**
+  Taken as recommended. Those two open with "PORTED VERBATIM — rules unchanged" and this
+  file exists for geometry they cannot express; `route.css` is imported after both, so an
+  override at equal specificity wins on order with no `!important`. The one exception is
+  the DELETION in `i18n.css`, whose language-switch block was written by prompt 8 and is
+  not part of the legacy port — recorded above.
+- **5.2 — the bar is a row of `.route`, NOT sticky inside `.route__main`.** Taken the other
+  way from the recommendation, and the reason is structural rather than stylistic:
+  `RailDrawer` wraps the RAIL, which is already a sibling row of `.route`, so a bar
+  sticky inside `.route__main` would have to be threaded through `ProjectsScreen`,
+  `DesignScreen` and `MediaScreen` into a different subtree — three edits to screens this
+  prompt otherwise leaves alone. It also needs no sticky at all: `.route` is a grid of
+  fixed height and `.route__main` is the only thing in it that scrolls, so an ordinary
+  first row IS a fixed bar, and nothing overlaps the grid. Measured at 899, 820 and 375 in
+  both locales: the bar's bottom edge and the first card's top edge never overlap.
+- **5.3 — the caption comes back below 860px.** Taken as recommended. With the drawing now
+  visible the stacked column has a picture and a title and nothing saying what it is about,
+  and a stacked row has room for one line at `--fs-xs`. `shell.css:320`'s `display: none`
+  is overridden from `route.css`.
+- **The drawer FADES rather than SLIDES, and that follows from the RTL rule.** A slide is
+  `translateX`, which carries a physical sign; flipping it for Persian needs a
+  `[dir="rtl"]` (or `:dir()`) override, which §6 of this prompt bans. Opacity plus a
+  uniform `scale(0.98)` has no wrong direction. The panel's POSITION is fully logical —
+  `inset-inline-start` — so it opens from the left in English and the right in Persian with
+  no direction rule anywhere. Verified flush against the correct edge at 899, 820 and 375
+  in both locales.
+- **`children` is rendered twice rather than moved by CSS.** The alternative — one copy that
+  the media query repositions — cannot carry `inert` correctly, because `inert` would then
+  have to be applied on the narrow viewport only, which is the `matchMedia` branch this
+  design exists to avoid.
+
+### The copy that changed
+
+Per the content-fidelity policy, every one of these is recorded rather than made quietly.
+
+| Key / string       | Change                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `Est. 2007`        | **Removed from the site.** `ui.est` stays in both catalogs, unused                                             |
+| The project count  | **Removed from the site.** `ui.projectsCount` is still the rails' noun                                         |
+| `Select a section` | **Removed from the site** with `SectionHint`. `ui.selectSection` unused                                        |
+| `Esc to close`     | **Removed from the site**; `ui.escToClose` is still written by the shell into an element that no longer exists |
+| `ui.filter`        | **NEW** — `Filter` / `فیلتر`                                                                                   |
+| `ui.close`         | **NEW, and a restoration**: prompt 8 removed this exact key when it deleted the closer. `Close` / `بستن`       |
+
+The Persian is authored, not ported — the legacy site had no filter drawer. `فیلتر` is the
+spelling the catalog already uses in `filter.noMatch`, so the two agree; `بستن` is what
+`ui.escToClose` already says. Both are owed the same native reader the `form.*` keys are.
+
+### Studio's rail is NOT `route--solo`, contrary to the assumption this prompt was written on
+
+The prompt assumed studio and contact both had `display: none` on their rail already. That
+is true of **contact** (`route--solo`, `route.css:32`) and false of **studio**, which
+renders a plain `.route` with a `.route__rail` of anchors — `StudioScreen.tsx:71`. Checking
+it changed nothing about the work, because the new bar and drawer are scoped to
+`.route__rail--drawer` and the classes `RailDrawer` renders, none of which the studio rail
+carries. Verified at 375px and 1440px: studio's anchor rail behaves exactly as it did.
+
+### Outstanding — owed, not fixed here
+
+**The two rail SKELETONS still draw the wide shape below 900px.**
+`GridSkeleton.tsx:26` and `ProjectsScreenSkeleton.tsx:24` render `.route__rail` with four
+tall placeholder bars, and the real screen now answers with a one-line bar — so a narrow
+viewport gets a layout jump when the content lands, which is exactly what a shape-accurate
+skeleton exists to prevent (`references/10-routing-and-app-shell.md`, the `loading.tsx`
+invariant). Both files were out of this prompt's scope and neither blocked it. The fix is a
+media query on the skeleton's rail, or the skeleton rendering the bar's box below 900px.
 
 ## Deviations from the architecture playbook
 
