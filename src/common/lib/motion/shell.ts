@@ -279,6 +279,16 @@ export function createShell(options: ShellOptions): ShellApi {
   let markW = 0;
   let markState: number | null = null; // last requested activeIndex
 
+  /**
+   * The `fill: 'forwards'` animations this shell has started on the masthead's marks.
+   *
+   * They are held because the marks OUTLIVE the shell — they live in the layout — and a
+   * forwards-filled animation keeps asserting its end state after it finishes. That is the
+   * deliberate exception to invariant 1 (`anim.ts`) while the shell is alive; on the way
+   * out it is a write to somebody else's element, so `destroy()` cancels them.
+   */
+  const markAnimations: Animation[] = [];
+
   const markRO = new ResizeObserver(([entry]) => {
     const w = entry.contentRect.width;
     if (w < 1 || Math.abs(w - markW) < 0.5) return;
@@ -304,6 +314,7 @@ export function createShell(options: ShellOptions): ShellApi {
           delay: duration > 1 ? k * 26 : 0,
           fill: 'forwards',
         });
+        if (a) markAnimations.push(a);
         m.style.opacity = activeIndex != null && k === activeIndex + 1 ? '1' : '';
         return a ? a.done : Promise.resolve();
       }),
@@ -321,6 +332,19 @@ export function createShell(options: ShellOptions): ShellApi {
      runs one transition and lands on the third.
      ====================================================================== */
   let queued: { id: string | null; push: boolean } | null = null;
+
+  /**
+   * The navigation a PREVENTED click still owes.
+   *
+   * The click handler below calls `preventDefault()` on the column's own `<a>` and takes
+   * responsibility for going there itself, through `onChange` at the end of `runOpen`. If
+   * anything between the two throws, `pump`'s catch swallows it — correctly, because a
+   * throw there would freeze the queue for the rest of the session — and the reader is left
+   * on a title that is a real link, was prevented, and went nowhere. So the promise is
+   * recorded when it is made and honoured in the catch: a click either navigates or is not
+   * prevented, never both.
+   */
+  let pendingNav: { id: string; push: boolean } | null = null;
 
   /** @param id section to show, or null for the index */
   function go(id: string | null, { push = true }: { push?: boolean } = {}): void {
@@ -347,6 +371,13 @@ export function createShell(options: ShellOptions): ShellApi {
       }
     } catch (err) {
       console.error(err);
+      // The transition failed after a click was prevented on its behalf. Go anyway —
+      // see `pendingNav`.
+      if (pendingNav) {
+        const owed = pendingNav;
+        pendingNav = null;
+        onChange?.(owed);
+      }
     } finally {
       // `busy` gates the queue, so it is released in a finally and never at
       // the end of the happy path. One throw here would otherwise freeze the
@@ -359,6 +390,7 @@ export function createShell(options: ShellOptions): ShellApi {
   const close = (opts?: { push?: boolean }): void => go(null, opts);
 
   async function runOpen(col: HTMLElement, id: string, push: boolean): Promise<void> {
+    pendingNav = { id, push };
     const i = Number(col.dataset.i);
     const others = cols.filter(c => c !== col);
 
@@ -428,6 +460,7 @@ export function createShell(options: ShellOptions): ShellApi {
 
     if (hint) hint.textContent = t('ui.escToClose');
     if (live) live.textContent = `${t('nav.' + id)} — ${t('ui.opened')}`;
+    pendingNav = null;
     onChange?.({ id, push });
 
     await sweepPromise;
@@ -506,28 +539,41 @@ export function createShell(options: ShellOptions): ShellApi {
   colsWrap.addEventListener('pointerover', onPointerOver);
   colsWrap.addEventListener('pointerout', onPointerOut);
 
-  colsWrap.addEventListener('click', e => {
+  /**
+   * THE CLICK IS PREVENTED ONLY WHEN THIS SHELL WILL ACTUALLY HANDLE IT.
+   *
+   * `.col__hit` is a real `<a>` to a real route, so the browser's own navigation is the
+   * fallback and it is always correct. Preventing it and then discovering there is no
+   * column for that id — `go()` returns at its first line when `byId` has no entry — turns
+   * a working link into a dead one, silently. So the lookup happens BEFORE the
+   * `preventDefault`, and anything this shell cannot open is simply left to the anchor.
+   */
+  const onColsClick = (e: MouseEvent): void => {
     const hit = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-open]') : null;
-    if (!hit) return;
+    const id = hit?.dataset.open;
+    if (!id || !byId.has(id)) return;
     e.preventDefault();
-    if (hit.dataset.open) open(hit.dataset.open);
-  });
+    open(id);
+  };
+  colsWrap.addEventListener('click', onColsClick);
 
   // Focus drives the same affordances as hover, so keyboard users see the art.
-  colsWrap.addEventListener('focusin', e => {
+  const onFocusIn = (e: FocusEvent): void => {
     const col = e.target instanceof Element ? e.target.closest<HTMLElement>('.col') : null;
     if (col) {
       col.classList.add('is-focus');
       hoverIn(col);
     }
-  });
-  colsWrap.addEventListener('focusout', e => {
+  };
+  const onFocusOut = (e: FocusEvent): void => {
     const col = e.target instanceof Element ? e.target.closest<HTMLElement>('.col') : null;
     if (col) {
       col.classList.remove('is-focus');
       hoverOut(col);
     }
-  });
+  };
+  colsWrap.addEventListener('focusin', onFocusIn);
+  colsWrap.addEventListener('focusout', onFocusOut);
 
   // `#home` lives in the MASTHEAD, which is part of the site layout and therefore
   // outlives this shell across a navigation. Its handler is named so `destroy()` can take
@@ -575,17 +621,70 @@ export function createShell(options: ShellOptions): ShellApi {
   };
   addEventListener('resize', onResize, { passive: true });
 
+  /**
+   * Undo every write `runOpen` made to an element this shell does not own.
+   *
+   * ─── WHY THIS EXISTS: THE COLUMNS ARE NOT UNMOUNTED ────────────────────────────
+   * The assumption this file was written on — and the one `ShellTransition`'s header
+   * still states — was that leaving the index unmounts the column subtree, so anything
+   * written onto a `.col` goes with it. IT DOES NOT. The App Router keeps a visited
+   * segment MOUNTED AND HIDDEN (React writes `display: none !important` inline on
+   * `#cols`), which is what makes Back instant, so the five `.col` elements survive the
+   * round trip as THE SAME NODES. Measured, not reasoned about: an expando stamped on
+   * them before the navigation is still there afterwards.
+   *
+   * The effects DO tear down and re-run, so `destroy()` is called and `createShell` runs
+   * again on the way back — over the same, still-dirty, DOM. The four columns `runOpen`
+   * marked `inert` were therefore still `inert` on the index: an `inert` element receives
+   * no pointer event, no hover and no focus, so four of the five columns were dead until
+   * a full reload built the document again. That is the whole bug.
+   *
+   * `is-open` ON `#stage` IS DELIBERATELY NOT TOUCHED HERE, and that is the other half of
+   * the fix. `Stage` renders that class from the pathname, which is the truth and which
+   * has to be in the server HTML — a deep link to `/en/projects` must not paint the index
+   * layout for a frame. So `Stage` owns the durable value and this file only ANTICIPATES
+   * it for the navigation the transition is itself about to cause. Removing it here would
+   * strip a class React's own prop still claims is present, and React does not re-write a
+   * prop that has not changed: the section route would lose its chrome. One owner per
+   * class; see `Stage.tsx`.
+   */
+  function resetColumnState(): void {
+    for (const col of cols) {
+      col.classList.remove('is-active', 'is-hover', 'is-focus');
+      col.removeAttribute('inert');
+      setRule(col, false);
+    }
+    // `sweep` leaves the wipe parked with inline transform and opacity. A fresh document
+    // has neither, and `#wipe` is re-shown with the rest of the segment.
+    wipe.style.opacity = '';
+    wipe.style.transform = '';
+    wipe.style.transformOrigin = '';
+    // The marks live in the MASTHEAD and outlive every shell. `MarkStepper` owns their
+    // resting position and re-asserts it on each pathname change, so what has to go is
+    // only what this shell wrote on top: its own `fill: 'forwards'` animations and the
+    // inline opacity it set on the active dot.
+    for (const animation of markAnimations) animation.cancel();
+    markAnimations.length = 0;
+    for (const mark of marks) mark.style.opacity = '';
+    openId = null;
+  }
+
   function destroy(): void {
     // Queued work first: a transition still in flight would otherwise reach for
     // elements React has already detached.
     queued = null;
+    pendingNav = null;
     colsWrap.removeEventListener('pointerover', onPointerOver);
     colsWrap.removeEventListener('pointerout', onPointerOut);
+    colsWrap.removeEventListener('click', onColsClick);
+    colsWrap.removeEventListener('focusin', onFocusIn);
+    colsWrap.removeEventListener('focusout', onFocusOut);
     home?.removeEventListener('click', onHomeClick);
     removeEventListener('keydown', onKeydown);
     removeEventListener('resize', onResize);
     clearTimeout(rt);
     markRO.disconnect();
+    resetColumnState();
   }
 
   /**

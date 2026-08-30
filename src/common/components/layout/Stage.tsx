@@ -15,6 +15,23 @@
  *
  * `usePathname` deliberately rather than `useSearchParams`: the latter forces a Suspense
  * boundary on every consumer, and a filtered projects URL is still a section route.
+ *
+ * ─── THIS COMPONENT OWNS `is-open`. `shell.ts` ONLY ANTICIPATES IT (prompt 13) ────
+ * Two things write that class and the rule between them is written down here because a
+ * className with two owners is how a column ends up dead — React only writes `className`
+ * when its own prop CHANGED between renders, so an imperative `classList` write it did not
+ * make is invisible to it.
+ *
+ *  - THIS component owns the DURABLE value. It is a function of the pathname, which is the
+ *    truth, and it has to be in the server HTML: rendering it in an effect instead would
+ *    paint the index layout for one frame on every deep link to a section route.
+ *  - `motion/shell.ts` adds it inside the FLIP's layout mutation, ~a second before the
+ *    route commits, because that IS the transition — the columns have to collapse while
+ *    the glyphs are measured. It is anticipating the pathname its own `onChange` is about
+ *    to cause, never disagreeing with it.
+ *  - Therefore `createShell`'s `destroy()` deliberately does NOT remove it. Removing a
+ *    class this component's prop still claims is present would leave React unable to
+ *    re-add it, and the section route would lose its chrome. See that function's header.
  */
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
