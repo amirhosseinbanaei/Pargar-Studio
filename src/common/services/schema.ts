@@ -375,6 +375,56 @@ export const contactMessages = sqliteTable('contact_messages', {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   index_cards — the WORDS AND THE PICTURE on each of the five columns (prompt 13)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * FIVE ROWS, FOREVER, KEYED ON THE NAV IDS. This is a bounded reversal of the decision in
+ * `common/constants/site.ts`, and the boundary is the whole design.
+ *
+ * That file says the wordmark and the five section ids are CHROME: they are referenced by
+ * the route tree, by `.col[data-id]` in the ported CSS and by the shell transition, so
+ * making them editable would let a dashboard save delete a route. That reasoning is
+ * correct and stands. `id`, `path`, `art` and `seed` are still constants and nobody can
+ * edit them.
+ *
+ * What is NOT chrome is the words on the card and the picture behind it, and that is what
+ * this table holds. `section_id` is the PRIMARY KEY and it is one of the five NAV ids: the
+ * table can never gain a sixth row that means anything, and deleting a row deletes CONTENT,
+ * never a route — the column keeps rendering, from the message catalog.
+ *
+ * ─── EVERY COLUMN DEGRADES, AND THE ROW ITSELF IS OPTIONAL ────────────────────────
+ * `title_*` and `caption_*` are `NOT NULL DEFAULT ''` rather than nullable, because `''`
+ * is what an empty form control holds and one spelling of "nothing" is enough. An empty
+ * value — or a missing row entirely — falls back to `nav.<id>` / `cap.<id>` in the message
+ * catalog, which is exactly what the columns showed before this table existed. That is why
+ * seeding it is a convenience rather than a requirement, and why a column can never render
+ * blank. See `index-card-service.ts`.
+ *
+ * ─── THE IMAGE TRIO IS PROMPT 10'S, UNCHANGED ─────────────────────────────────────
+ * The same three columns `projects`, `design_works` and `media` carry, so the uploader,
+ * the stored-path pattern, the alt rule and `/api/media` all apply with nothing added.
+ * A column with no picture keeps its generated drawing — the decision recorded for records
+ * in prompt 10, taken the same way here for the same reason.
+ */
+export const indexCards = sqliteTable('index_cards', {
+  /** One of the five ids in `NAV`. Not an autoincrement id: the identity is the section. */
+  sectionId: text('section_id').primaryKey(),
+
+  titleEn: text('title_en').notNull().default(''),
+  titleFa: text('title_fa').notNull().default(''),
+  captionEn: text('caption_en').notNull().default(''),
+  captionFa: text('caption_fa').notNull().default(''),
+
+  /** The trio from prompt 10 — see `projects.cover_image` for all of it. */
+  coverImage: text('cover_image'),
+  coverAltEn: text('cover_alt_en'),
+  coverAltFa: text('cover_alt_fa'),
+
+  ...timestamps,
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    taxonomy_terms — every closed axis, for every subject, in ONE table (prompt 9)
    ═══════════════════════════════════════════════════════════════════════════════ */
 

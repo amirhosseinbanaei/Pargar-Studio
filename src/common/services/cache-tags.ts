@@ -18,6 +18,7 @@
  *   projects        project:<slug>
  *   design-works    design-work:<slug>
  *   media           media:<slug>
+ *   index-cards     (five rows read as one set — no instance tag)
  *   studio          (singleton — no instance tag)
  *   contact         (singleton — no instance tag)
  *   contact-messages (not cached at all — see below)
@@ -55,6 +56,12 @@ export const CACHE_TAGS = {
   media: 'media',
   studio: 'studio',
   contact: 'contact',
+  /**
+   * The five index cards (prompt 13). ONE tag, no instance tag: the five rows are read as
+   * a set by the one function that reads them at all, so a per-section tag would be five
+   * names to purge for a save that always invalidates the same page.
+   */
+  indexCards: 'index-cards',
   /** Declared for completeness; no read service caches it. */
   contactMessages: 'contact-messages',
   /** Every editable taxonomy axis, for every subject. Purged in a PAIR — see above. */

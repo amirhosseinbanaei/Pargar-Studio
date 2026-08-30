@@ -9,6 +9,24 @@
  * they are interface copy and live in `@/common/i18n` under `nav.*` and `cap.*`, which is
  * what makes the columns bilingual without a second constant.
  *
+ * ─── PARTIALLY REVERSED IN PROMPT 13, AND THE BOUNDARY IS THE WHOLE DESIGN ────────
+ * An editor CAN now change a column's title and caption and put a photograph behind it,
+ * through `index_cards` and `/dashboard/index-cards`. The paragraph above is not repealed —
+ * it is the reason the reversal is bounded exactly where it is:
+ *
+ *   EDITABLE (a row in `index_cards`, keyed on `id`) — the title, the caption, the picture
+ *     and its alt text. None of these is referenced by anything but a renderer, so the
+ *     worst a bad save can do is show the wrong words on the front page.
+ *   NOT EDITABLE (still here, still constants) — `id`, `path`, `art` and `seed`. These ARE
+ *     the route tree, the CSS hook and the shell transition's lookup, and the failure the
+ *     original decision names is real: a dashboard that could change `id` or `path` is a
+ *     dashboard that can delete a route with a save.
+ *
+ * `labelKey` and `captionKey` stay too, and are now the FALLBACK rather than the only
+ * source: a section with no row, or with an empty title, renders `nav.<id>` / `cap.<id>`
+ * exactly as it always did. Deleting those catalog entries would break that degradation —
+ * they are load-bearing copy, not dead copy.
+ *
  * Ported from `legacy/data/studio.js:6` (BRAND) and `:17` (NAV), with the per-column
  * drawing kind and seed lifted out of `legacy/index.html:112` onward, where they were
  * `data-art` / `data-seed` attributes read by the client at runtime. They are constants
@@ -85,6 +103,17 @@ export const NAV: readonly NavSection[] = [
     seed: 'kavan-contact',
   },
 ] as const;
+
+/**
+ * Is this string one of the five sections?
+ *
+ * The one place that question is answered, because two callers ask it and they must agree:
+ * `/dashboard/index-cards/[section]` refuses an unknown segment with `notFound()` before
+ * rendering anything, and `indexCardSubmissionSchema` refuses one on the way in — a Server
+ * Action is a public endpoint and the route's check proves nothing about a hand-written
+ * POST. A third caller would be a third chance to spell the list differently.
+ */
+export const isNavSectionId = (value: string): boolean => NAV.some(section => section.id === value);
 
 /**
  * The ratio the column artwork is authored at.
