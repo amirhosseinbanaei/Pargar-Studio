@@ -41,7 +41,9 @@
     "opened": "section opened",
     "returned": "Returned to index",
     "worksCount": "Works",
-    "entriesCount": "Entries"
+    "entriesCount": "Entries",
+    "filter": "Filter",
+    "close": "Close"
   },
   "error": {
     "title": "Something went wrong",

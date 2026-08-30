@@ -18,8 +18,15 @@
  * `<details>` the reader opens stays open until the navigation replaces it. Which is the
  * one behaviour URL state does NOT preserve, and the trade is worth stating: the filter
  * survives a reload and a shared link; which drawers were open does not.
+ *
+ * SINCE PROMPT 12 IT IS WRAPPED IN `RailDrawer` — the same wrapper `FacetRail` uses, so
+ * projects, design and media all collapse to one bar and one drawer below 900px and none
+ * of the three has its own copy of the focus and Escape wiring. The four groups are handed
+ * over as children unchanged, first one still open; only the `.fcount` line moved, because
+ * the bar renders it. Above 900px this rail is exactly what it was.
  */
 import Link from 'next/link';
+import { RailDrawer } from '@/common/components/collection';
 import type { Dictionary } from '@/common/i18n';
 import type { Project } from '@/common/schemas/project';
 import type { TermOption } from '@/common/schemas/taxonomy';
@@ -91,9 +98,12 @@ export function ProjectFilterRail({
   const { t, num, term } = dictionary;
 
   return (
-    <div className="route__rail">
-      <p className="fcount">{`${num(shown)} ${t('ui.projectsCount')}`}</p>
-
+    <RailDrawer
+      countLabel={`${num(shown)} ${t('ui.projectsCount')}`}
+      filterLabel={t('ui.filter')}
+      closeLabel={t('ui.close')}
+      hasActiveFilter={hasAnyFilter(filters)}
+    >
       {FILTER_KEYS.map((key, index) => (
         <details className="fgroup" key={key} data-group={key} open={index === 0}>
           <summary className="fgroup__head">
@@ -154,6 +164,6 @@ export function ProjectFilterRail({
           {t('ui.clearAll')}
         </Link>
       )}
-    </div>
+    </RailDrawer>
   );
 }

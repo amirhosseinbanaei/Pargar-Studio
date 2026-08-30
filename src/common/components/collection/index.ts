@@ -16,4 +16,5 @@ export { CardReveal } from './CardReveal';
 export { DetailPlates, type DetailPlatesProps } from './DetailPlates';
 export { FacetRail, type FacetOption, type FacetRailProps } from './FacetRail';
 export { GridSkeleton, type GridSkeletonProps } from './GridSkeleton';
+export { RailDrawer, type RailDrawerProps } from './RailDrawer';
 export { SpecRow, type SpecRowProps } from './SpecRow';

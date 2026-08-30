@@ -41,7 +41,9 @@
     "opened": "باز شد",
     "returned": "بازگشت به فهرست",
     "worksCount": "اثر",
-    "entriesCount": "مورد"
+    "entriesCount": "مورد",
+    "filter": "فیلتر",
+    "close": "بستن"
   },
   "error": {
     "title": "خطایی رخ داد",

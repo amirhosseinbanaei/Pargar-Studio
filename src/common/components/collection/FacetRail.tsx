@@ -15,10 +15,17 @@
  * Every option is a `<Link>`, so selecting one is a navigation the server answers with
  * the filtered grid already rendered: no client state, a linkable view, and a Back button
  * that walks the filter history.
+ *
+ * SINCE PROMPT 12 IT IS WRAPPED IN `RailDrawer`, and this file's own markup did not change
+ * for it: the group, the options and the clear link are handed over as children, and the
+ * count moved into the wrapper because the narrow-screen bar is what renders it. Above
+ * 900px the result is the rail exactly as it was. This component stays a Server Component
+ * — `RailDrawer` is the one `'use client'` leaf, and it is a leaf.
  */
 import Link from 'next/link';
 import type { Dictionary } from '@/common/i18n';
 import { facetHref } from '@/common/utils/facets';
+import { RailDrawer } from './RailDrawer';
 
 export interface FacetOption {
   /** The raw, canonical-English value that goes in the URL. */
@@ -55,9 +62,12 @@ export function FacetRail({
   const { t, num } = dictionary;
 
   return (
-    <div className="route__rail">
-      <p className="fcount">{countLabel}</p>
-
+    <RailDrawer
+      countLabel={countLabel}
+      filterLabel={t('ui.filter')}
+      closeLabel={t('ui.close')}
+      hasActiveFilter={selected !== undefined}
+    >
       {/* `<details>` is the accordion the legacy `aria-expanded` button hand-built, and it
           works with no JavaScript. Open by default: with a single group there is nothing
           below it to push off the fold. */}
@@ -97,6 +107,6 @@ export function FacetRail({
           {t('ui.clearAll')}
         </Link>
       )}
-    </div>
+    </RailDrawer>
   );
 }

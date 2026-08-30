@@ -106,6 +106,147 @@ details[open] > .fgroup__head .fgroup__caret { transform: rotate(45deg); }
 details > .fgroup__body { grid-template-rows: 1fr; }
 
 /* --------------------------------------------------------------------------
+   The narrow-screen filter bar and drawer (prompt 12)
+   --------------------------------------------------------------------------
+   Below 900px the block above stacks `.route__rail` on top of the grid, which on
+   `/en/projects` is a count plus four accordions before the first card. `RailDrawer`
+   renders BOTH shapes — the rail as it has always been, and a bar plus a drawer — and
+   these rules pick one. The switch is here rather than in the component because a
+   JavaScript width branch renders the wrong shape on the server and swaps it after
+   hydration.
+
+   Everything below is new geometry, so it belongs in this file: `shell.css` and
+   `panel.css` are byte-identical ports and additions go beside them, never into them.
+
+   DIRECTION IS EXPRESSED WITH LOGICAL PROPERTIES AND NOTHING ELSE. The drawer is
+   anchored with `inset-inline-start`, so it opens from the left in English and the
+   right in Persian with no `[dir="rtl"]` rule anywhere. That is also why it FADES
+   rather than SLIDES: `translateX` carries a physical sign, and flipping it for
+   Persian would need exactly the direction override this file does not want. Opacity
+   and a small uniform `scale` have no wrong direction, and both are on the list of
+   properties this project animates.
+
+   Reduced motion is covered by `globals.css`, which collapses every `--d-*` token to
+   1ms — including the two this section uses for its visibility delay, so the drawer
+   appears and disappears at once rather than lingering transparent. */
+
+/* Above 900px the drawer half does not exist at all. `display: none` is what keeps its
+   copy of the rail out of the tab order and off the accessibility tree; `inert` on the
+   panel is the other half, for the narrow case where it is closed but displayed. */
+.railbar,
+.railscrim,
+.raildrawer { display: none; }
+
+@media (max-width: 900px) {
+  /* One of the two copies of the rail is shown, never both. */
+  .rail__wide { display: none; }
+
+  .route__rail--drawer { padding-bottom: var(--sp-3); }
+
+  /* THE BAR IS A ROW OF `.route`, NOT A STICKY BOX INSIDE `.route__main`. `.route` is a
+     grid inside a fixed-height stage and `.route__main` is the element that scrolls, so
+     an ordinary first row already holds its place while the grid moves under it — with
+     nothing overlapping, so the first card is never hidden behind it on first paint. */
+  .railbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+  }
+  .railbar .fcount { margin-bottom: 0; }
+
+  .railbar__b {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-xs);
+    letter-spacing: var(--tr-mid);
+    text-transform: uppercase;
+    color: var(--t-lo);
+    transition: color var(--d-xs) var(--e-out);
+  }
+  .railbar__b:hover { color: var(--t-md); }
+  .railbar__b[aria-expanded="true"] { color: var(--t-hi); }
+  /* A dot, not only a colour: the state has to survive a reader who cannot tell
+     champagne from grey. The button is also described by the count beside it. */
+  .railbar__b[data-active="true"] { color: var(--a-1); }
+  .railbar__dot {
+    inline-size: 4px;
+    block-size: 4px;
+    background: var(--a-1);
+  }
+
+  .railscrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-panel);
+    background: var(--s-0);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--d-sm) var(--e-out),
+      visibility 0s linear var(--d-sm);
+  }
+  .railscrim[data-open="true"] {
+    opacity: 0.72;
+    visibility: visible;
+    transition: opacity var(--d-sm) var(--e-out);
+  }
+
+  /* It spans the CONTENT region, between the masthead and the footer bar, and sits
+     below both (`--z-head`) rather than over them: the drawer belongs to the grid it
+     filters, and the wordmark, the clock and the language switch stay reachable. */
+  .raildrawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset-block: var(--head-h) var(--foot-h);
+    inset-inline-start: 0;
+    inline-size: min(20rem, 84vw);
+    z-index: var(--z-panel);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--s-1);
+    border-inline-end: 1px solid var(--rule-md);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.98);
+    transition:
+      opacity var(--d-sm) var(--e-out),
+      transform var(--d-md) var(--e-expo),
+      visibility 0s linear var(--d-md);
+  }
+  .raildrawer[data-open="true"] {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    transition:
+      opacity var(--d-sm) var(--e-out),
+      transform var(--d-md) var(--e-expo);
+  }
+
+  .raildrawer__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
+  }
+  .raildrawer__head .fcount { margin-bottom: 0; }
+  .raildrawer__x {
+    font-size: var(--fs-xs);
+    letter-spacing: var(--tr-mid);
+    text-transform: uppercase;
+    color: var(--t-xlo);
+    transition: color var(--d-xs) var(--e-out);
+  }
+  .raildrawer__x:hover { color: var(--a-1); }
+}
+
+/* --------------------------------------------------------------------------
    The footer bar carries one thing (prompt 12)
    -------------------------------------------------------------------------- */
 
