@@ -247,6 +247,36 @@ details > .fgroup__body { grid-template-rows: 1fr; }
 }
 
 /* --------------------------------------------------------------------------
+   The column artwork without a hover (prompt 12)
+   --------------------------------------------------------------------------
+   `shell.css:137` rests `.col__art` at `opacity: 0` and raises it to 0.62 only under
+   `.col.is-hover` / `.col.is-focus`, both of which come from `pointerover` and
+   `focusin` handlers in `motion/shell.ts`. A touch device fires neither: the first
+   thing a finger does is tap, and a tap navigates. So on a phone or a tablet the
+   drawing behind each of the five columns was never seen at all.
+
+   `(hover: none)` is the precise test and `(max-width: 900px)` is the one the request
+   named; both are here, so a large tablet and a small laptop window each get it.
+
+   0.62 IS MIRRORED FROM `shell.css:146` rather than tokenized, because tokenizing it
+   would mean editing the port to read the token. The hover raise on `.col__art > svg`
+   and the vignette are deliberately untouched — the vignette is what keeps the title
+   legible over the drawing. */
+@media (hover: none), (max-width: 900px) {
+  .col__art { opacity: 0.62; }
+  .col__caption { opacity: 1; transform: translate3d(-50%, 0, 0); }
+}
+
+/* And the caption comes back below 860px, where `shell.css:320` hides it. It was hidden
+   because a stacked column had a title over an empty field and the caption was the third
+   line of text in a 5-row layout. With the drawing now visible the column has a picture
+   and a title and nothing saying what it is about, and the stacked row has the height for
+   one line at `--fs-xs`. */
+@media (max-width: 860px) {
+  .col__caption { display: block; }
+}
+
+/* --------------------------------------------------------------------------
    The footer bar carries one thing (prompt 12)
    -------------------------------------------------------------------------- */
 
