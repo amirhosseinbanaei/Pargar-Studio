@@ -247,6 +247,80 @@ details > .fgroup__body { grid-template-rows: 1fr; }
 }
 
 /* --------------------------------------------------------------------------
+   THE WHOLE COLUMN IS THE LINK (prompt 13)
+   --------------------------------------------------------------------------
+   `ColumnShell` puts the only anchor inside the `<h2>`, so until now the artwork, the
+   caption and the index numeral were not clickable and the tap target on a phone was a
+   line of text in the middle of a full-height column.
+
+   THE ANCHOR DID NOT MOVE, and that is the point of doing it this way. Four things
+   address `.col__hit` by name and all four still work untouched: the per-glyph FLIP
+   reads `.col__title .ch`, `setTitles` rewrites `.col__hit`, the click delegation
+   matches `[data-open]`, and the custom cursor's magnet selector lists `.col__hit`. The
+   accessible name, the tab order and the focus ring are the anchor's own and are
+   unchanged; with scripting off the link still navigates, because the overlay below IS
+   the anchor.
+
+   ─── WHY THE CONTAINING BLOCK NEEDS CONTAINER UNITS ─────────────────────────────
+   The obvious spelling — `position: absolute; inset: 0` — does NOT cover the column.
+   An absolutely positioned box resolves against its nearest POSITIONED ancestor, and
+   that is `.col__title` (`shell.css:166`: `position: absolute; top: 50%; left: 50%`),
+   not `.col`. `inset: 0` therefore reproduces the title's own box, which is the anchor
+   we already had. Every one of `.col`'s children is absolutely positioned, so no
+   descendant pseudo-element resolves against the column.
+
+   Over-covering with large negative insets is the usual workaround and is wrong here:
+   the columns are siblings with no clipping, so column 5's overlay would spill across
+   the whole row and claim every click in it. Clipping `.col` to fix that is worse — the
+   captions genuinely overflow their columns between about 860px and 1000px (measured:
+   a 190px caption in a 164px column at 900px), and `overflow: hidden` would cut them.
+
+   So the box is SIZED from the column with container units instead. `.col` is a size
+   container; `100cqw`/`100cqh` are the column's own dimensions, and the offset back to
+   its edges is `50% - 50cq*` — the percentage is half the TITLE (the containing block)
+   and the container half is half the COLUMN, and the title is centred in the column, so
+   the difference is exactly the gap. It is written with logical properties, so it needs
+   no `[dir="rtl"]` rule; verified in both locales at 1440, 900 and 375.
+
+   `container-type: size` applies size, layout and style containment — NOT paint — so
+   nothing is clipped. `.col`'s own size never came from its contents in the first place:
+   it is a flex item whose children are all absolutely positioned.
+
+   ─── NO z-index, DELIBERATELY ───────────────────────────────────────────────────
+   The overlay inherits `.col__title`'s stacking context (`--z-title`), which already
+   sits above `.col__art` (`--z-art`) and below `.col__caption` — a later sibling at the
+   same level — so the band the overlay needs comes from the cascade rather than from a
+   number, and this file adds no z-index literal and no new token. The consequences,
+   both verified with `elementFromPoint`:
+
+    - The CAPTION paints over it and stays selectable, which is the check that the layer
+      is right. It is therefore not itself a link target — the standard trade of a
+      stretched link, and the alternative (`pointer-events: none`) would make selecting
+      it impossible, which is the failure this is avoiding.
+    - The NUMERAL is under it, so a tap on `01` opens the section. It is transparent, so
+      nothing about the numeral looks different. */
+.col {
+  container-type: size;
+}
+
+.col__hit::after {
+  content: "";
+  position: absolute;
+  inline-size: 100cqw;
+  block-size: 100cqh;
+  inset-block-start: calc(50% - 50cqh);
+  inset-inline-start: calc(50% - 50cqw);
+}
+
+/* While a section is opening, `.col__title` is moved to the column's top-left corner and
+   is no longer centred, so the arithmetic above stops describing the column. The overlay
+   has nothing to do at that point — the siblings are collapsed and `pointer-events: none`
+   — so it stands down rather than being left somewhere slightly wrong. */
+.stage.is-open .col__hit::after {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
    The column artwork without a hover (prompt 12)
    --------------------------------------------------------------------------
    `shell.css:137` rests `.col__art` at `opacity: 0` and raises it to 0.62 only under
@@ -336,7 +410,6 @@ a.detail__back { text-decoration: none; }
 .card:hover .card__frame > img { transform: scale(1); }
 
 .detail__plate > img { object-fit: cover; }
-
 /* `.person__plate` is sized by `aspect-ratio` and is not positioned in the port; a
    `fill` image needs a positioned ancestor or it escapes to the nearest one, which
    on the studio page is the whole document. One additive property. */
