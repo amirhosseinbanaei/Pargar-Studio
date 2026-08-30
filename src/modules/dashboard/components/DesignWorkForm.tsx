@@ -173,8 +173,9 @@ export function DesignWorkForm({ designWork, terms }: DesignWorkFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Content</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              English on the left, Persian on the right. A Persian field left empty is stored as its
-              English counterpart, so the Persian page never renders blank.
+              English on the left, Persian on the right. A field marked with an asterisk is required
+              in BOTH languages: since prompt 14 an empty Persian field is a refusal, not a silent
+              copy of the English one.
             </p>
           </div>
 
@@ -195,9 +196,9 @@ export function DesignWorkForm({ designWork, terms }: DesignWorkFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              Optional. A work with no cover keeps the drawing generated from its slug and steered
-              by its category. Every image you do add needs a description in both languages — the
-              Persian one is not filled in from the English, because it is heard rather than read.
+              Optional, and empty is a normal state — a work with no photographs simply shows none.
+              Every image you do add needs a description in both languages — the Persian one is not
+              filled in from the English, because it is heard rather than read.
             </p>
           </div>
 
@@ -205,20 +206,21 @@ export function DesignWorkForm({ designWork, terms }: DesignWorkFormProps) {
             name="coverImage"
             label="Cover image"
             itemLabel="cover"
-            description="Shown on the card and as the first plate on the work's page, in place of the generated drawing."
+            description="Shown on the card and as the first plate on the work's page."
           />
 
           <LocaleFieldPair<DesignWorkFormValues>
             label="Cover description"
             en="coverAltEn"
             fa="coverAltFa"
+            requiredWithImage="coverImage"
             description="What the photograph shows. Required once there is a cover."
           />
 
           <GalleryField<DesignWorkFormValues>
             name="gallery"
             label="Gallery"
-            description="Shown after the cover, in this order. Use the arrows to reorder; the order is saved with the record."
+            description="Shown after the cover on the public page, in this order. Drag a row by its handle to reorder — or focus the handle and use the arrow keys. The order is saved with the record."
           />
         </section>
 

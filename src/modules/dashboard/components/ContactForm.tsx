@@ -17,6 +17,8 @@ import {
 } from '../schemas/contact-form';
 import { RecordForm } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
+import { ImageUploadField } from './ImageUploadField';
+import { GalleryField } from './GalleryField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 
 const SOCIAL_COLUMNS = [
@@ -62,22 +64,34 @@ export function ContactForm({ contact }: ContactFormProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <FormInput<ContactFormValues> name="postcode" label="Postcode" />
             <FormInput<ContactFormValues> name="phone" label="Phone (display)" />
+            {/*
+              THESE FIVE ARE MARKED REQUIRED BECAUSE THE SCHEMA REQUIRES THEM, and until
+              prompt 14's label-versus-schema sweep none of them said so. Each carries a
+              format constraint — `z.email()`, a digits-only pattern, a decimal pattern —
+              and every one of those refuses an EMPTY string, so clearing any of the five
+              made the form unsaveable with a marker nowhere on the page.
+
+              `postcode` and `phone` above are `z.string()` and stay unmarked, correctly.
+            */}
             <FormInput<ContactFormValues>
               name="phoneHref"
               label="Phone (tel: target)"
+              required
               description="Digits only, optionally a leading +."
               classNames={{ input: 'font-mono' }}
             />
-            <FormInput<ContactFormValues> name="email" label="Email" type="email" />
-            <FormInput<ContactFormValues> name="press" label="Press email" type="email" />
+            <FormInput<ContactFormValues> name="email" label="Email" type="email" required />
+            <FormInput<ContactFormValues> name="press" label="Press email" type="email" required />
             <FormInput<ContactFormValues>
               name="lat"
               label="Latitude"
+              required
               classNames={{ input: 'font-mono' }}
             />
             <FormInput<ContactFormValues>
               name="lng"
               label="Longitude"
+              required
               classNames={{ input: 'font-mono' }}
             />
           </div>
@@ -87,8 +101,9 @@ export function ContactForm({ contact }: ContactFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Content</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              English on the left, Persian on the right. A Persian field left empty is stored as its
-              English counterpart, so the Persian page never renders blank.
+              English on the left, Persian on the right. Nothing is filled in from the English any
+              more: since prompt 14 a Persian field left empty is stored empty, and a field marked
+              with an asterisk is required in both languages.
             </p>
           </div>
 
@@ -102,6 +117,39 @@ export function ContactForm({ contact }: ContactFormProps) {
               rows={'rows' in field ? field.rows : undefined}
             />
           ))}
+        </section>
+
+        <section className="flex flex-col gap-6 border-t border-rule pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
+            <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
+              New in prompt 14: this page had no pictures of its own at all, only two generated
+              drawings seeded from fixed strings. The COVER fills the band across the top, the first
+              GALLERY image fills the site-plan slot beside the address, and the rest render in a
+              band below it. Empty is a normal state — those boxes simply stay empty.
+            </p>
+          </div>
+
+          <ImageUploadField<ContactFormValues>
+            name="coverImage"
+            label="Cover image"
+            itemLabel="cover"
+            description="The band across the top of /contact."
+          />
+
+          <LocaleFieldPair<ContactFormValues>
+            label="Cover description"
+            en="coverAltEn"
+            fa="coverAltFa"
+            requiredWithImage="coverImage"
+            description="What the photograph shows — read aloud in place of it. Required once there is a cover."
+          />
+
+          <GalleryField<ContactFormValues>
+            name="gallery"
+            label="Gallery"
+            description="In this order — the first image fills the site-plan slot beside the address, the rest are a band below it. Drag a row by its handle to reorder, or focus the handle and use the arrow keys. The order is saved with the record."
+          />
         </section>
 
         <section className="flex flex-col gap-6 border-t border-rule pt-8">

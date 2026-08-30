@@ -27,6 +27,19 @@
  * and the announcements are identical here and in the tables, which is the whole reason
  * `SortableList` takes the commit as a parameter instead of assuming one.
  *
+ * ═══ A ROW'S MARKERS FOLLOW ITS OWN STATE (prompt 14) ═════════════════════════════
+ * `requireAltWithImage` has refused a row with an image and an empty description since
+ * prompt 10, in either language — and nothing on screen said so. The editor was told at
+ * SAVE time about a rule the form never showed them.
+ *
+ * Both descriptions are marked required exactly while this row holds a path, which is
+ * exactly what the schema refuses on. The condition is `useWatch` on the row's OWN path, so
+ * it is per row rather than per gallery, and it lives here rather than in the five forms
+ * that mount a gallery — one implementation, like the rule it mirrors.
+ *
+ * The row's uploader is marked required unconditionally, because a row with no path at all
+ * fails `galleryFormItemSchema.path` outright: the row exists because somebody added it.
+ *
  * ═══ AN EMPTY ROW IS AN INVALID ROW, ON PURPOSE ═══════════════════════════════════
  * "Add image" appends a row with no path, and the schema refuses it — so `FormButton` stays
  * disabled until the editor either uploads a file into it or removes it again. The
@@ -35,8 +48,15 @@
  * to `isValid`. An incomplete row that says so is the honest version.
  */
 'use client';
-import { useFieldArray, useFormContext, type FieldValues, type Path } from 'react-hook-form';
-import { Button, Input } from '@/common/components/ds';
+import { useId } from 'react';
+import {
+  useFieldArray,
+  useFormContext,
+  useWatch,
+  type FieldValues,
+  type Path,
+} from 'react-hook-form';
+import { Button, Input, Label } from '@/common/components/ds';
 import {
   FormDescription,
   FormField,
@@ -79,7 +99,7 @@ export function GalleryField<TValues extends FieldValues>({
           <div className="flex flex-col gap-4">
             {fields.length === 0 && (
               <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-                No images yet. The detail page shows its generated drawings.
+                No images yet. The page shows no pictures until one is added.
               </p>
             )}
 
@@ -120,23 +140,27 @@ export function GalleryField<TValues extends FieldValues>({
                       name={`${name}.${index}.path` as Path<TValues>}
                       label={`Image ${index + 1} file`}
                       itemLabel="image"
+                      // Unconditional: a gallery row with no path fails its own schema. The
+                      // DESCRIPTIONS below are the conditional pair.
+                      required
                     />
 
                     {/*
-                  Both descriptions, side by side, with the Persian one in its own direction
-                  and language — the same treatment `LocaleFieldPair` gives every other
-                  translated field. Neither is optional and neither is filled in from the
-                  other: see `../schemas/image` for why alt text is the one exception to the
-                  Persian-falls-back-to-English rule.
-                */}
+                      Both descriptions, side by side, with the Persian one in its own
+                      direction and language — the same treatment `LocaleFieldPair` gives
+                      every other translated field. Neither is filled in from the other, and
+                      since prompt 14 nothing anywhere in this dashboard is.
+                    */}
                     <div className="grid gap-3 md:grid-cols-2">
                       <GalleryAltInput<TValues>
                         name={`${name}.${index}.altEn` as Path<TValues>}
-                        label={`Image ${index + 1} description · English`}
+                        label="Description · English"
+                        imagePath={`${name}.${index}.path` as Path<TValues>}
                       />
                       <GalleryAltInput<TValues>
                         name={`${name}.${index}.altFa` as Path<TValues>}
-                        label={`Image ${index + 1} description · Persian`}
+                        label="Description · Persian"
+                        imagePath={`${name}.${index}.path` as Path<TValues>}
                         dir="rtl"
                         lang="fa"
                       />
@@ -172,30 +196,53 @@ export function GalleryField<TValues extends FieldValues>({
  *
  * Its own small component rather than a `FormInput`, because a `FormInput` renders a
  * `FormItem` with its own label/description/message wiring and nesting one inside this
- * field's `FormItem` would give the row two `aria-describedby` chains. Here the label is
- * visually hidden — the row's heading and the field's own label already say what this is —
- * and remains a real `<label>` so the control is named for anyone who cannot see that
- * grouping.
+ * field's `FormItem` would give the row two `aria-describedby` chains.
+ *
+ * ─── THE LABEL IS VISIBLE NOW, AND THAT IS FORCED BY THE MARKER (prompt 14) ───────
+ * It used to be `sr-only`, on the argument that the row's heading and the field's own label
+ * already said what this was. A required marker inside a hidden label is invisible, which
+ * is the entire defect this change exists to fix — so the label is shown, shortened to
+ * "Description · English" because the row heading two lines above already says "Image 3".
+ *
+ * It also fixes something the hidden label was papering over: the two boxes were told apart
+ * only by their PLACEHOLDER, which disappears the moment either one is typed into.
+ *
+ * `ds/Label` rather than a bare `<span>`, so the asterisk arrives with its `(required)`
+ * from the one place that pairing is written — and associated with `htmlFor`/`id` rather
+ * than by nesting. `ds/Label` RENDERS a `<label>`, so wrapping it in another one is invalid
+ * markup and leaves the outer element with no unambiguous control; `useId` is SSR-stable,
+ * which a hand-rolled counter is not.
  */
 function GalleryAltInput<TValues extends FieldValues>({
   name,
   label,
+  imagePath,
   dir,
   lang,
 }: {
   name: Path<TValues>;
   label: string;
+  /** The row's own path field. The marker appears exactly while it holds an image. */
+  imagePath: Path<TValues>;
   dir?: 'rtl';
   lang?: string;
 }) {
   const form = useFormContext<TValues>();
+  const inputId = useId();
   const error = form.getFieldState(name, form.formState).error;
+  // This ROW's path, not the gallery's: `useWatch` on one leaf, so typing in row 3 does not
+  // re-render rows 1 and 2.
+  const path = useWatch({ control: form.control, name: imagePath }) as unknown;
+  const required = String(path ?? '').trim() !== '';
 
   return (
-    <label className="flex flex-col gap-1">
-      <span className="sr-only">{label}</span>
+    <div className="flex flex-col gap-1">
+      <Label htmlFor={inputId} required={required}>
+        {label}
+      </Label>
       <Input
         {...form.register(name)}
+        id={inputId}
         dir={dir}
         lang={lang}
         placeholder={dir === 'rtl' ? 'Persian description' : 'English description'}
@@ -205,6 +252,6 @@ function GalleryAltInput<TValues extends FieldValues>({
       {error?.message && (
         <span className="text-fs-xs tracking-flat-kavan text-danger">{String(error.message)}</span>
       )}
-    </label>
+    </div>
   );
 }

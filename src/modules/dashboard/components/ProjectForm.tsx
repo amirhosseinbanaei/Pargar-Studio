@@ -170,7 +170,7 @@ export function ProjectForm({ project, terms }: ProjectFormProps) {
               description={
                 editing
                   ? 'Changing this moves the public URL. The old one stops resolving.'
-                  : 'Also the seed for this project’s generated drawings.'
+                  : 'Lowercase words separated by single hyphens. It becomes the public URL.'
               }
               classNames={{ input: 'font-mono' }}
             />
@@ -213,8 +213,9 @@ export function ProjectForm({ project, terms }: ProjectFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Content</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              English on the left, Persian on the right. A Persian field left empty is stored as its
-              English counterpart, so the Persian page never renders blank.
+              English on the left, Persian on the right. A field marked with an asterisk is required
+              in BOTH languages: since prompt 14 an empty Persian field is a refusal, not a silent
+              copy of the English one.
             </p>
           </div>
 
@@ -235,9 +236,8 @@ export function ProjectForm({ project, terms }: ProjectFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              Optional. A project with no cover keeps the drawing generated from its slug, on the
-              card and on its page — so leaving this empty is a finished state, not an unfinished
-              one. A description is required in both languages for every image you do add: it is
+              Optional, and empty is a normal state — a project with no photographs simply shows
+              none. A description is required in both languages for every image you do add: it is
               what a reader who cannot see the photograph gets instead, and the Persian one is not
               filled in from the English, because a Persian screen reader would read out an English
               sentence.
@@ -248,20 +248,23 @@ export function ProjectForm({ project, terms }: ProjectFormProps) {
             name="coverImage"
             label="Cover image"
             itemLabel="cover"
-            description="Shown on the project card and as the first plate on its page, in place of the generated drawing."
+            description="Shown on the project card and as the first plate on its page."
           />
 
           <LocaleFieldPair<ProjectFormValues>
             label="Cover description"
             en="coverAltEn"
             fa="coverAltFa"
+            // Marked required exactly while there IS a cover, which is what the schema
+            // refuses on — see `LocaleFieldPair`'s header.
+            requiredWithImage="coverImage"
             description="What the photograph shows — read aloud in place of it. Required once there is a cover."
           />
 
           <GalleryField<ProjectFormValues>
             name="gallery"
             label="Gallery"
-            description="Shown after the cover on the project page, in this order. Use the arrows to reorder; the order is saved with the record."
+            description="Shown after the cover on the public page, in this order. Drag a row by its handle to reorder — or focus the handle and use the arrow keys. The order is saved with the record."
           />
         </section>
       </RecordForm>

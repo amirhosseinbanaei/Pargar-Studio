@@ -31,6 +31,7 @@ import {
 import { RecordForm, RecordFormCancel } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
 import { ImageUploadField } from './ImageUploadField';
+import { GalleryField } from './GalleryField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 import { DeleteRecordDialog } from './DeleteRecordDialog';
 
@@ -169,8 +170,9 @@ export function MediaForm({ media, projectOptions, terms }: MediaFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Content</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              English on the left, Persian on the right. A Persian field left empty is stored as its
-              English counterpart, so the Persian page never renders blank.
+              English on the left, Persian on the right. A field marked with an asterisk is required
+              in BOTH languages: since prompt 14 an empty Persian field is a refusal, not a silent
+              copy of the English one.
             </p>
           </div>
 
@@ -191,9 +193,10 @@ export function MediaForm({ media, projectOptions, terms }: MediaFormProps) {
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              Optional, and one image at most. With no cover this entry keeps the drawing seeded
-              from its RELATED PROJECT rather than from itself, so a cutting about a building shows
-              the building. A description is required in both languages once there is a cover.
+              Optional, and empty is a normal state — an entry with no photographs simply shows
+              none. A cover and a gallery, the same as a project: an exhibition or a lecture is
+              photographed like anything else. A description is required in both languages for every
+              image you add.
             </p>
           </div>
 
@@ -201,14 +204,21 @@ export function MediaForm({ media, projectOptions, terms }: MediaFormProps) {
             name="coverImage"
             label="Cover image"
             itemLabel="cover"
-            description="Overrides the related project's drawing for this entry only."
+            description="Shown on the card and as the first plate on this entry's page."
           />
 
           <LocaleFieldPair<MediaFormValues>
             label="Cover description"
             en="coverAltEn"
             fa="coverAltFa"
+            requiredWithImage="coverImage"
             description="What the image shows. Required once there is a cover."
+          />
+
+          <GalleryField<MediaFormValues>
+            name="gallery"
+            label="Gallery"
+            description="Shown after the cover on the public page, in this order. Drag a row by its handle to reorder — or focus the handle and use the arrow keys. The order is saved with the record."
           />
         </section>
 

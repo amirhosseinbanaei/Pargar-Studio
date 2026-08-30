@@ -93,10 +93,10 @@ export function IndexCardForm({
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Words</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              English on the left, Persian on the right. A Persian field left empty is NOT filled in
-              from the English here — unlike everywhere else in this dashboard — because the column
-              falls back to its own translated wording instead, which is better Persian than the
-              English word would be.
+              English on the left, Persian on the right. Nothing is filled in from the English —
+              here the column falls back to its own translated wording instead, which is better
+              Persian than the English word would be. The title is required in both languages; the
+              caption is optional in both.
             </p>
           </div>
 
@@ -120,11 +120,12 @@ export function IndexCardForm({
           <div className="flex flex-col gap-1">
             <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Picture</h2>
             <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
-              Optional. A column with no picture keeps its generated drawing, which is a finished
-              state rather than an unfinished one — the drawing is what the front page has always
-              shown. A description is required in both languages for a picture you do add: it is
-              what a reader who cannot see it gets instead, and the Persian one is not filled in
-              from the English, because a Persian screen reader would read out an English sentence.
+              Optional. A column with no picture keeps its generated drawing — these five are the
+              one place that fallback survives, because five empty frames is an empty front page
+              (see AGENTS.md). A description is required in both languages for a picture you do add:
+              it is what a reader who cannot see it gets instead, and the Persian one is not filled
+              in from the English, because a Persian screen reader would read out an English
+              sentence.
             </p>
           </div>
 
@@ -139,6 +140,7 @@ export function IndexCardForm({
             label="Picture description"
             en="coverAltEn"
             fa="coverAltFa"
+            requiredWithImage="coverImage"
             description="What the photograph shows — read aloud in place of it. Required once there is a picture."
           />
         </section>

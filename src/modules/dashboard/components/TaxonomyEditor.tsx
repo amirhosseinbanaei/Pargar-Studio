@@ -401,12 +401,18 @@ function CreateTerm({ subject, axis }: { subject: TaxonomySubject; axis: Taxonom
 /**
  * The two labels, side by side, Persian in its own direction.
  *
- * Written out rather than reusing `LocaleFieldPair` because of the one place they differ:
- * that component never marks the Persian side required, and here it IS required. Persian is
- * optional on every content form — an empty column is filled with its English counterpart so
- * a studio is never blocked from publishing — but a term is one word that every Persian rail
- * on the site renders, so the same fallback would quietly put an English word on the Persian
- * page for as long as nobody noticed. See `schemas/taxonomy-form.ts`.
+ * ─── THE REASON THIS IS NOT `LocaleFieldPair` HAS EXPIRED (prompt 14) ────────────
+ * It was written out because that component "never marks the Persian side required, and
+ * here it IS required" — a real difference when Persian was optional everywhere else and
+ * an empty column was filled from the English one on save. Prompt 14 removed that fallback
+ * and `LocaleFieldPair` now marks both sides, so this pair is no longer special: what was
+ * an exception here is the rule everywhere.
+ *
+ * It is left as it is rather than folded in, because the two are not interchangeable in
+ * MARKUP — `LocaleFieldPair` wraps its pair in a `<fieldset>` with a `<legend>` naming the
+ * field, and this one sits inside a form section that already has its own heading. That is
+ * a layout question for whoever next works on this screen, not a correctness one; both
+ * spellings mark both sides required, which is all the schema asks.
  *
  * Typed against the two fields it actually binds rather than against either whole form.
  * Both form value types include this pair structurally, so the annotation is true in both

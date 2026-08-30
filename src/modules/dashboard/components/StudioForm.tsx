@@ -16,6 +16,7 @@ import {
 } from '../schemas/studio-form';
 import { RecordForm } from './RecordForm';
 import { LocaleFieldPair } from './LocaleFieldPair';
+import { GalleryField } from './GalleryField';
 import { RepeatableListField } from './RepeatableListField';
 import { RepeatableGroupField } from './RepeatableGroupField';
 
@@ -25,9 +26,13 @@ import { RepeatableGroupField } from './RepeatableGroupField';
  * A founder's photograph is one fact and their description of it is two — so the uploader is
  * rendered on the English editor only (`imageKey` below) and the path is copied into the
  * Persian array by index on save. The alt text is a genuine column here because it is heard
- * in the reader's own language, and it is the one translated field in this codebase that is
- * deliberately NOT filled in from English when it is left blank: see
+ * in the reader's own language, and it is never filled in from the English — which used to
+ * make it the ONE such field in the codebase and, since prompt 14, makes it ordinary. See
  * `../schemas/image.ts`'s header.
+ *
+ * `imageAltKey` marks it required while that founder has a portrait. Until prompt 14 nothing
+ * required it at all, and an undescribed portrait was silently replaced by the generated one
+ * on the public page — see `RepeatableGroupField`'s header.
  */
 const FOUNDER_COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -95,6 +100,24 @@ export function StudioForm({ studio }: StudioFormProps) {
         </section>
 
         <section className="flex flex-col gap-6 border-t border-rule pt-8">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Photographs</h2>
+            <p className="text-fs-xs tracking-flat-kavan text-t-xlo">
+              The page&rsquo;s own pictures, added in prompt 14. The FIRST image fills the band
+              across the top of /studio — which used to be a generated drawing of no particular
+              building — and the rest render in a band at the foot of the page. A founder&rsquo;s
+              portrait is separate and lives with that founder, below.
+            </p>
+          </div>
+
+          <GalleryField<StudioFormValues>
+            name="gallery"
+            label="Gallery"
+            description="In this order — the first image is the band at the top of the page, the rest are the band at the foot of it. Drag a row by its handle to reorder, or focus the handle and use the arrow keys. The order is saved with the record."
+          />
+        </section>
+
+        <section className="flex flex-col gap-6 border-t border-rule pt-8">
           <h2 className="text-fs-xs tracking-mid-kavan text-t-lo uppercase">Founders</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <RepeatableGroupField<StudioFormValues>
@@ -106,7 +129,10 @@ export function StudioForm({ studio }: StudioFormProps) {
               // The uploader lives on this side only — see FOUNDER_COLUMNS above.
               imageKey="image"
               imageLabel="Portrait"
-              description="A founder with no portrait keeps the generated one, drawn from their English name."
+              // Marks the description required exactly while that founder HAS a portrait,
+              // which is what the schema refuses on since prompt 14 closed that gap.
+              imageAltKey="imageAlt"
+              description="A founder with no portrait keeps the generated one, drawn from their English name. A portrait you do upload needs a description here and on the Persian side, or it is not rendered at all."
             />
             <RepeatableGroupField<StudioFormValues>
               name="foundersFa"
@@ -114,6 +140,9 @@ export function StudioForm({ studio }: StudioFormProps) {
               columns={FOUNDER_COLUMNS}
               emptyRow={EMPTY_FOUNDER}
               itemLabel="Founder"
+              // No `imageKey`: the path has one author. The DESCRIPTION is per-locale and is
+              // required on this side too, so the marker is.
+              imageAltKey="imageAlt"
               dir="rtl"
               lang="fa"
             />

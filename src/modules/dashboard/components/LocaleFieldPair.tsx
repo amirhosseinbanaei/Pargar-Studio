@@ -25,14 +25,32 @@
  * hyphenation rules, and what tells a screen reader to switch voices — without it a Persian
  * value is read out by an English synthesiser.
  *
- * ─── WHY THE PERSIAN SIDE IS NEVER MARKED REQUIRED ────────────────────────────────
- * Persian is optional on save; an empty Persian column is filled with its English
- * counterpart by the action before the write (`schemas/project-form.ts`). So a required
- * marker there would be a lie, and — worse — would train an editor to paste the English text
- * in by hand, producing exactly the same stored value with none of the traceability.
+ * ─── ~~THE PERSIAN SIDE IS NEVER MARKED REQUIRED~~ REVERSED IN PROMPT 14 ─────────
+ * This header used to argue that a required marker on the Persian side "would be a lie,
+ * and — worse — would train an editor to paste the English text in by hand". The first half
+ * was TRUE and is why the marker could not simply be added: the schema did not require the
+ * field, because `withPersianFallback` filled an empty Persian column with its English
+ * counterpart on save.
+ *
+ * So the FALLBACK went, not the marker. `required` now marks BOTH sides, because the schema
+ * requires both sides — `schemas/project-form.ts` and its four siblings — and the second
+ * half of the old argument answers itself: an editor who pastes English into a Persian box
+ * has made a visible, attributable choice, where the fallback made the identical stored
+ * value invisibly and automatically.
+ *
+ * ─── AND SOME FIELDS ARE REQUIRED ONLY SOMETIMES ──────────────────────────────────
+ * `requiredWithImage` names the form path of an image whose DESCRIPTION this pair is. The
+ * marker then appears exactly when there is an image in that slot and disappears when there
+ * is not, which is precisely what `requireAltWithImage` refuses on — so the label and the
+ * schema cannot disagree.
+ *
+ * It lives here rather than in each of the six forms that mount such a pair for the reason
+ * `schemas/image.ts` gives for the rule itself: a condition written six times is a condition
+ * that gets it wrong in one of them. `useWatch` on the one path subscribes to that field
+ * alone, so typing anywhere else in a sixteen-field form re-renders nothing here.
  */
 'use client';
-import type { FieldValues, Path } from 'react-hook-form';
+import { useFormContext, useWatch, type FieldValues, type Path } from 'react-hook-form';
 import { FormInput, FormTextarea } from '@/common/components/form';
 
 export interface LocaleFieldPairProps<TValues extends FieldValues> {
@@ -42,8 +60,15 @@ export interface LocaleFieldPairProps<TValues extends FieldValues> {
   fa: Path<TValues>;
   multiline?: boolean;
   rows?: number;
-  /** Marks the ENGLISH side only. The Persian side is never required — see the header. */
+  /** Marks BOTH sides, because the schema requires both — see the header. */
   required?: boolean;
+  /**
+   * The form path of an image this pair DESCRIBES, when it describes one.
+   *
+   * Set it and the pair is required exactly while that path holds an image, matching
+   * `requireAltWithImage` in `../schemas/image`. Leave it unset for an ordinary pair.
+   */
+  requiredWithImage?: Path<TValues>;
   description?: React.ReactNode;
 }
 
@@ -54,8 +79,25 @@ export function LocaleFieldPair<TValues extends FieldValues>({
   multiline = false,
   rows = 3,
   required = false,
+  requiredWithImage,
   description,
 }: LocaleFieldPairProps<TValues>) {
+  const { control } = useFormContext<TValues>();
+  /**
+   * `useWatch` with a name, never `form.watch()` with none: the latter re-renders the whole
+   * form on every keystroke anywhere in it (`references/07-forms.md` §4), and this pair is
+   * mounted up to six times on one screen.
+   *
+   * The hook is called unconditionally with a placeholder name when there is no image path
+   * to watch — a hook cannot be called conditionally, and `''` subscribes to nothing.
+   */
+  const watchedImage = useWatch({
+    control,
+    name: (requiredWithImage ?? ('' as Path<TValues>)) as Path<TValues>,
+  }) as unknown;
+
+  const isRequired =
+    required || (requiredWithImage !== undefined && String(watchedImage ?? '').trim() !== '');
   /**
    * The two branches are written out rather than aliased to one `Control` variable, because
    * `ds/Input` and `ds/Textarea` do NOT share a props shape: Input renders up to three
@@ -72,7 +114,17 @@ export function LocaleFieldPair<TValues extends FieldValues>({
       */}
       <legend className="mb-1 text-fs-xs tracking-mid-kavan text-t-lo uppercase">
         {label}
-        {required && <span className="ms-1 text-danger">*</span>}
+        {/*
+          Decorative here, and deliberately so: this is the GROUP's marker, and both
+          controls inside carry their own from `ds/Label`, which pairs the glyph with a real
+          `(required)` for a screen reader. Announcing it a third time on the legend would
+          have every field read "required" twice.
+        */}
+        {isRequired && (
+          <span aria-hidden="true" className="ms-1 text-danger">
+            *
+          </span>
+        )}
       </legend>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -81,12 +133,13 @@ export function LocaleFieldPair<TValues extends FieldValues>({
             <FormTextarea<TValues>
               name={en}
               label={`${label} · English`}
-              required={required}
+              required={isRequired}
               rows={rows}
             />
             <FormTextarea<TValues>
               name={fa}
               label={`${label} · Persian`}
+              required={isRequired}
               rows={rows}
               dir="rtl"
               lang="fa"
@@ -95,10 +148,11 @@ export function LocaleFieldPair<TValues extends FieldValues>({
           </>
         ) : (
           <>
-            <FormInput<TValues> name={en} label={`${label} · English`} required={required} />
+            <FormInput<TValues> name={en} label={`${label} · English`} required={isRequired} />
             <FormInput<TValues>
               name={fa}
               label={`${label} · Persian`}
+              required={isRequired}
               dir="rtl"
               lang="fa"
               classNames={{ input: 'text-end' }}
