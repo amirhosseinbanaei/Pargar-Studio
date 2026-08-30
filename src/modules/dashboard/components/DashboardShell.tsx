@@ -43,9 +43,29 @@ export async function DashboardShell({ children }: DashboardShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-s-0 md:flex-row">
+      {/*
+        ─── THE RAIL STAYS IN VIEW ON DESKTOP (prompt 14) ────────────────────────────
+        A 76-row projects table is several viewports tall and the navigation used to scroll
+        away with it, so reaching another area meant scrolling back to the top first.
+
+        STICKY, NOT FIXED. `position: fixed` takes the element out of flow, which would
+        leave the content column sitting under it and need a matching inset — a second
+        number to keep in sync with `md:w-64` forever, and one that is wrong at every width
+        where the rail is not exactly that wide. Sticky keeps the element in flow, so the
+        content column's own width is still computed from it.
+
+        `md:h-screen` plus `md:overflow-y-auto` is the other half: without a height the
+        sticky box is only as tall as its content and `top-0` has nothing to pin, and
+        without its own scroller a navigation longer than the viewport would have entries
+        that cannot be reached at all.
+
+        BELOW `md` NOTHING STICKS. The rail is a horizontal band above the content there and
+        scrolls away with it, exactly as before — `sticky` is applied at the `md:` breakpoint
+        only, so the narrow layout is untouched.
+      */}
       <nav
         aria-label="Content areas"
-        className="flex shrink-0 flex-col gap-8 border-b border-rule bg-s-1 px-6 py-6 md:w-64 md:border-e md:border-b-0 md:px-5 md:py-8"
+        className="flex shrink-0 flex-col gap-8 border-b border-rule bg-s-1 px-6 py-6 md:sticky md:top-0 md:h-screen md:w-64 md:overflow-y-auto md:border-e md:border-b-0 md:px-5 md:py-8"
       >
         <Link
           href="/dashboard"
